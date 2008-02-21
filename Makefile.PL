@@ -51,13 +51,37 @@ $| = 1;
     }
 }
 
-{
-    # make sure that we have dualvar from the XS Version of Scalar::Util
-    if ( eval { require Scalar::Util } ) {
-	eval { Scalar::Util::dualvar( 0,'' ) };
-    	die "You need the XS Version of Scalar::Util for dualvar() support" 
-	    if $@
-    }
+# make sure that we have dualvar from the XS Version of Scalar::Util
+if ( eval { require Scalar::Util } ) {
+    eval { Scalar::Util::dualvar( 0,'' ) };
+    die "You need the XS Version of Scalar::Util for dualvar() support" 
+	if $@
+}
+
+# check if we have something which handles IDN
+if ( ! eval { require Net::IDN::Encode } and ! eval { require Net::LibIDN }) {
+    warn <<'EOM';
+
+WARNING
+No library for handling international domain names found.
+It will work but croak if you try to verify an international name against
+a certificate.
+It's recommended to install either Net::IDN::Encode or Net::LibIDN
+
+EOM
+}
+
+# check Version
+if ( eval { require Net::SSLeay } and $Net::SSLeay::VERSION <1.33 ) {
+    warn <<"EOM";
+
+WARNING
+You have version $Net::SSLeay::VERSION of Net::SSLeay.
+Support for subjectAltNames in certificates is only available in Version >=1.33
+so verifying a hostname against the certificate will not work.
+It is recommended to upgrade to a current Net::SSLeay.
+
+EOM
 }
 
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
