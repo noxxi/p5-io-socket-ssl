@@ -878,8 +878,10 @@ sub dump_peer_certificate {
 	if ( $Net::SSLeay::VERSION >= 1.30 ) {
 		# I think X509_NAME_get_text_by_NID got added in 1.30
 		$dispatcher{commonName} = sub { 
-			Net::SSLeay::X509_NAME_get_text_by_NID(
-				Net::SSLeay::X509_get_subject_name( shift ), NID_CommonName)
+			my $cn = Net::SSLeay::X509_NAME_get_text_by_NID(
+				Net::SSLeay::X509_get_subject_name( shift ), NID_CommonName);
+			$cn =~s{\0$}{}; # work around Bug in Net::SSLeay <1.33
+			$cn;
 		}
 	} else {
 		$dispatcher{commonName} = sub { 
@@ -934,7 +936,7 @@ sub dump_peer_certificate {
 		# rfc 2818
 		http => {
 			wildcards_in_cn	 => 0,
-			wildcards_in_alt => 'leftmost',
+			wildcards_in_alt => 'anywhere',
 			check_cn         => 'when_only',
 		},
 		# rfc 3207
@@ -1015,9 +1017,9 @@ sub dump_peer_certificate {
 			# deal with certificates like *.com, *.co.uk or even *
 			# see also http://nils.toedtmann.net/pub/subjectAltName.txt
 			if ( $wtyp eq 'anywhere' and $name =~m{^([^\*]*)\*(.+)} ) {
-				$pattern = qr{^\Q$1\E[\w\-]*\Q$2\E$}i
+				$pattern = qr{^\Q$1\E[\w\-]*\Q$2\E$}i;
 			} elsif ( $wtyp eq 'leftmost' and $name =~m{^\*(\..+)$} ) {
-				$pattern = qr{^[\w\-]*\Q$1\E$}i
+				$pattern = qr{^[\w\-]*\Q$1\E$}i;
 			} else {
 				$pattern = qr{^\Q$name}i;
 			}
@@ -1025,19 +1027,20 @@ sub dump_peer_certificate {
 		};
 
 		my $alt_dnsNames = 0;
-		foreach (@altNames) {
+		while (@altNames) {
 			my ($type, $name) = splice (@altNames, 0, 2);
-			$name =~s/\s+$//; $name =~s/^\s+//;
 			if ( $type == GEN_IPADD ) {
 				# exakt match needed for IP
+				# $name is already packed format (inet_xton)
 				return 1 if 
-					$ip6 ? $ip6 eq inet_pton($name) : 
-					$ip4 ? $ip4 eq inet_aton($name) :
+					$ip6 ? $ip6 eq $name : 
+					$ip4 ? $ip4 eq $name :
 					0;
 
 			} elsif ( $type == GEN_DNS ) {
+				$name =~s/\s+$//; $name =~s/^\s+//;
 				$alt_dnsNames++;
-				$check_name->($name,$identity,$scheme->{wildcards_in_altnames})
+				$check_name->($name,$identity,$scheme->{wildcards_in_alt})
 					and return 1;
 			}
 		}

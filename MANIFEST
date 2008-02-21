@@ -33,6 +33,7 @@ t/readline.t
 t/start-stopssl.t
 t/acceptSSL-timeout.t
 t/connectSSL-timeout.t
+t/verify_hostname.pl
 t/testlib.pl
 util/export_certs.pl
 META.yml
