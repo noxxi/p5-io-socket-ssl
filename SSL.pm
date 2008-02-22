@@ -51,7 +51,7 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 BEGIN {
 	# Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
 	@ISA = qw(IO::Socket::INET);
-	$VERSION = '1.13_1';
+	$VERSION = '1.13_2';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1016,7 +1016,7 @@ sub dump_peer_certificate {
 			# The RFCs are in this regard unspecific but we don't want to have to
 			# deal with certificates like *.com, *.co.uk or even *
 			# see also http://nils.toedtmann.net/pub/subjectAltName.txt
-			if ( $wtyp eq 'anywhere' and $name =~m{^([^\*]*)\*(.+)} ) {
+			if ( $wtyp eq 'anywhere' and $name =~m{^([\w\-]*)\*(.+)} ) {
 				$pattern = qr{^\Q$1\E[\w\-]*\Q$2\E$}i;
 			} elsif ( $wtyp eq 'leftmost' and $name =~m{^\*(\..+)$} ) {
 				$pattern = qr{^[\w\-]*\Q$1\E$}i;
@@ -1448,18 +1448,16 @@ IO::Socket::SSL -- Nearly transparent SSL encapsulation for IO::Socket::INET.
 
 =head1 SYNOPSIS
 
+	use strict;
 	use IO::Socket::SSL;
 
-	my $client = IO::Socket::SSL->new("www.example.com:https");
+	my $client = IO::Socket::SSL->new("www.example.com:https") 
+		|| warn "I encountered a problem: ".IO::Socket::SSL::errstr();
+	$client->verify_hostname( 'www.example.com','http' )
+		|| die "hostname verification failed";
 
-	if ($client) {
-		print $client "GET / HTTP/1.0\r\n\r\n";
-		print <$client>;
-		close $client;
-	} else {
-		warn "I encountered a problem: ",
-		  IO::Socket::SSL::errstr();
-	}
+	print $client "GET / HTTP/1.0\r\n\r\n";
+	print <$client>;
 
 
 =head1 DESCRIPTION
@@ -1715,12 +1713,98 @@ method directly returns the result of the dump_peer_certificate() method of Net:
 
 =item B<peer_certificate($field)>
 
-If a peer certificate exists, this function can retrieve values from it.  Right now, the
-only fields it can return are "authority" and "owner" (or "issuer" and "subject" if
-you want to use OpenSSL names), corresponding to the certificate authority that signed the
-peer certificate and the owner of the peer certificate.	 This function returns a string
-with all the information about the particular field in one parsable line.
-If no field is given it returns the full certificate (x509).
+If a peer certificate exists, this function can retrieve values from it. 
+If no field is given the internal representation of certificate from Net::SSLeay is
+returned.
+The following fields can be queried:
+
+=over 8
+
+=item authority (alias issuer)
+
+The certificate authority which signed the certificate.
+
+=item owner (alias subject)
+
+The owner of the certificate.
+
+=item commonName (alias cn) - only for Net::SSLeay version >=1.30
+
+The common name, usually the server name for SSL certificates.
+
+=item subjectAltNames - only for Net::SSLeay version >=1.33
+
+Alternative names for the subject, usually different names for the same
+server, like example.org, example.com, *.example.com.
+
+It returns a list of (typ,value) with typ GEN_DNS, GEN_IPADD etc (these
+constants are exported from IO::Socket::SSL). 
+See Net::SSLeay::X509_get_subjectAltNames.
+
+=back
+
+=item B<verify_hostname($hostname,$scheme)>
+
+This verifies the given hostname against the peer certificate using the
+given scheme. Hostname is usually what you specify within the PeerAddr.
+
+Verification of hostname against a certificate is different between various
+applications and RFCs. Some scheme allow wildcards for hostnames, some only
+in subjectAltNames, and even their different wildcard schemes are possible.
+
+To ease the verification the following schemes are predefined:
+
+=over 8
+
+=item ldap (rfc4513), pop3,imap,acap (rfc2995), nntp (rfc4642)
+
+Simple wildcards in subjectAltNames are possible, e.g. *.example.org matches
+www.example.org but not lala.www.example.org. If nothing from subjectAltNames
+match it checks against the common name, but there are no wildcards allowed.
+
+=item http (rfc2818), alias is www
+
+Extended wildcards in subjectAltNames are possible, e.g. *.example.org or
+even www*.example.org. Wildcards in the common name are not allowed. The common
+name will be only checked if no names are given in subjectAltNames.
+
+=item smtp (rfc3207)
+
+This RFC doesn't say much useful about the verification so it just assumes
+that subjectAltNames are possible, but no wildcards are possible anywhere.
+
+=back
+
+The scheme can be given either by specifying the name for one of the above predefined 
+schemes, by using a callback (see below) or by using a hash which can have the 
+following keys and values:
+
+=over 8
+
+=item check_cn:  0|'always'|'when_only'
+
+Determines if the common name gets checked. If 'always' it will always be checked 
+(like in ldap), if 'when_only' it will only be checked if no names are given in
+subjectAltNames (like in http), for any other values the common name will not be checked.
+
+=item wildcards_in_alt: 0|'leftmost'|'anywhere'
+
+Determines if and where wildcards in subjectAltNames are possible. If 'leftmost'
+only cases like *.example.org will be possible (like in ldap), for 'anywhere' 
+www*.example.org is possible too (like http), dangerous things like but www.*.org 
+or even '*' will not be allowed.
+
+=item wildcards_in_cn: 0|'leftmost'|'anywhere'
+
+Similar to wildcards_in_alt, but checks the common name. There is no predefined
+scheme which allows wildcards in common names.
+
+=back
+
+If you give a subroutine for verification it will be called with the arguments
+($hostname,$commonName,@subjectAltNames), where hostname is the name given for
+verification, commonName is the result from peer_certificate('cn') and
+subjectAltNames is the result from peer_certificate('subjectAltNames').
 
 =item B<errstr()>
 

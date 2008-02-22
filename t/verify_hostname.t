@@ -20,8 +20,14 @@ if ( $Net::SSLeay::VERSION < 1.33 ) {
 use vars qw( $SSL_SERVER_ADDR );
 do "t/ssl_settings.req" || do "ssl_settings.req";
 
+# if we have an IDN library max the IDN tests too
+my $can_idn  = eval { require Encode } &&
+	( eval { require Net::LibIDN } || eval { require Net::IDN::Encode } );
+
 $|=1;
-print "1..33\n";
+my $max = 37;
+$max+=3 if $can_idn;
+print "1..$max\n";
 
 my $server = IO::Socket::SSL->new(
 	LocalAddr => $SSL_SERVER_ADDR,
@@ -60,10 +66,11 @@ if ( $pid == 0 ) {
 		GEN_IPADD() => '127.0.0.1',
 		GEN_DNS() => 'www*.other.local',
 		GEN_DNS() => 'smtp.mydomain.local',
+		GEN_DNS() => 'xn--lwe-sna.idntest.local',
 	);
 	while (@want) {
 		my ($typ,$text) = splice(@want,0,2);
-		my $data = ($typ == GEN_IPADD) ? inet_aton($text):$text;
+		my $data = ($typ == GEN_IPADD() ) ? inet_aton($text):$text;
 		my ($th,$dh) = splice(@alt,0,2);
 		$th == $typ and $dh eq $data or print "not ";
 		ok( $text );
@@ -80,7 +87,14 @@ if ( $pid == 0 ) {
 		'www-13.other.local' => [qw(www)],
 		'www-13.lala.other.local' => [],
 		'smtp.mydomain.local' => [qw(smtp ldap www)],
+		'xn--lwe-sna.idntest.local' => [qw(smtp ldap www)],
 	);
+	if ( $can_idn ) {
+		# check IDN handling
+		my $loewe = "l\366we.idntest.local";
+		push @tests, ( $loewe => [qw(smtp ldap www)] );
+	}
+
 	while (@tests) {
 		my ($host,$expect) = splice(@tests,0,2);
 		my %expect = map { $_=>1 } @$expect;
