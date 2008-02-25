@@ -51,7 +51,7 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 BEGIN {
 	# Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
 	@ISA = qw(IO::Socket::INET);
-	$VERSION = '1.13_3';
+	$VERSION = '1.13_4';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -70,6 +70,7 @@ sub DEBUG {
 	$DEBUG or return;
 	my (undef,$file,$line) = caller;
 	my $msg = shift;
+	$file = '...'.substr( $file,-17 ) if length($file)>20;
 	$msg = sprintf $msg,@_ if @_;
 	print STDERR "DEBUG: $file:$line: $msg\n";
 }
@@ -166,15 +167,17 @@ sub configure_SSL {
 
 	my $is_server = $arg_hash->{'SSL_server'} || $arg_hash->{'Listen'} || 0;
 	my %default_args = (
-		'Proto'		 => 'tcp',
-		'SSL_server'	 => $is_server,
-		'SSL_ca_file'	 => 'certs/my-ca.pem',
-		'SSL_ca_path'	 => 'ca/',
-		'SSL_use_cert'	 => $is_server,
-		'SSL_check_crl'  => 0,
-		'SSL_version'	 => 'sslv23',
-		'SSL_verify_mode' => Net::SSLeay::VERIFY_NONE(),
-		'SSL_verify_callback' => 0,
+		Proto => 'tcp',
+		SSL_server => $is_server,
+		SSL_ca_file => 'certs/my-ca.pem',
+		SSL_ca_path => 'ca/',
+		SSL_use_cert => $is_server,
+		SSL_check_crl => 0,
+		SSL_version	=> 'sslv23',
+		SSL_verify_mode => Net::SSLeay::VERIFY_NONE(),
+		SSL_verify_callback => undef,
+		SSL_verifycn_scheme => undef,  # don't verify cn
+		SSL_verifycn_name => undef,    # use from PeerAddr/PeerHost
 	);
 	 
 	# SSL_key_file and SSL_cert_file will only be set in defaults if 
@@ -198,6 +201,33 @@ sub configure_SSL {
 	if ($arg_hash->{'SSL_ca_path'} ne '' and !(-f $arg_hash->{'SSL_ca_file'})) {
 		warn "CA file $arg_hash->{'SSL_ca_file'} not found, using CA path instead.\n" if ($DEBUG);
 		$arg_hash->{'SSL_ca_file'} = '';
+	}
+
+	my $vcn_scheme = delete $arg_hash->{SSL_verifycn_scheme};
+	if ( $vcn_scheme && $vcn_scheme ne 'none' ) {
+		my $vcb = $arg_hash->{SSL_verify_callback};
+		$arg_hash->{SSL_verify_callback} = sub {
+			my ($ok,$ctx_store,$cert,$error) = @_;
+			$ok = $vcb->($ok,$ctx_store,$cert,$error) if $vcb;
+			$ok or return;
+			my $depth = Net::SSLeay::X509_STORE_CTX_get_error_depth($ctx_store);
+			return $ok if $depth != 0;
+
+			# use SSL_peer_hostname or determine from PeerAddr
+			my $arg_hash = ${*$self}{_SSL_arguments};
+			my $host = $arg_hash->{SSL_verifycn_name};
+			if (not defined($host)) {
+				$host = ( $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} );
+				$host =~s{:\w+$}{} if ! $host;
+			}
+			$host ||= ref($vcn_scheme) && $vcn_scheme->{callback} && 'unknown';
+			$host or return $self->error( "Cannot determine peer hostname for verification" );
+
+			# verify name
+			DEBUG( "check $host with $vcn_scheme against $cert" );
+			my $x509 = Net::SSLeay::X509_STORE_CTX_get_current_cert($ctx_store);
+			return verify_hostname_of_cert( $host,$x509,$vcn_scheme );
+		};
 	}
 
 	${*$self}{'_SSL_arguments'} = $arg_hash;
@@ -973,12 +1003,14 @@ sub dump_peer_certificate {
 		my $cert = shift;
 		my $scheme = shift || 'none';
 		if ( ! ref($scheme) ) {
+			DEBUG( "scheme=$scheme cert=$cert" );
 			$scheme = $scheme{$scheme} or croak "scheme $scheme not defined";
 		}
 
 		# get data from certificate
 		my $commonName = $dispatcher{cn}->($cert);
 		my @altNames = $dispatcher{subjectAltNames}->($cert);
+		DEBUG( "identity=$identity cn=$commonName alt=@altNames" );
 
 		if ( my $sub = $scheme->{callback} ) {
 			# use custom callback
@@ -1129,6 +1161,14 @@ sub set_default_session_cache {
 	$GLOBAL_CONTEXT_ARGS->{SSL_session_cache} = shift;
 }
 
+sub set_ctx_defaults {
+	my %args = @_;
+	while ( my ($k,$v) = each %args ) {
+		$k =~s{^(SSL_)?}{SSL_};
+		$GLOBAL_CONTEXT_ARGS->{$k} = $v;
+	}
+}
+
 
 sub opened {
 	my $self = shift;
@@ -1253,7 +1293,7 @@ sub new {
 		SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER|SSL_MODE_ENABLE_PARTIAL_WRITE);
 
 
-	my ($verify_mode, $verify_cb) = @{$arg_hash}{'SSL_verify_mode','SSL_verify_callback'};
+	my $verify_mode = $arg_hash->{SSL_verify_mode};
 	unless ($verify_mode == Net::SSLeay::VERIFY_NONE()) {
 		Net::SSLeay::CTX_load_verify_locations(
 			$ctx, $arg_hash->{SSL_ca_file},$arg_hash->{SSL_ca_path}
@@ -1320,6 +1360,7 @@ sub new {
 		}
 	}
 
+	my $verify_cb = $arg_hash->{SSL_verify_callback};
 	my $verify_callback = $verify_cb && sub {
 		my ($ok, $ctx_store) = @_;
 		my ($cert, $error);
@@ -1330,6 +1371,7 @@ sub new {
 				Net::SSLeay::X509_NAME_oneline(Net::SSLeay::X509_get_subject_name($cert));
 			$error &&= Net::SSLeay::ERR_error_string($error);
 		}
+		DEBUG( "ok=$ok cert=$cert" );
 		return $verify_cb->($ok, $ctx_store, $cert, $error);
 	};
 
@@ -1585,6 +1627,7 @@ This option sets the verification mode for the peer certificate.  The default
 (0x00) does no authentication.	You may combine 0x01 (verify peer), 0x02 (fail
 verification if no peer certificate exists; ignored for clients), and 0x04
 (verify client once) to change the default.
+See OpenSSL man page for SSL_CTX_set_verify for more information.
 
 =item SSL_verify_callback
 
@@ -1596,6 +1639,22 @@ with this parameter to do so.  When the callback is called, it will be passed:
 4) a string containing any errors encountered (0 if no errors).
 The function should return 1 or 0, depending on whether it thinks the certificate
 is valid or invalid.  The default is to let OpenSSL do all of the busy work.
+
+=item SSL_verifycn_scheme
+
+Set the scheme used to automatically verify the hostname of the peer.
+See the information about the verification schemes in B<verify_hostname>.
+The default is undef, e.g. to not automatically verify the hostname.
+
+=item SSL_verifycn_name
+
+Set the name which is used in verification of hostname. If SSL_verifycn_scheme
+is set and no SSL_verifycn_name is given it will try to use the PeerHost and
+PeerAddr settings and fail if no name caan be determined.
+
+Using PeerHost or PeerAddr works only if you create the connection directly
+with C<< IO::Socket::SSL->new >>, if an IO::Socket::INET object is upgraded
+with B<start_SSL> the name has to be given in B<SSL_verifycn_name>.
 
 =item SSL_check_crl
 
@@ -1872,6 +1931,24 @@ get_session and add_session like IO::Socket::SSL::Session_Cache does).
 See the SSL_session_cache option of new() for more details.	 Note that this sets the default
 cache globally, so use with caution.
 
+=item B<IO::Socket::SSL::set_ctx_defaults(%args)>
+
+With this function one can set defaults for all SSL_* parameter used for creation of
+the context, like the SSL_verify* parameter.
+
+=over 8
+
+=item mode - set default SSL_verify_mode
+
+=item callback - set default SSL_verify_callback
+
+=item scheme - set default SSL_verifycn_scheme
+
+=item name - set default SSL_verifycn_name
+
+If not given and scheme is hash reference with key callback it will be set to 'unknown'
+
+=back
 
 =back
 
@@ -1972,7 +2049,7 @@ IO::Socket::SSL is not threadsafe.
 This is because IO::Socket::SSL is based on Net::SSLeay which 
 uses a global object to access some of the API of openssl
 and is therefore not threadsafe.
-It might probably work if you don't use SSL_verify_cb and
+It might probably work if you don't use SSL_verify_callback and
 SSL_password_cb.
 
 IO::Socket::SSL does not work together with Storable::fd_retrieve/fd_store.

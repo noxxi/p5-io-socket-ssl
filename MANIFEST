@@ -14,6 +14,7 @@ docs/debugging.txt
 example/ssl_client.pl
 example/ssl_server.pl
 example/async_https_server.pl
+example/lwp-with-verifycn.pl
 Makefile.PL
 MANIFEST
 patches/Net_SSLeay.patch
@@ -35,6 +36,7 @@ t/start-stopssl.t
 t/acceptSSL-timeout.t
 t/connectSSL-timeout.t
 t/verify_hostname.t
+t/auto_verify_hostname.t
 t/testlib.pl
 util/export_certs.pl
 META.yml
