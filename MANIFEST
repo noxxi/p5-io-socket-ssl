@@ -8,6 +8,7 @@ certs/server-key.enc
 certs/server-key.pem
 certs/test-ca.pem
 certs/server-rsa384-dh.pem
+certs/server-wildcard.pem
 Changes
 docs/debugging.txt
 example/ssl_client.pl

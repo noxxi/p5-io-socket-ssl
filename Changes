@@ -1,3 +1,11 @@
+v1.13_3
+	- added support for verification of hostname from certificate
+          including subjectAltNames, support for IDN etc based on patch and
+          input from christopher[AT]odenbachs[DOT]de and 
+          achim[AT]grolmsnet[DOT]de.
+          It is also possible to get more information frum peer_certificate
+          based on this patch. See documentation for peer_certificate and
+          verify_hostname
 v1.13
         - removed CLONE_SKIP which was added in 1.03 because this breaks
           windows forking. Handled threads/windows forking better by making
