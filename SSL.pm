@@ -51,7 +51,7 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 BEGIN {
 	# Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
 	@ISA = qw(IO::Socket::INET);
-	$VERSION = '1.13_4';
+	$VERSION = '1.13_5';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -112,10 +112,10 @@ sub import {
 
 	my @export;
 	foreach (@_) { 
-		if ( /^inet4i$/i ) {
+		if ( /^inet4$/i ) {
 			require IO::Socket::INET;
 			@ISA = 'IO::Socket::INET'
-		} elsif ( /înet6$/i ) {
+		} elsif ( /^inet6$/i ) {
 			require IO::Socket::INET6;
 			require Socket6;
 			Socket6->import( 'inet_pton' );

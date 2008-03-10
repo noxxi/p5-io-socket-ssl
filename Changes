@@ -1,4 +1,4 @@
-v1.13_4
+v1.13_5
 	- added support for verification of hostname from certificate
           including subjectAltNames, support for IDN etc based on patch and
           input from christopher[AT]odenbachs[DOT]de and 
@@ -10,6 +10,8 @@ v1.13_4
           SSL_verifycn_name
         - global setting of default context options like SSL_verifycn_scheme,
           SSL_verify_mode with set_ctx_defaults
+        - fix import of inet4,inet6 which got broken within 1.13_X.
+          Thanks to <at[AT]altlinux[DOT]ru> for bugreport and patch
 v1.13
         - removed CLONE_SKIP which was added in 1.03 because this breaks
           windows forking. Handled threads/windows forking better by making
