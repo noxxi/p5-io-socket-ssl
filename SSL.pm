@@ -51,7 +51,7 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 BEGIN {
 	# Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
 	@ISA = qw(IO::Socket::INET);
-	$VERSION = '1.13_5';
+	$VERSION = '1.14';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -67,7 +67,7 @@ BEGIN {
 }
 
 sub DEBUG {
-	$DEBUG or return;
+	$DEBUG>=shift or return; # check against debug level
 	my (undef,$file,$line) = caller;
 	my $msg = shift;
 	$file = '...'.substr( $file,-17 ) if length($file)>20;
@@ -199,7 +199,8 @@ sub configure_SSL {
 
 	#Handle CA paths properly if no CA file is specified
 	if ($arg_hash->{'SSL_ca_path'} ne '' and !(-f $arg_hash->{'SSL_ca_file'})) {
-		warn "CA file $arg_hash->{'SSL_ca_file'} not found, using CA path instead.\n" if ($DEBUG);
+		DEBUG(1, "CA file $arg_hash->{SSL_ca_file} not found, using CA path instead.\n" )
+			if $arg_hash->{SSL_ca_file};
 		$arg_hash->{'SSL_ca_file'} = '';
 	}
 
@@ -224,7 +225,7 @@ sub configure_SSL {
 			$host or return $self->error( "Cannot determine peer hostname for verification" );
 
 			# verify name
-			DEBUG( "check $host with $vcn_scheme against $cert" );
+			DEBUG(2, "check $host with $vcn_scheme against $cert" );
 			my $x509 = Net::SSLeay::X509_STORE_CTX_get_current_cert($ctx_store);
 			return verify_hostname_of_cert( $host,$x509,$vcn_scheme );
 		};
@@ -262,9 +263,9 @@ sub connect {
 		# if this fails this might not be an error (e.g. if $! = EINPROGRESS
 		# and socket is nonblocking this is normal), so keep any error
 		# handling to the client
-		#DEBUG( 'socket not yet connected' );
+		DEBUG(2, 'socket not yet connected' );
 		$self->SUPER::connect(@_) || return;
-		#DEBUG( 'socket connected' );
+		DEBUG(2,'socket connected' );
 	}
 	return $self->connect_SSL;
 }
@@ -277,7 +278,7 @@ sub connect_SSL {
 	my ($ssl,$ctx);
 	if ( ! ${*$self}{'_SSL_opening'} ) {
 		# start ssl connection
-		#DEBUG( 'ssl handshake not started' );
+		DEBUG(2,'ssl handshake not started' );
 		${*$self}{'_SSL_opening'} = 1;
 		my $arg_hash = ${*$self}{'_SSL_arguments'};
 
@@ -308,7 +309,7 @@ sub connect_SSL {
 		? $args->{Timeout} 
 		: ${*$self}{io_socket_timeout}; # from IO::Socket
 	if ( defined($timeout) && $timeout>0 && $self->blocking(0) ) {
-		#DEBUG( "set socket to non-blocking to enforce timeout=$timeout" );
+		DEBUG(2, "set socket to non-blocking to enforce timeout=$timeout" );
 		# timeout was given and socket was blocking
 		# enforce timeout with now non-blocking socket
 	} else {
@@ -320,17 +321,17 @@ sub connect_SSL {
 	for my $dummy (1) {
 		#DEBUG( 'calling ssleay::connect' );
 		my $rv = Net::SSLeay::connect($ssl);
-		#DEBUG( "connect -> rv=$rv" );
+		DEBUG( 3,"Net::SSLeay::connect -> $rv" );
 		if ( $rv < 0 ) {
 			unless ( $self->_set_rw_error( $ssl,$rv )) {
 				$self->error("SSL connect attempt failed with unknown error");
 				delete ${*$self}{'_SSL_opening'};
 				${*$self}{'_SSL_opened'} = 1;
-				#DEBUG( "fatal SSL error: $SSL_ERROR" );
+				DEBUG(1, "fatal SSL error: $SSL_ERROR" );
 				return $self->fatal_ssl_error();
 			}
 
-			#DEBUG( 'ssl handshake in progress' );
+			DEBUG(2,'ssl handshake in progress' );
 			# connect failed because handshake needs to be completed
 			# if socket was non-blocking or no timeout was given return with this error
 			return if ! defined($timeout);
@@ -340,17 +341,17 @@ sub connect_SSL {
 			if ( $timeout>0 ) {
 				my $vec = '';
 				vec($vec,$self->fileno,1) = 1;
-				#DEBUG( "waiting for fd to become ready: $SSL_ERROR" );
+				DEBUG(2, "waiting for fd to become ready: $SSL_ERROR" );
 				$rv = 
 					$SSL_ERROR == SSL_WANT_READ ? select( $vec,undef,undef,$timeout) :
 					$SSL_ERROR == SSL_WANT_WRITE ? select( undef,$vec,undef,$timeout) :
 					undef;
 			} else {
-				#DEBUG( "handshake failed because no more time" );
+				DEBUG(2,"handshake failed because no more time" );
 				$! = ETIMEDOUT
 			}
 			if ( ! $rv ) {
-				#DEBUG( "handshake failed because socket did not became ready" );
+				DEBUG(2,"handshake failed because socket did not became ready" );
 				# failed because of timeout, return
 				$! ||= ETIMEDOUT;
 				delete ${*$self}{'_SSL_opening'};
@@ -360,7 +361,7 @@ sub connect_SSL {
 			}
 
 			# socket is ready, try non-blocking connect again after recomputing timeout
-			#DEBUG( "socket ready, retrying connect" );
+			DEBUG(2,"socket ready, retrying connect" );
 			my $now = time();
 			$timeout -= $now - $start;
 			$start = $now;
@@ -368,14 +369,14 @@ sub connect_SSL {
 
 		} elsif ( $rv == 0 ) {
 			delete ${*$self}{'_SSL_opening'};
-			#DEBUG( "connection failed - connect returned 0" );
+			DEBUG(2,"connection failed - connect returned 0" );
 			$self->error("SSL connect attempt failed because of handshake problems" );
 			${*$self}{'_SSL_opened'} = 1;
 			return $self->fatal_ssl_error();
 		}
 	}
 
-	#DEBUG( 'ssl handshake done' );
+	DEBUG(2,'ssl handshake done' );
 	# ssl connect successful
 	delete ${*$self}{'_SSL_opening'};
 	${*$self}{'_SSL_opened'}=1;
@@ -417,13 +418,13 @@ sub accept {
 	my $socket = ${*$self}{'_SSL_opening'};
 	if ( ! $socket ) {
 		# underlying socket not done
-		#DEBUG( 'no socket yet' );
+		DEBUG(2,'no socket yet' );
 		$socket = $self->SUPER::accept($class) || return;
-		#DEBUG( 'accept created normal socket '.$socket );
+		DEBUG(2,'accept created normal socket '.$socket );
 	}
 
 	$self->accept_SSL($socket) || return;
-	#DEBUG( 'accept_SSL ok' );
+	DEBUG(2,'accept_SSL ok' );
 
 	return wantarray ? ($socket, getpeername($socket) ) : $socket;
 }
@@ -435,7 +436,7 @@ sub accept_SSL {
 
 	my $ssl;
 	if ( ! ${*$self}{'_SSL_opening'} ) {
-		#DEBUG( 'starting sslifying' );
+		DEBUG(2,'starting sslifying' );
 		${*$self}{'_SSL_opening'} = $socket;
 		my $arg_hash = ${*$self}{'_SSL_arguments'};
 		${*$socket}{'_SSL_arguments'} = { %$arg_hash, SSL_server => 0 };
@@ -459,7 +460,7 @@ sub accept_SSL {
 	$ssl ||= ${*$socket}{'_SSL_object'};
 
 	$SSL_ERROR = undef;
-	#DEBUG( 'calling ssleay::accept' );
+	#DEBUG(2,'calling ssleay::accept' );
 
 	my $timeout = exists $args->{Timeout} 
 		? $args->{Timeout} 
@@ -475,7 +476,7 @@ sub accept_SSL {
 	my $start = defined($timeout) && time();
 	for my $dummy (1) {
 		my $rv = Net::SSLeay::accept($ssl);
-		#DEBUG( 'called ssleay::accept rv='.$rv );
+		DEBUG(3, "Net::SSLeay::accept -> $rv" );
 		if ( $rv < 0 ) {
 			unless ( $socket->_set_rw_error( $ssl,$rv )) {
 				$socket->error("SSL accept attempt failed with unknown error");
@@ -523,7 +524,7 @@ sub accept_SSL {
 		}
 	}
 
-	#DEBUG( 'handshake done, socket ready' );
+	DEBUG(2,'handshake done, socket ready' );
 	# socket opened
 	delete ${*$self}{'_SSL_opening'};
 	${*$socket}{'_SSL_opened'} = 1;
@@ -864,7 +865,7 @@ sub start_SSL {
 	my $start_handshake = $arg_hash->{SSL_startHandshake};
 	if ( ! defined($start_handshake) || $start_handshake ) {
 		# if we have no callback force blocking mode
-		#DEBUG( "start handshake" );
+		DEBUG(2, "start handshake" );
 		my $blocking = $socket->blocking(1);
 		my $result = ${*$socket}{'_SSL_arguments'}{SSL_server}
 			? $socket->accept_SSL(%to)
@@ -872,7 +873,7 @@ sub start_SSL {
 		$socket->blocking(0) if !$blocking;
 		return $result ? $socket : (bless($socket, $original_class) && ());
 	} else {
-		#DEBUG( "dont start handshake: $socket" );
+		DEBUG(2, "dont start handshake: $socket" );
 		return $socket; # just return upgraded socket 
 	}
 
@@ -1003,14 +1004,14 @@ sub dump_peer_certificate {
 		my $cert = shift;
 		my $scheme = shift || 'none';
 		if ( ! ref($scheme) ) {
-			DEBUG( "scheme=$scheme cert=$cert" );
+			DEBUG(3, "scheme=$scheme cert=$cert" );
 			$scheme = $scheme{$scheme} or croak "scheme $scheme not defined";
 		}
 
 		# get data from certificate
 		my $commonName = $dispatcher{cn}->($cert);
 		my @altNames = $dispatcher{subjectAltNames}->($cert);
-		DEBUG( "identity=$identity cn=$commonName alt=@altNames" );
+		DEBUG(3,"identity=$identity cn=$commonName alt=@altNames" );
 
 		if ( my $sub = $scheme->{callback} ) {
 			# use custom callback
@@ -1127,7 +1128,7 @@ sub get_ssleay_error {
 sub error {
 	my ($self, $error, $destroy_socket) = @_;
 	$error .= Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error());
-	carp $error."\n".$self->get_ssleay_error() if $DEBUG;
+	DEBUG(2, $error."\n".$self->get_ssleay_error());
 	$SSL_ERROR = dualvar( -1, $error );
 	${*$self}{'_SSL_last_err'} = $SSL_ERROR if (ref($self));
 	return;
@@ -1260,7 +1261,7 @@ use constant SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER => 2;
 # it can be blessed.
 sub new {
 	my $class = shift;
-	DEBUG( "$class @_" );
+	#DEBUG( "$class @_" );
 	my $arg_hash = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
 
 	my $ctx_object = $arg_hash->{'SSL_reuse_ctx'};
@@ -1371,14 +1372,14 @@ sub new {
 				Net::SSLeay::X509_NAME_oneline(Net::SSLeay::X509_get_subject_name($cert));
 			$error &&= Net::SSLeay::ERR_error_string($error);
 		}
-		DEBUG( "ok=$ok cert=$cert" );
+		DEBUG(3, "ok=$ok cert=$cert" );
 		return $verify_cb->($ok, $ctx_store, $cert, $error);
 	};
 
 	Net::SSLeay::CTX_set_verify($ctx, $verify_mode, $verify_callback);
 
 	$ctx_object = { context => $ctx };
-	DEBUG( "new ctx $ctx" );
+	DEBUG(3, "new ctx $ctx" );
 	$CTX_CREATED_IN_THIS_THREAD{$ctx} = 1;
 
 	if ( my $cache = $arg_hash->{SSL_session_cache} ) {
@@ -1409,14 +1410,14 @@ sub has_session_cache {
 }
 
 
-sub CLONE { %CTX_CREATED_IN_THIS_THREAD = (); DEBUG( "clone!" ) }
+sub CLONE { %CTX_CREATED_IN_THIS_THREAD = (); }
 sub DESTROY {
 	my $self = shift;
 	if ( my $ctx = $self->{context} ) {
-		DEBUG( "free ctx $ctx open=".join( " ",keys %CTX_CREATED_IN_THIS_THREAD ));
+		DEBUG( 3,"free ctx $ctx open=".join( " ",keys %CTX_CREATED_IN_THIS_THREAD ));
 		if ( %CTX_CREATED_IN_THIS_THREAD and 
 			delete $CTX_CREATED_IN_THIS_THREAD{$ctx} ) {
-			DEBUG( "OK free ctx $ctx" );
+			DEBUG( 3,"OK free ctx $ctx" );
 			Net::SSLeay::CTX_free($ctx);
 		}
 	}
@@ -2009,35 +2010,30 @@ but it is planned for a future release.
 
 If you are having problems using IO::Socket::SSL despite the fact that can recite backwards
 the section of this documentation labelled 'Using SSL', you should try enabling debugging.	To
-specify the debug level, pass 'debug#' (where # is a number from 0 to 4) to IO::Socket::SSL
-when calling it:
+specify the debug level, pass 'debug#' (where # is a number from 0 to 3) to IO::Socket::SSL
+when calling it. 
+The debug level will also be propagated to Net::SSLeay::trace, see also L<Net::SSLeay>:
 
 =over 4
 
 =item use IO::Socket::SSL qw(debug0);
 
-#No debugging (default).
+No debugging (default).
 
 =item use IO::Socket::SSL qw(debug1);
 
-#Only print out errors.
+Print out errors from IO::Socket::SSL and ciphers from Net::SSLeay.
 
 =item use IO::Socket::SSL qw(debug2);
 
-#Print out errors and cipher negotiation.
+Print also information about call flow from IO::Socket::SSL and progress
+information from Net::SSLeay.
 
 =item use IO::Socket::SSL qw(debug3);
 
-#Print out progress, ciphers, and errors.
-
-=item use IO::Socket::SSL qw(debug4);
-
-#Print out everything, including data.
+Print also some data dumps from IO::Socket::SSL and from Net::SSLeay.
 
 =back
-
-You can also set $IO::Socket::SSL::DEBUG to 0-4, but that's a bit of a mouthful,
-isn't it?
 
 =head1 EXAMPLES
 
