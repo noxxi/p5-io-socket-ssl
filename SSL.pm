@@ -51,7 +51,7 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 BEGIN {
 	# Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
 	@ISA = qw(IO::Socket::INET);
-	$VERSION = '1.14';
+	$VERSION = '1.15';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -225,9 +225,12 @@ sub configure_SSL {
 			$host or return $self->error( "Cannot determine peer hostname for verification" );
 
 			# verify name
-			DEBUG(2, "check $host with $vcn_scheme against $cert" );
 			my $x509 = Net::SSLeay::X509_STORE_CTX_get_current_cert($ctx_store);
-			return verify_hostname_of_cert( $host,$x509,$vcn_scheme );
+			my $rv = verify_hostname_of_cert( $host,$x509,$vcn_scheme );
+			# just do some code here against optimization because x509 has no
+			# increased reference and CRYPTO_add is not available from Net::SSLeay
+			DEBUG(99999,"don't to anything with $x509" );
+			return $rv;
 		};
 	}
 
@@ -326,7 +329,7 @@ sub connect_SSL {
 			unless ( $self->_set_rw_error( $ssl,$rv )) {
 				$self->error("SSL connect attempt failed with unknown error");
 				delete ${*$self}{'_SSL_opening'};
-				${*$self}{'_SSL_opened'} = 1;
+				${*$self}{'_SSL_opened'} = -1;
 				DEBUG(1, "fatal SSL error: $SSL_ERROR" );
 				return $self->fatal_ssl_error();
 			}
@@ -355,7 +358,7 @@ sub connect_SSL {
 				# failed because of timeout, return
 				$! ||= ETIMEDOUT;
 				delete ${*$self}{'_SSL_opening'};
-				${*$self}{'_SSL_opened'} = 1;
+				${*$self}{'_SSL_opened'} = -1;
 				$self->blocking(1); # was blocking before
 				return 
 			}
@@ -371,7 +374,7 @@ sub connect_SSL {
 			delete ${*$self}{'_SSL_opening'};
 			DEBUG(2,"connection failed - connect returned 0" );
 			$self->error("SSL connect attempt failed because of handshake problems" );
-			${*$self}{'_SSL_opened'} = 1;
+			${*$self}{'_SSL_opened'} = -1;
 			return $self->fatal_ssl_error();
 		}
 	}
@@ -481,7 +484,7 @@ sub accept_SSL {
 			unless ( $socket->_set_rw_error( $ssl,$rv )) {
 				$socket->error("SSL accept attempt failed with unknown error");
 				delete ${*$self}{'_SSL_opening'};
-				${*$socket}{'_SSL_opened'} = 1;
+				${*$socket}{'_SSL_opened'} = -1;
 				return $socket->fatal_ssl_error();
 			}
 
@@ -505,7 +508,7 @@ sub accept_SSL {
 				# failed because of timeout, return
 				$! ||= ETIMEDOUT;
 				delete ${*$self}{'_SSL_opening'};
-				${*$socket}{'_SSL_opened'} = 1;
+				${*$socket}{'_SSL_opened'} = -1;
 				$socket->blocking(1); # was blocking before
 				return 
 			}
@@ -519,7 +522,7 @@ sub accept_SSL {
 		} elsif ( $rv == 0 ) {
 			$socket->error("SSL connect accept failed because of handshake problems" );
 			delete ${*$self}{'_SSL_opening'};
-			${*$socket}{'_SSL_opened'} = 1;
+			${*$socket}{'_SSL_opened'} = -1;
 			return $socket->fatal_ssl_error();
 		}
 	}
@@ -740,7 +743,8 @@ sub close {
 sub stop_SSL {
 	my $self = shift || return _invalid_object();
 	my $stop_args = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
-	return $self->error("SSL object already closed") unless (${*$self}{'_SSL_opened'});
+	return $self->error("SSL object already closed") 
+		unless (${*$self}{'_SSL_opened'} == 1);
 
 	if (my $ssl = ${*$self}{'_SSL_object'}) {
 		my $shutdown_done;
@@ -814,7 +818,7 @@ sub stop_SSL {
 sub kill_socket {
 	my $self = shift;
 	shutdown($self, 2);
-	$self->close(SSL_no_shutdown => 1) if (${*$self}{'_SSL_opened'});
+	$self->close(SSL_no_shutdown => 1) if (${*$self}{'_SSL_opened'} == 1);
 	delete(${*$self}{'_SSL_ctx'});
 	return;
 }
@@ -1137,7 +1141,8 @@ sub error {
 
 sub DESTROY {
 	my $self = shift || return;
-	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1) if (${*$self}{'_SSL_opened'});
+	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1) 
+		if (${*$self}{'_SSL_opened'} == 1);
 	delete(${*$self}{'_SSL_ctx'});
 }
 
@@ -1173,7 +1178,7 @@ sub set_ctx_defaults {
 
 sub opened {
 	my $self = shift;
-	return IO::Handle::opened($self) && ${*$self}{'_SSL_opened'};
+	return IO::Handle::opened($self) && ( ${*$self}{'_SSL_opened'} == 1 );
 }
 
 sub opening {

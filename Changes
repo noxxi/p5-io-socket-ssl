@@ -1,3 +1,7 @@
+v1.15
+	- change internal behavior when SSL handshake failed (like when verify
+          callback returned an error) in the hope to fix spurios errors in 
+          t/auto_verify_hostname.t
 v1.14
 	- added support for verification of hostname from certificate
           including subjectAltNames, support for IDN etc based on patch and
