@@ -51,7 +51,7 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 BEGIN {
 	# Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
 	@ISA = qw(IO::Socket::INET);
-	$VERSION = '1.15';
+	$VERSION = '1.15_01';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1308,7 +1308,7 @@ sub new {
 
 	if ($arg_hash->{'SSL_check_crl'}) {
 		if (Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x0090702f) {
-			Net::SSLeay::X509_STORE_CTX_set_flags(
+			Net::SSLeay::X509_STORE_set_flags(
 				Net::SSLeay::CTX_get_cert_store($ctx),
 				Net::SSLeay::X509_V_FLAG_CRL_CHECK()
 			);
