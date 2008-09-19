@@ -1,6 +1,10 @@
+v1.16
 	- change code for SSL_check_crl to use X509_STORE_set_flags instead of
           X509_STORE_CTX_set_flags based on bug report from 
           <tjtoocool[AT]phreaker[DOT]net >
+        - change opened() to report -1 if the IO::Handle is open, but the
+          SSL connection failed, needed with HTTP::Daemon::SSL which will send
+          an error mssage over the unencrypted socket
 v1.15
 	- change internal behavior when SSL handshake failed (like when verify
           callback returned an error) in the hope to fix spurios errors in 

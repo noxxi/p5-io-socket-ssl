@@ -51,7 +51,7 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 BEGIN {
 	# Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
 	@ISA = qw(IO::Socket::INET);
-	$VERSION = '1.15_01';
+	$VERSION = '1.16';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1178,7 +1178,7 @@ sub set_ctx_defaults {
 
 sub opened {
 	my $self = shift;
-	return IO::Handle::opened($self) && ( ${*$self}{'_SSL_opened'} == 1 );
+	return IO::Handle::opened($self) && ${*$self}{'_SSL_opened'};
 }
 
 sub opening {
@@ -1881,6 +1881,12 @@ C<SSL wants a read first!> or C<SSL wants a write first!> meaning that the other
 is expecting to read from or write to the socket and wants to be satisfied before you
 get to do anything. But with version 0.98 you are better comparing the global exported 
 variable $SSL_ERROR against the exported symbols SSL_WANT_READ and SSL_WANT_WRITE.
+
+=item B<opened()>
+
+This returns false if the socket could not be opened, 1 if the socket could be opened
+and the SSL handshake was successful done and -1 if the underlying IO::Handle is open,
+but the SSL handshake failed.
 
 =item B<< IO::Socket::SSL->start_SSL($socket, ... ) >>
 
