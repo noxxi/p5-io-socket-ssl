@@ -37,6 +37,7 @@ t/acceptSSL-timeout.t
 t/connectSSL-timeout.t
 t/verify_hostname.t
 t/auto_verify_hostname.t
+t/inet6.t
 t/testlib.pl
 util/export_certs.pl
 META.yml

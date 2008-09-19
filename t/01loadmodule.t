@@ -7,7 +7,10 @@ BEGIN { $| = 1; print "1..4\n"; }
 END {print "Load failed ... not ok 1\n" unless $loaded;}
 
 use Carp;
-BEGIN { $foo = 0; $SIG{__DIE__} = sub { $foo++ if !$^S } unless ($] < 5.006); }
+BEGIN { 
+	$foo = 0; 
+	$SIG{__DIE__} = sub { $foo++ if defined $^S && !$^S } if $] > 5.006; 
+}
 use IO::Socket::SSL qw(:debug1);
 $loaded = 1;
 $test=1;

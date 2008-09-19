@@ -48,10 +48,25 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 	@EXPORT = qw( SSL_WANT_READ SSL_WANT_WRITE $SSL_ERROR GEN_DNS GEN_IPADD );
 }
 
+my @caller_force_inet4; # in case inet4 gets forced we store here who forced it
+my $can_ipv6;           # true if we successfully enabled ipv6 while loading
+
 BEGIN {
 	# Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
-	@ISA = qw(IO::Socket::INET);
-	$VERSION = '1.16';
+	
+	# if we have IO::Socket::INET6 we will use this not IO::Socket::INET, because
+	# it can handle both IPv4 and IPv6. If we don't have INET6 available fall back
+	# to INET
+	if ( ! eval {
+		require Socket6;
+		Socket6->import( 'inet_pton' );
+		require IO::Socket::INET6;
+		@ISA = qw(IO::Socket::INET6);
+		$can_ipv6 = 1;
+	}) {
+		@ISA = qw(IO::Socket::INET);
+	}
+	$VERSION = '1.16_1';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -113,13 +128,22 @@ sub import {
 	my @export;
 	foreach (@_) { 
 		if ( /^inet4$/i ) {
-			require IO::Socket::INET;
-			@ISA = 'IO::Socket::INET'
+			# explicitly fall back to inet4
+			@ISA = 'IO::Socket::INET';
+			@caller_force_inet4 = caller(); # save for warnings for 'inet6' case
 		} elsif ( /^inet6$/i ) {
-			require IO::Socket::INET6;
-			require Socket6;
-			Socket6->import( 'inet_pton' );
-			@ISA = 'IO::Socket::INET6'
+			# check if we have already ipv6 as base
+			if ( ! UNIVERSAL::isa( $class, 'IO::Socket::INET6' )) {
+				# either we don't support it or we disabled it by explicitly
+				# loading it with 'inet4'. In this case re-enable but warn
+				# because this is probably an error
+				if ( $can_ipv6 ) {
+					@ISA = 'IO::Socket::INET6';
+					warn "IPv6 support re-enabled in __PACKAGE__, got disabled in file $caller_force_inet4[1] line $caller_force_inet4[2]";
+				} else {
+					die "INET6 is not supported, missing Socket6 or IO::Socket::INET6";
+				}
+			}
 		} elsif ( /^:?debug(\d+)/ ) {
 			$DEBUG=$1;
 		} else {
@@ -890,11 +914,11 @@ sub new_from_fd {
 		(my $mode = $_[0]) =~ tr/+<>//d;
 		shift unless length($mode);
 	}
-	my $handle = IO::Socket::INET->new_from_fd($fd, '+<')
+	my $handle = $ISA[0]->new_from_fd($fd, '+<')
 		|| return($class->error("Could not create socket from file descriptor."));
 
 	# Annoying workaround for Perl 5.6.1 and below:
-	$handle = IO::Socket::INET->new_from_fd($handle, '+<');
+	$handle = $ISA[0]->new_from_fd($handle, '+<');
 
 	return $class->start_SSL($handle, @_);
 }
@@ -1990,6 +2014,19 @@ and read/sysread families instead.
 
 =back
 
+=head1 IPv6
+
+Support for IPv6 with IO::Socket::SSL is expected to work and basic testing is done.
+If IO::Socket::INET6 is available it will automatically use it instead of 
+IO::Socket::INET4. 
+
+Please be aware of the associated problems: If you give a name as a host and the
+host resolves to both IPv6 and IPv4 it will try IPv6 first and if there is no IPv6
+connectivity it will fail. 
+
+To avoid these problems you can either force IPv4 by specifying and AF_INET as the
+Domain (this is per socket) or load IO::Socket::SSL with the option 'inet4'
+(This is a global setting, e.g. affects all IO::Socket::SSL objects in the program).
 
 =head1 RETURN VALUES
 
@@ -2000,21 +2037,6 @@ false in all contexts, but those who have been using the return values as argume
 to subroutines (like C<mysub(IO::Socket::SSL(...)->new, ...)>) may run into problems.
 The moral of the story: I<always> check the return values of these functions before
 using them in any way that you consider meaningful.
-
-
-=head1 IPv6
-
-Support for IPv6 with IO::Socket::SSL is expected to work, but is experimental, as
-none of the author's machines use IPv6 and hence he cannot test IO::Socket::SSL with
-them.  However, a few brave people have used it without incident, so if you wish to
-make IO::Socket::SSL IPv6 aware, pass the 'inet6' option to IO::Socket::SSL when
-calling it (i.e. C<use IO::Socket::SSL qw(inet6);>).  You will need IO::Socket::INET6
-and Socket6 to use this option, and you will also need to write C<use Socket6;> before
-using IO::Socket::SSL.	If you absolutely do not want to use this (or want a quick
-change back to IPv4), pass the 'inet4' option instead.
-
-Currently, there is no support for using IPv4 and IPv6 simultaneously in a single program, 
-but it is planned for a future release.
 
 
 =head1 DEBUGGING
