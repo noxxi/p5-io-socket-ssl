@@ -1,4 +1,6 @@
 
+- remove tests of recv/send from t/core.t. Might badly interact
+  with SSL handshake and cause crashes
 v.16_1   2008.09.19
 - better support for IPv6:
   - IPv6 is enabled by default if IO::Socket::INET6 is available
