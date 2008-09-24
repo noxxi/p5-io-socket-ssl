@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.16_1';
+	$VERSION = '1.16_2';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -165,6 +165,21 @@ sub configure {
 	my ($self, $arg_hash) = @_;
 	return _invalid_object() unless($self);
 
+	# work around Bug in IO::Socket::INET6 where it doesn't use the
+	# right family for the socket on BSD systems:
+	# http://rt.cpan.org/Ticket/Display.html?id=39550
+	if ( $can_ipv6 && ! $arg_hash->{Domain} && 
+		! ( $arg_hash->{LocalAddr} || $arg_hash->{LocalHost} ) &&
+		(my $peer = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost})) {
+		# set Domain to AF_INET/AF_INET6 if there is only one choice
+		($peer, my $port) = IO::Socket::INET6::_sock_info( $peer,$arg_hash->{PeerPort},6 );
+		my @res = Socket6::getaddrinfo( $peer,$port,AF_UNSPEC,SOCK_STREAM );
+		if (@res == 5) {
+			$arg_hash->{Domain} = $res[0];
+			DEBUG(2,'set domain to '.$res[0] );
+		}
+	}
+
 	# force initial blocking 
 	# otherwise IO::Socket::SSL->new might return undef if the
 	# socket is nonblocking and it fails to connect immediatly
@@ -174,6 +189,7 @@ sub configure {
 
 	# because Net::HTTPS simple redefines blocking() to {} (e.g
 	# return undef) and IO::Socket::INET does not like this we
+		
 	# set Blocking only explicitly if it was set
 	$arg_hash->{Blocking} = 1 if defined ($blocking);
 
