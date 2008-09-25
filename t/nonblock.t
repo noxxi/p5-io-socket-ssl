@@ -102,6 +102,12 @@ if ( $pid == 0 ) {
 	}
 	ok( "client tcp connect" );
 
+	# work around (older?) systems where IO::Socket::INET
+	# cannot do non-blocking connect by forcing non-blocking
+	# again (we want to test non-blocking behavior of IO::Socket::SSL,
+        # not IO::Socket::INET)
+	$to_server->blocking(0);
+
 	# send some plain text on non-ssl socket
 	syswrite( $to_server,'plaintext' ) || print "not ";
 	ok( "write plain text" );

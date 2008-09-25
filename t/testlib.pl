@@ -23,7 +23,7 @@ if ( ! defined &ok ) {
 		my ($bool,$desc) = @_;
 		print $bool ? "ok ":"not ok ", '# ',$desc || '',"\n";
 	};
-	*{'diag'} = sub { print STDERR "@_\n"; };
+	*{'diag'} = sub { print "# @_\n"; };
 	*{'like'} = sub {
 		my ( $data,$rx,$desc ) = @_;
 		ok( $data =~ $rx ? 1:0, $desc );
