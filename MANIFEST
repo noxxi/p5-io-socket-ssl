@@ -19,6 +19,7 @@ Makefile.PL
 MANIFEST
 patches/Net_SSLeay.patch
 README
+README.Win32
 SSL.pm
 t/01loadmodule.t
 t/02settings.t

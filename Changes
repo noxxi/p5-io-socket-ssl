@@ -1,4 +1,9 @@
 
+v.17 2008.10.13
+- no code changes, publish v.16_3 as v.17 because it looks better 
+  than v.16
+- document win32 behavior regarding non-blocking and timeouts
+
 v.16_3   2008.09.25
 - fix t/nonblock.t with workaround for problems with 
   IO::Socket::INET on some systems (Mac,5.6.2) where it cannot do 

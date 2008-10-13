@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.16_3';
+	$VERSION = '1.17';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -2099,6 +2099,10 @@ SSL_password_cb.
 
 IO::Socket::SSL does not work together with Storable::fd_retrieve/fd_store.
 See BUGS file for more information and how to work around the problem.
+
+Non-blocking and timeouts (which are based on non-blocking) are not
+supported on Win32, because the underlying IO::Socket::INET does not support
+non-blocking on this platform.
 
 =head1 LIMITATIONS
 
