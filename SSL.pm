@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.17';
+	$VERSION = '1.18';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1124,7 +1124,7 @@ sub dump_peer_certificate {
 
 		if ( $scheme->{check_cn} eq 'always' or 
 			$scheme->{check_cn} eq 'when_only' and !$alt_dnsNames) {
-			$check_name->($commonName,$identity,$scheme->{wildcars_in_cn})
+			$check_name->($commonName,$identity,$scheme->{wildcards_in_cn})
 				and return 1;
 		}
 

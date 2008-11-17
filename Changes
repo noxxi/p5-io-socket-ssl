@@ -1,17 +1,22 @@
 
-v.17 2008.10.13
+v1.18 2008.11.17
+- fixed typo in argument: wildcars_in_cn -> wildcards_in_cn
+  http://rt.cpan.org/Ticket/Display.html?id=40997
+  thanks to ludwig[DOT]nussel[AT]suse[DOT]de for reporting
+
+v1.17 2008.10.13
 - no code changes, publish v.16_3 as v.17 because it looks better 
   than v.16
 - document win32 behavior regarding non-blocking and timeouts
 
-v.16_3   2008.09.25
+v1.16_3   2008.09.25
 - fix t/nonblock.t with workaround for problems with 
   IO::Socket::INET on some systems (Mac,5.6.2) where it cannot do 
   nonblocking connect and leaves socket blocked.
 - make some tests less verbose by fixing diag in t/testlib.t 
   (send output to STDOUT not STDERR and prefix with '#')
 
-v.16_2   2008.09.24
+v1.16_2   2008.09.24
 - work around Bug in IO::Socket::INET6 on BSD systems
   http://rt.cpan.org/Ticket/Display.html?id=39550
   by setting Domain based on PeerAddr
@@ -19,7 +24,7 @@ v.16_2   2008.09.24
 - remove tests of recv/send from t/core.t. Might badly interact
   with SSL handshake and cause crashes as seen on OS X 10.4
 
-v.16_1   2008.09.19
+v1.16_1   2008.09.19
 - better support for IPv6:
   - IPv6 is enabled by default if IO::Socket::INET6 is available
   - t/inet6.t for basic tests
