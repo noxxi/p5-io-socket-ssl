@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.18';
+	$VERSION = '1.19';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -258,8 +258,9 @@ sub configure_SSL {
 			my $arg_hash = ${*$self}{_SSL_arguments};
 			my $host = $arg_hash->{SSL_verifycn_name};
 			if (not defined($host)) {
-				$host = ( $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} );
-				$host =~s{:\w+$}{} if ! $host;
+				if ( $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} ) {
+					$host =~s{:\w+$}{};
+				}
 			}
 			$host ||= ref($vcn_scheme) && $vcn_scheme->{callback} && 'unknown';
 			$host or return $self->error( "Cannot determine peer hostname for verification" );

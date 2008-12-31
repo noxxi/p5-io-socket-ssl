@@ -1,4 +1,7 @@
 
+v1.19 2008.12.31
+- fix verfycn_name autodetection from PeerAddr/PeerHost
+
 v1.18 2008.11.17
 - fixed typo in argument: wildcars_in_cn -> wildcards_in_cn
   http://rt.cpan.org/Ticket/Display.html?id=40997
