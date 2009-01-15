@@ -1,4 +1,8 @@
 
+v1.20 2009.01.15
+- only changes on test suite to make it ready for win32
+  (tested with strawberry perl 5.8.8)
+
 v1.19 2008.12.31
 - fix verfycn_name autodetection from PeerAddr/PeerHost
 

@@ -69,11 +69,8 @@ sub fork_sub {
 	if ( ! $pid ) {
 		# CHILD, exec sub
 		close($rh);
-		open( STDOUT,'>&'.fileno($wh) ) || die $!;
-		close( $wh );
-		open( STDERR,'>&STDOUT' ) || die $!;
-		STDOUT->autoflush;
-		STDERR->autoflush;
+		local *STDOUT = local *STDERR = $wh;
+		$wh->autoflush;
 		print "OK\n";
 		$sub->(@arg);
 		exit(0);
@@ -117,7 +114,7 @@ sub fd_grep {
 		foreach my $fd (@fd) {
 			my $buf = \$fd2buf{$fd};
 			$$buf || next;
-			if ( $$buf =~s{\A(?:.*?)($pattern)(.*)}{$2}s ) {
+			if ( $$buf =~s{\A(?:.*?)($pattern)}{}s ) {
 				#diag( "found" );
 				return wantarray ? ( $1,$name ) : $1;
 			}

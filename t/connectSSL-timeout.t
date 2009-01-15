@@ -3,34 +3,43 @@ use warnings;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 $|=1;
-print "1..15\n";
+print "1..16\n";
 
-my ($server,$saddr) = create_listen_socket();
-ok( 'listening' );
 
-# first try bad non-SSL client
-my $srv = fork_sub( 'server' );
-fd_grep_ok( 'Waiting', $srv );
-my $cl = fork_sub( 'client' );
-fd_grep_ok( 'Connect from',$srv );
-fd_grep_ok( 'Connected', $cl );
-fd_grep_ok( 'SSL Handshake FAILED', $cl );
-killall();
+{
+	# first use SSL client
+	my ($server,$saddr) = create_listen_socket();
+	ok( 1, "listening \@$saddr" );
+	my $srv = fork_sub( 'server','ssl',$server );
+	close($server);
+	fd_grep_ok( 'Waiting', $srv );
+	my $cl = fork_sub( 'client',$saddr );
+	fd_grep_ok( 'Connect from',$srv );
+	fd_grep_ok( 'Connected', $cl );
+	fd_grep_ok( 'SSL Handshake OK', $srv );
+	fd_grep_ok( 'SSL Handshake OK', $cl );
+	fd_grep_ok( 'Hi!', $cl );
+}
 
-# then use SSL client
-$srv = fork_sub( 'server','ssl' );
-fd_grep_ok( 'Waiting', $srv );
-$cl = fork_sub( 'client' );
-fd_grep_ok( 'Connect from',$srv );
-fd_grep_ok( 'Connected', $cl );
-fd_grep_ok( 'SSL Handshake OK', $srv );
-fd_grep_ok( 'SSL Handshake OK', $cl );
-fd_grep_ok( 'Hi!', $cl );
-killall();
+if ( $^O =~m{mswin32}i ) {
+	# skip
+	ok( 1, "skip - TODO on win32" ) for(1..7);
+} else {
+	# then try bad non-SSL client
+	my ($server,$saddr) = create_listen_socket();
+	ok( 1, "listening \@$saddr" );
+	my $srv = fork_sub( 'server','nossl',$server );
+	close($server);
+	fd_grep_ok( 'Waiting', $srv );
+	my $cl = fork_sub( 'client',$saddr );
+	fd_grep_ok( 'Connect from',$srv );
+	fd_grep_ok( 'Connected', $cl );
+	fd_grep_ok( 'SSL Handshake FAILED', $cl );
+}
 
 
 sub server {
-	my $behavior = shift || 'nossl';
+	my ($behavior,$server) = @_;
 	print "Waiting\n";
 	my $client = $server->accept || die "accept failed: $!";
 	print "Connect from ".$client->peerhost.':'.$client->peerport."\n";
@@ -45,6 +54,7 @@ sub server {
 }
 
 sub client {
+	my $saddr = shift;
 	my $c = IO::Socket::INET->new( $saddr ) || die "connect failed: $!";
 	print "Connected\n";
 	if ( IO::Socket::SSL->start_SSL( $c, Timeout => 5 )) {

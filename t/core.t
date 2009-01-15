@@ -11,6 +11,7 @@ eval {require "t/ssl_settings.req";} ||
 eval {require "ssl_settings.req";};
 
 $GUARANTEED_TO_HAVE_NONBLOCKING_SOCKETS = eval "use 5.006; use IO::Select; return 1";
+$GUARANTEED_TO_HAVE_NONBLOCKING_SOCKETS = 0 if $^O =~m{mswin32}i;
 $NET_SSLEAY_VERSION = $Net::SSLeay::VERSION;
 $OPENSSL_VERSION = 0;
 $OPENSSL_VERSION = &Net::SSLeay::OPENSSL_VERSION_NUMBER if ($NET_SSLEAY_VERSION>=1.19);

@@ -22,6 +22,11 @@ if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
     exit
 }
 
+if ( $^O =~m{mswin32}i ) {
+	print "1..0 # Skipped: nonblocking does not work on Win32\n";
+	exit
+}
+
 $SIG{PIPE} = 'IGNORE'; # use EPIPE not signal handler
 
 $|=1;
