@@ -4,5 +4,3 @@ means also, that timeouts don't work (because they are based on
 non-blocking).
 See also http://www.perlmonks.org/?node_id=378675
 
-Because fork() on Win32 is just an incomplete implementation using threads
-the tests might block, e.g. the test suite will not succeed.
