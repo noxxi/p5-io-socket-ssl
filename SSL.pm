@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.20';
+	$VERSION = '1.21';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -246,31 +246,31 @@ sub configure_SSL {
 
 	my $vcn_scheme = delete $arg_hash->{SSL_verifycn_scheme};
 	if ( $vcn_scheme && $vcn_scheme ne 'none' ) {
+		# don't access ${*self} inside callback - this seems to create
+		# circular references from the ssl object to the context and back
+
+		# use SSL_verifycn_name or determine from PeerAddr
+		my $host = $arg_hash->{SSL_verifycn_name};
+		if (not defined($host)) {
+			if ( $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} ) {
+				$host =~s{:\w+$}{};
+			}
+		}
+		$host ||= ref($vcn_scheme) && $vcn_scheme->{callback} && 'unknown';
+		$host or return $self->error( "Cannot determine peer hostname for verification" );
+
 		my $vcb = $arg_hash->{SSL_verify_callback};
 		$arg_hash->{SSL_verify_callback} = sub {
-			my ($ok,$ctx_store,$cert,$error) = @_;
-			$ok = $vcb->($ok,$ctx_store,$cert,$error) if $vcb;
+			my ($ok,$ctx_store,$certname,$error,$cert) = @_;
+			$ok = $vcb->($ok,$ctx_store,$certname,$error,$cert) if $vcb;
 			$ok or return;
 			my $depth = Net::SSLeay::X509_STORE_CTX_get_error_depth($ctx_store);
 			return $ok if $depth != 0;
 
-			# use SSL_peer_hostname or determine from PeerAddr
-			my $arg_hash = ${*$self}{_SSL_arguments};
-			my $host = $arg_hash->{SSL_verifycn_name};
-			if (not defined($host)) {
-				if ( $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} ) {
-					$host =~s{:\w+$}{};
-				}
-			}
-			$host ||= ref($vcn_scheme) && $vcn_scheme->{callback} && 'unknown';
-			$host or return $self->error( "Cannot determine peer hostname for verification" );
-
 			# verify name
-			my $x509 = Net::SSLeay::X509_STORE_CTX_get_current_cert($ctx_store);
-			my $rv = verify_hostname_of_cert( $host,$x509,$vcn_scheme );
+			my $rv = verify_hostname_of_cert( $host,$cert,$vcn_scheme );
 			# just do some code here against optimization because x509 has no
 			# increased reference and CRYPTO_add is not available from Net::SSLeay
-			DEBUG(99999,"don't to anything with $x509" );
 			return $rv;
 		};
 	}
@@ -948,8 +948,8 @@ sub dump_peer_certificate {
 
 {
 	my %dispatcher = (
-		issuer =>	  sub { Net::SSLeay::X509_NAME_oneline( Net::SSLeay::X509_get_issuer_name( shift )) },
-		subject =>	  sub { Net::SSLeay::X509_NAME_oneline( Net::SSLeay::X509_get_subject_name( shift )) },
+		issuer =>  sub { Net::SSLeay::X509_NAME_oneline( Net::SSLeay::X509_get_issuer_name( shift )) },
+		subject => sub { Net::SSLeay::X509_NAME_oneline( Net::SSLeay::X509_get_subject_name( shift )) },
 	);
 	if ( $Net::SSLeay::VERSION >= 1.30 ) {
 		# I think X509_NAME_get_text_by_NID got added in 1.30
@@ -1410,16 +1410,16 @@ sub new {
 	my $verify_cb = $arg_hash->{SSL_verify_callback};
 	my $verify_callback = $verify_cb && sub {
 		my ($ok, $ctx_store) = @_;
-		my ($cert, $error);
+		my ($certname,$cert,$error);
 		if ($ctx_store) {
 			$cert = Net::SSLeay::X509_STORE_CTX_get_current_cert($ctx_store);
 			$error = Net::SSLeay::X509_STORE_CTX_get_error($ctx_store);
-			$cert &&= Net::SSLeay::X509_NAME_oneline(Net::SSLeay::X509_get_issuer_name($cert)).
+			$certname = Net::SSLeay::X509_NAME_oneline(Net::SSLeay::X509_get_issuer_name($cert)).
 				Net::SSLeay::X509_NAME_oneline(Net::SSLeay::X509_get_subject_name($cert));
 			$error &&= Net::SSLeay::ERR_error_string($error);
 		}
 		DEBUG(3, "ok=$ok cert=$cert" );
-		return $verify_cb->($ok, $ctx_store, $cert, $error);
+		return $verify_cb->($ok,$ctx_store,$certname,$error,$cert);
 	};
 
 	Net::SSLeay::CTX_set_verify($ctx, $verify_mode, $verify_callback);

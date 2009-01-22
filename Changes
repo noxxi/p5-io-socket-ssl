@@ -1,10 +1,17 @@
 
+v1.21 2009.01.22
+- auto verification of name in certificate created circular reference between
+  SSL and CTX object with the verify_callback, which caused the objects to be
+  destroyed only at program end. Fix it be no longer access $self from inside
+  the callback.
+  Thanks to odenbach[AT]uni-paderborn[DOT]de for reporting
+
 v1.20 2009.01.15
 - only changes on test suite to make it ready for win32
   (tested with strawberry perl 5.8.8)
 
 v1.19 2008.12.31
-- fix verfycn_name autodetection from PeerAddr/PeerHost
+- fix verifycn_name autodetection from PeerAddr/PeerHost
 
 v1.18 2008.11.17
 - fixed typo in argument: wildcars_in_cn -> wildcards_in_cn
