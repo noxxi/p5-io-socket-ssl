@@ -1,4 +1,8 @@
 
+v1.22 2009.01.24
+- Net::SSLeay stores verify callbacks inside hash and never clears them, so
+  set verify callback to NULL in destroy of context
+
 v1.21 2009.01.22
 - auto verification of name in certificate created circular reference between
   SSL and CTX object with the verify_callback, which caused the objects to be

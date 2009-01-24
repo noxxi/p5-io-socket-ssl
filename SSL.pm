@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.21';
+	$VERSION = '1.22';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1425,6 +1425,7 @@ sub new {
 	Net::SSLeay::CTX_set_verify($ctx, $verify_mode, $verify_callback);
 
 	$ctx_object = { context => $ctx };
+	$ctx_object->{has_verifycb} = 1 if $verify_callback;
 	DEBUG(3, "new ctx $ctx" );
 	$CTX_CREATED_IN_THIS_THREAD{$ctx} = 1;
 
@@ -1463,6 +1464,11 @@ sub DESTROY {
 		DEBUG( 3,"free ctx $ctx open=".join( " ",keys %CTX_CREATED_IN_THIS_THREAD ));
 		if ( %CTX_CREATED_IN_THIS_THREAD and 
 			delete $CTX_CREATED_IN_THIS_THREAD{$ctx} ) {
+			# remove any verify callback for this context
+			if ( $self->{has_verifycb}) {
+				DEBUG( 3,"free ctx $ctx callback" );
+				Net::SSLeay::CTX_set_verify($ctx, 0,undef);
+			}
 			DEBUG( 3,"OK free ctx $ctx" );
 			Net::SSLeay::CTX_free($ctx);
 		}
