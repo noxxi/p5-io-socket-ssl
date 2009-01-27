@@ -95,5 +95,4 @@ WriteMakefile(
 	'DISTNAME' => 'IO-Socket-SSL',
 	'PREREQ_PM' => { 'Net::SSLeay' => 1.21, 'Scalar::Util' => 0 },
 	'dist' => { COMPRESS => 'gzip', SUFFIX => 'gz', },
-	'NO_META' => 1,
 );
