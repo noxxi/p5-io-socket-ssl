@@ -1344,7 +1344,7 @@ sub new {
 	my $verify_mode = $arg_hash->{SSL_verify_mode};
 	if ( $verify_mode != Net::SSLeay::VERIFY_NONE() and 
 		! Net::SSLeay::CTX_load_verify_locations( 
-			$ctx, $arg_hash->{SSL_ca_file},$arg_hash->{SSL_ca_path}) ) {
+			$ctx, $arg_hash->{SSL_ca_file} || '',$arg_hash->{SSL_ca_path} || '') ) {
 		if ( ! $arg_hash->{SSL_ca_file} && ! $arg_hash->{SSL_ca_path} ) {
 			carp("No certificate verification because neither SSL_ca_file nor SSL_ca_path known");
 			$verify_mode = Net::SSLeay::VERIFY_NONE();
