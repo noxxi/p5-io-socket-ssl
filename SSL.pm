@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.22';
+	$VERSION = '1.23';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -209,8 +209,6 @@ sub configure_SSL {
 	my %default_args = (
 		Proto => 'tcp',
 		SSL_server => $is_server,
-		SSL_ca_file => 'certs/my-ca.pem',
-		SSL_ca_path => 'ca/',
 		SSL_use_cert => $is_server,
 		SSL_check_crl => 0,
 		SSL_version	=> 'sslv23',
@@ -231,18 +229,20 @@ sub configure_SSL {
 			:  "certs/client-${k}.pem";
 	}	
 
+	# add only SSL_ca_* if not in args
+	if ( ! exists $arg_hash->{SSL_ca_file} && ! exists $arg_hash->{SSL_ca_path} ) {
+		if ( -f 'certs/my-ca.pem' ) {
+			$default_args{SSL_ca_file} = 'certs/my-ca.pem'
+		} elsif ( -d 'ca/' ) {
+			$default_args{SSL_ca_path} = 'ca/'
+		}
+	}
+		
 	#Replace nonexistent entries with defaults
 	%$arg_hash = ( %default_args, %$GLOBAL_CONTEXT_ARGS, %$arg_hash );
 
 	#Avoid passing undef arguments to Net::SSLeay
 	defined($arg_hash->{$_}) or delete($arg_hash->{$_}) foreach (keys %$arg_hash);
-
-	#Handle CA paths properly if no CA file is specified
-	if ($arg_hash->{'SSL_ca_path'} ne '' and !(-f $arg_hash->{'SSL_ca_file'})) {
-		DEBUG(1, "CA file $arg_hash->{SSL_ca_file} not found, using CA path instead.\n" )
-			if $arg_hash->{SSL_ca_file};
-		$arg_hash->{'SSL_ca_file'} = '';
-	}
 
 	my $vcn_scheme = delete $arg_hash->{SSL_verifycn_scheme};
 	if ( $vcn_scheme && $vcn_scheme ne 'none' ) {
@@ -1292,6 +1292,7 @@ sub CLOSE {							 #<---- Do not change this function!
 
 
 package IO::Socket::SSL::SSL_Context;
+use Carp;
 use strict;
 
 my %CTX_CREATED_IN_THIS_THREAD;
@@ -1341,10 +1342,15 @@ sub new {
 
 
 	my $verify_mode = $arg_hash->{SSL_verify_mode};
-	unless ($verify_mode == Net::SSLeay::VERIFY_NONE()) {
-		Net::SSLeay::CTX_load_verify_locations(
-			$ctx, $arg_hash->{SSL_ca_file},$arg_hash->{SSL_ca_path}
-		) || return IO::Socket::SSL->error("Invalid certificate authority locations");
+	if ( $verify_mode != Net::SSLeay::VERIFY_NONE() and 
+		! Net::SSLeay::CTX_load_verify_locations( 
+			$ctx, $arg_hash->{SSL_ca_file},$arg_hash->{SSL_ca_path}) ) {
+		if ( ! $arg_hash->{SSL_ca_file} && ! $arg_hash->{SSL_ca_path} ) {
+			carp("No certificate verification because neither SSL_ca_file nor SSL_ca_path known");
+			$verify_mode = Net::SSLeay::VERIFY_NONE();
+		} else {
+			return IO::Socket::SSL->error("Invalid certificate authority locations");
+		}
 	}
 
 	if ($arg_hash->{'SSL_check_crl'}) {

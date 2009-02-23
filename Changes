@@ -1,4 +1,10 @@
 
+v1.23 2009.02.23
+- if neither SSL_ca_file nor SSL_ca_path are known (e.g not given and the
+  default values have no existing file|path) disable checking of
+  certificates, but carp about the problem
+- new test certificates, the old ones expired and caused tests to fail
+
 v1.22 2009.01.24
 - Net::SSLeay stores verify callbacks inside hash and never clears them, so
   set verify callback to NULL in destroy of context
