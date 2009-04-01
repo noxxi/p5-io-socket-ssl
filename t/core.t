@@ -107,7 +107,7 @@ unless (fork) {
 		my ($ok, $ctx_store, $cert, $error) = @_;
 		unless ($ok && $ctx_store && $cert && !$error) 
 		{ print("not ok #client failure\n") && exit; }
-		($cert =~ /IO::Socket::SSL Test CA/) || print "not";
+		($cert =~ /IO::Socket::SSL Demo CA/) || print "not";
 		&ok("Client Verify-sub Check");
 		return 1;
 	}

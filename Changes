@@ -1,4 +1,8 @@
 
+v1.24 2009.04.01
+- add verify hostname scheme ftp, same as http
+- renew test certificates again (root CA expired, now valid for 10 years)
+
 v1.23 2009.02.23
 - if neither SSL_ca_file nor SSL_ca_path are known (e.g not given and the
   default values have no existing file|path) disable checking of

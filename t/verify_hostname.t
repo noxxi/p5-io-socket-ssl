@@ -53,7 +53,7 @@ if ( $pid == 0 ) {
 	ok( "client ssl connect" );
 
 	my $issuer = $client->peer_certificate( 'issuer' );
-	print "not " if $issuer !~m{IO::Socket::SSL Test CA};
+	print "not " if $issuer !~m{IO::Socket::SSL Demo CA};
 	ok("issuer");
 
 	my $cn = $client->peer_certificate( 'cn' );

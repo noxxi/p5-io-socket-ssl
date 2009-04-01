@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.23';
+	$VERSION = '1.24';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1037,6 +1037,7 @@ sub dump_peer_certificate {
 	$scheme{imap} = $scheme{ldap}; # rfc 2595
 	$scheme{acap} = $scheme{ldap}; # rfc 2595
 	$scheme{nntp} = $scheme{ldap}; # rfc 4642
+	$scheme{ftp}  = $scheme{http}; # rfc 4217
 
 	# function to verify the hostname
 	#
@@ -1751,7 +1752,7 @@ added.
 
 Specifies session cache object which should be used instead of creating a new.
 Overrules SSL_session_cache_size.
-This option is useful if you wan't to reuse the cache, but not the rest of
+This option is useful if you want to reuse the cache, but not the rest of
 the context.
 
 A session cache object can be created using 
