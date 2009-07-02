@@ -1,4 +1,8 @@
 
+v1.25 2009.07.02
+- t/nonblock.t: increase number of bytes written to fix bug with OS X 10.5
+  https://rt.cpan.org/Ticket/Display.html?id=47240
+
 v1.24 2009.04.01
 - add verify hostname scheme ftp, same as http
 - renew test certificates again (root CA expired, now valid for 10 years)

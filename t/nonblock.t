@@ -161,7 +161,7 @@ if ( $pid == 0 ) {
 	}
 
 	# send some data
-	# we send up to 100000 bytes, server reads first 10 bytes and then sleeps
+	# we send up to 500000 bytes, server reads first 10 bytes and then sleeps
 	# before reading more. In total server only reads 30000 bytes 
 	# the sleep will cause the internal buffers to fill up so that the syswrite
 	# should return with EAGAIN+SSL_WANT_WRITE.
@@ -171,7 +171,7 @@ if ( $pid == 0 ) {
 	$attempts = 0;
 	my $bytes_send = 0;
 
-	# set send buffer to 8192 so it will definitly fail writing all 100000 bytes in it
+	# set send buffer to 8192 so it will definitly fail writing all 500000 bytes in it
 	# linux allocates twice as much (see tcp(7)) but it's small enough anyway
 	eval q{ 
 	    setsockopt( $to_server, SOL_SOCKET, SO_SNDBUF, pack( "I",8192 ));
@@ -184,7 +184,7 @@ if ( $pid == 0 ) {
 	}
 
 	WRITE:
-	for( my $i=0;$i<10000;$i++ ) {
+	for( my $i=0;$i<50000;$i++ ) {
 	    my $offset = 0;
 	    while (1) {
 		my $n = syswrite( $to_server,$msg,length($msg)-$offset,$offset );
