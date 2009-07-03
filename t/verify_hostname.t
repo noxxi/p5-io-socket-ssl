@@ -88,6 +88,7 @@ if ( $pid == 0 ) {
 		'www-13.lala.other.local' => [],
 		'smtp.mydomain.local' => [qw(smtp ldap www)],
 		'xn--lwe-sna.idntest.local' => [qw(smtp ldap www)],
+		'smtp.mydomain.localizing.useless.local' => [],
 	);
 	if ( $can_idn ) {
 		# check IDN handling

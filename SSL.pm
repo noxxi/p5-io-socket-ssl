@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.25';
+	$VERSION = '1.26';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1078,7 +1078,7 @@ sub dump_peer_certificate {
 			$ip4 = inet_aton( $identity ) or croak "'$identity' is not IPv4, but neither IPv6 nor hostname";
 		} else {
 			# assume hostname
-			if ( $identity !~m{^[a-zA-Z0-9-_\.]+$} ) {
+			if ( $identity !~m{^[\w\-\.]+$} ) {
 				$identity = idn_to_ascii($identity) or
 					croak "Warning: Given name '$identity' could not be converted to IDNA!";
 			}
@@ -1100,7 +1100,7 @@ sub dump_peer_certificate {
 			} elsif ( $wtyp eq 'leftmost' and $name =~m{^\*(\..+)$} ) {
 				$pattern = qr{^[\w\-]*\Q$1\E$}i;
 			} else {
-				$pattern = qr{^\Q$name}i;
+				$pattern = qr{^\Q$name\E$}i;
 			}
 			return $identity =~ $pattern;
 		};
