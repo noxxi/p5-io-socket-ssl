@@ -25,7 +25,7 @@ my $can_idn  = eval { require Encode } &&
 	( eval { require Net::LibIDN } || eval { require Net::IDN::Encode } );
 
 $|=1;
-my $max = 37;
+my $max = 40;
 $max+=3 if $can_idn;
 print "1..$max\n";
 
