@@ -1,4 +1,12 @@
 
+v1.27 2009.07.24
+- changed possible local/utf-8 depended \w in some regex against more
+  explicit [a-zA-Z0-9_]. Fixed one regex, where it assumed, that service
+  names can't have '-' inside
+- fixed bug https://rt.cpan.org/Ticket/Display.html?id=48131
+  where eli[AT]dvns[DOT]com reported warnings when perl -w was used.
+  While there made it more aware of errors in Net::ssl_write_all (return
+  undef not 0 in generic_write)
 v1.26 2009.07.03
 - SECURITY BUGFIX! 
   fix Bug in verify_hostname_of_cert where it matched only the prefix for 

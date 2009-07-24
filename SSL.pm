@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.26';
+	$VERSION = '1.27';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -253,7 +253,7 @@ sub configure_SSL {
 		my $host = $arg_hash->{SSL_verifycn_name};
 		if (not defined($host)) {
 			if ( $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} ) {
-				$host =~s{:\w+$}{};
+				$host =~s{:[a-zA-Z0-9_\-]+$}{};
 			}
 		}
 		$host ||= ref($vcn_scheme) && $vcn_scheme->{callback} && 'unknown';
@@ -645,11 +645,14 @@ sub generic_write {
 	my $written;
 	if ( $write_all ) {
 		my $data = $length < $buf_len-$offset ? substr($$buffer, $offset, $length) : $$buffer;
-		$written = Net::SSLeay::ssl_write_all($ssl, $data);
+		($written, my $errs) = Net::SSLeay::ssl_write_all($ssl, $data);
+		# ssl_write_all returns number of bytes written
+		$written = undef if ! $written && $errs;
 	} else {
 		$written = Net::SSLeay::write_partial( $ssl,$offset,$length,$$buffer );
+		# write_partial does SSL_write which returns -1 on error
+		$written = undef if $written < 0;
 	}
-	$written = undef if $written < 0; # Net::SSLeay::write returns -1 not undef on error
 	if ( !defined($written) ) {
 		$self->_set_rw_error( $ssl,-1 )
 			|| $self->error("SSL write error");
@@ -1077,8 +1080,8 @@ sub dump_peer_certificate {
 			 # definitly no hostname, try IPv4
 			$ip4 = inet_aton( $identity ) or croak "'$identity' is not IPv4, but neither IPv6 nor hostname";
 		} else {
-			# assume hostname
-			if ( $identity !~m{^[\w\-\.]+$} ) {
+			# assume hostname, check for umlauts etc
+			if ( $identity =~m{[^a-zA-Z0-9_.\-]} ) {
 				$identity = idn_to_ascii($identity) or
 					croak "Warning: Given name '$identity' could not be converted to IDNA!";
 			}
@@ -1095,10 +1098,10 @@ sub dump_peer_certificate {
 			# The RFCs are in this regard unspecific but we don't want to have to
 			# deal with certificates like *.com, *.co.uk or even *
 			# see also http://nils.toedtmann.net/pub/subjectAltName.txt
-			if ( $wtyp eq 'anywhere' and $name =~m{^([\w\-]*)\*(.+)} ) {
-				$pattern = qr{^\Q$1\E[\w\-]*\Q$2\E$}i;
+			if ( $wtyp eq 'anywhere' and $name =~m{^([a-zA-Z0-9_\-]*)\*(.+)} ) {
+				$pattern = qr{^\Q$1\E[a-zA-Z0-9_\-]*\Q$2\E$}i;
 			} elsif ( $wtyp eq 'leftmost' and $name =~m{^\*(\..+)$} ) {
-				$pattern = qr{^[\w\-]*\Q$1\E$}i;
+				$pattern = qr{^[a-zA-Z0-9_\-]*\Q$1\E$}i;
 			} else {
 				$pattern = qr{^\Q$name\E$}i;
 			}
