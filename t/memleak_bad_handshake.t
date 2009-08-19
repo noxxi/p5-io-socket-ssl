@@ -19,18 +19,12 @@ if ( ! getsize($$) ) {
 	exit;
 }
 
-sub getsize {
-	my $pid = shift;
-	open( my $ps,'-|','ps','-o','size','-p',$pid ) or return;
-	<$ps>; # header
-	return int(<$ps>); # size
-}
-
 my $server = IO::Socket::SSL->new(
 	LocalAddr => $SSL_SERVER_ADDR,
 	Listen => 2,
 	ReuseAddr => 1,
 );
+my $addr = $SSL_SERVER_ADDR.':'.$server->sockport;
 
 defined( my $pid = fork()) or do {
 	print "1..0 # Skipped: fork failed\n";
@@ -41,27 +35,36 @@ if ( $pid == 0 ) {
 	# server
 	while (1) {
 		# socket accept, client handshake and client close 
-		$server->accept
+		$server->accept;
 	}
 	exit
 }
 
 close($server);
 # plain non-SSL connect and close w/o sending data
-IO::Socket::INET->new( $SSL_SERVER_ADDR ) for(1..100);
+IO::Socket::INET->new( $addr ) or die $! for(1..100);
 my $size100 = getsize($pid);
 if ( ! $size100 ) {
 	print "1..0 # Skipped: cannot get size of child process\n";
 	exit
 }
 
-IO::Socket::INET->new( $SSL_SERVER_ADDR ) for(100..1000);
-my $size1000 = getsize($pid);
+IO::Socket::INET->new( $addr ) or die $! for(100..200);
+my $size200 = getsize($pid);
 
 print "1..1\n";
-print "not " if $size100 != $size1000;
-print "ok # check memleak failed handshake ($size100)\n";
+print "not " if $size100 != $size200;
+print "ok # check memleak failed handshake ($size100,$size200)\n";
 
 kill(9,$pid);
 wait;
-exit
+exit;
+
+
+sub getsize {
+	my $pid = shift;
+	open( my $ps,'-|','ps','-o','vsize','-p',$pid ) or return;
+	<$ps>; # header
+	return int(<$ps>); # size
+}
+

@@ -1,4 +1,12 @@
 
+v1.30 2009.08.19
+- fix test t/memleak_bad_handshake.t
+v1.29 2009.08.19
+- fixed thanks for version 1.28
+v1.28 2009.08.19
+- fix memleak when SSL handshake failed.
+  Thanks richardhundtu[AT]gmail[DOT]com
+
 v1.27 2009.07.24
 - changed possible local/utf-8 depended \w in some regex against more
   explicit [a-zA-Z0-9_]. Fixed one regex, where it assumed, that service

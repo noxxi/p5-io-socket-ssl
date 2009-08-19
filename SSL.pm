@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.27';
+	$VERSION = '1.30';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -787,8 +787,8 @@ sub close {
 sub stop_SSL {
 	my $self = shift || return _invalid_object();
 	my $stop_args = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
-	return $self->error("SSL object already closed") 
-		unless (${*$self}{'_SSL_opened'} == 1);
+	return $self->error("SSL object not open") 
+		if ! ${*$self}{'_SSL_opened'};
 
 	if (my $ssl = ${*$self}{'_SSL_object'}) {
 		my $shutdown_done;
@@ -862,7 +862,7 @@ sub stop_SSL {
 sub kill_socket {
 	my $self = shift;
 	shutdown($self, 2);
-	$self->close(SSL_no_shutdown => 1) if (${*$self}{'_SSL_opened'} == 1);
+	$self->close(SSL_no_shutdown => 1) if ${*$self}{'_SSL_opened'};
 	delete(${*$self}{'_SSL_ctx'});
 	return;
 }
@@ -1187,7 +1187,7 @@ sub error {
 sub DESTROY {
 	my $self = shift || return;
 	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1) 
-		if (${*$self}{'_SSL_opened'} == 1);
+		if ${*$self}{'_SSL_opened'};
 	delete(${*$self}{'_SSL_ctx'});
 }
 
