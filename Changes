@@ -1,4 +1,10 @@
 
+v1.30_1 2009.08.31
+- make sure that idn_to_ascii gets no \0 bytes from identity, because
+  it simply cuts the string their (using C semantics). Not really a
+  security problem because IDN like identity is provided by user in
+  hostname, not by certificate.
+
 v1.30 2009.08.19
 - fix test t/memleak_bad_handshake.t
 v1.29 2009.08.19

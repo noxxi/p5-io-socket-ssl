@@ -66,7 +66,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.30';
+	$VERSION = '1.30_1';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1082,6 +1082,7 @@ sub dump_peer_certificate {
 		} else {
 			# assume hostname, check for umlauts etc
 			if ( $identity =~m{[^a-zA-Z0-9_.\-]} ) {
+				$identity =~m{\0} and croak("name '$identity' has \\0 byte");
 				$identity = idn_to_ascii($identity) or
 					croak "Warning: Given name '$identity' could not be converted to IDNA!";
 			}
