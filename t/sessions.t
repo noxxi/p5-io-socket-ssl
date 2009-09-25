@@ -27,20 +27,19 @@ if ($NET_SSLEAY_VERSION < 1.26) {
 
 print "1..$numtests\n";
 
-my %server_options =
-    (SSL_key_file => "certs/server-key.enc", 
-     SSL_passwd_cb => sub { return "bluebell" },
-     LocalAddr => $SSL_SERVER_ADDR,
-     Listen => 2,
-     Proto => 'tcp',
-     Timeout => 30,
-     ReuseAddr => 1,
-     SSL_verify_mode => 0x00,
-     SSL_ca_file => "certs/test-ca.pem",
-     SSL_use_cert => 1,
-     SSL_cert_file => "certs/server-cert.pem",
-     SSL_version => 'TLSv1',
-     SSL_cipher_list => 'HIGH');
+my %server_options = (
+    SSL_key_file => "certs/server-key.enc", 
+    SSL_passwd_cb => sub { return "bluebell" },
+    LocalAddr => $SSL_SERVER_ADDR,
+    Listen => 2,
+    Timeout => 30,
+    ReuseAddr => 1,
+    SSL_verify_mode => SSL_VERIFY_NONE, 
+    SSL_ca_file => "certs/test-ca.pem",
+    SSL_cert_file => "certs/server-cert.pem",
+    SSL_version => 'TLSv1',
+    SSL_cipher_list => 'HIGH'
+);
 
 
 my @servers = (IO::Socket::SSL->new( %server_options),
@@ -60,17 +59,15 @@ my ($SSL_SERVER_PORT3) = unpack_sockaddr_in( $servers[2]->sockname );
 
 unless (fork) {
     close $_ foreach @servers;
-    my $ctx = new IO::Socket::SSL::SSL_Context
-        (SSL_key_file => "certs/client-key.enc",
+    my $ctx = IO::Socket::SSL::SSL_Context->new(
 	 SSL_passwd_cb => sub { return "opossum" },
-	 SSL_verify_mode => 0x01,
+    	 SSL_verify_mode => SSL_VERIFY_PEER,
 	 SSL_ca_file => "certs/test-ca.pem",
 	 SSL_ca_path => '',
-	 SSL_use_cert => 1,
-	 SSL_cert_file => "certs/client-cert.pem",
 	 SSL_version => 'TLSv1',
 	 SSL_cipher_list => 'HIGH',
-	 SSL_session_cache_size => 4);
+	 SSL_session_cache_size => 4
+    );
 
 
     if (! defined $ctx->{'session_cache'}) {
@@ -125,8 +122,8 @@ unless (fork) {
 	PeerPort => $SSL_SERVER_PORT3
     );
     my @clients = (
-	IO::Socket::SSL->new(PeerAddr => $SSL_SERVER_ADDR, PeerPort => $SSL_SERVER_PORT),
-        IO::Socket::SSL->new(PeerAddr => $SSL_SERVER_ADDR, PeerPort => $SSL_SERVER_PORT2),
+	IO::Socket::SSL->new("$SSL_SERVER_ADDR:$SSL_SERVER_PORT"),
+        IO::Socket::SSL->new("$SSL_SERVER_ADDR:$SSL_SERVER_PORT2"),
         IO::Socket::SSL->start_SSL( $sock3 ),
     );
     
@@ -167,9 +164,11 @@ unless (fork) {
 	close $clients[$_];
     }
 
-    @clients = (new IO::Socket::SSL(PeerAddr => $SSL_SERVER_ADDR, PeerPort => $SSL_SERVER_PORT),
-		   new IO::Socket::SSL(PeerAddr => $SSL_SERVER_ADDR, PeerPort => $SSL_SERVER_PORT2),
-		   new IO::Socket::SSL(PeerAddr => $SSL_SERVER_ADDR, PeerPort => $SSL_SERVER_PORT3));
+    @clients = (
+    	IO::Socket::SSL->new("$SSL_SERVER_ADDR:$SSL_SERVER_PORT"),
+	IO::Socket::SSL->new("$SSL_SERVER_ADDR:$SSL_SERVER_PORT2"),
+	IO::Socket::SSL->new("$SSL_SERVER_ADDR:$SSL_SERVER_PORT3")
+    );
 
     if (keys(%$cache) != 6) {
 	print "not ";
@@ -213,7 +212,8 @@ close $_ foreach (@clients);
 
 @clients = map { scalar $_->accept } @servers;
 if (!$clients[0] or !$clients[1] or !$clients[2]) {
-    print "not ok \# Client init\n";
+    print $SSL_ERROR;
+    print "not ok \# Client init 2\n";
     exit;
 }
 &ok("Client init 2");

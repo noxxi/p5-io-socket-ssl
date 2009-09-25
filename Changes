@@ -1,4 +1,9 @@
 
+v1.31 2009.09.25
+- add and export constants for SSL_VERIFY_* 
+- set SSL_use_cert if cert is given and not SSL_server
+- support alternative CRL file with SSL_crl_file thanks to patch of
+  w[DOT]phillip[DOT]moore[AT]gmail[DOT]com
 v1.30_3 2009.09.03
 - make t/memleak_bad_handshake.t more stable (increase listen queue,
   ignore errors on connect, don't run on windows..)

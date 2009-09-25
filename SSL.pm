@@ -21,9 +21,17 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-# from openssl/ssl.h, should be better in Net::SSLeay
-use constant SSL_SENT_SHUTDOWN => 1;
-use constant SSL_RECEIVED_SHUTDOWN => 2;
+use constant {
+	SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE(),
+	SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER(),
+	SSL_VERIFY_FAIL_IF_NO_PEER_CERT => Net::SSLeay::VERIFY_FAIL_IF_NO_PEER_CERT(),
+	SSL_VERIFY_CLIENT_ONCE => Net::SSLeay::VERIFY_CLIENT_ONCE(),
+	# from openssl/ssl.h, should be better in Net::SSLeay
+	SSL_SENT_SHUTDOWN => 1,
+	SSL_RECEIVED_SHUTDOWN => 2,
+};
+
+	
 
 # non-XS Versions of Scalar::Util will fail
 BEGIN{
@@ -45,7 +53,11 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 	my $y = Net::SSLeay::ERROR_WANT_WRITE();
 	use constant SSL_WANT_WRITE => dualvar( \$y, 'SSL wants a write first' );
 
-	@EXPORT = qw( SSL_WANT_READ SSL_WANT_WRITE $SSL_ERROR GEN_DNS GEN_IPADD );
+	@EXPORT = qw( 
+		SSL_WANT_READ SSL_WANT_WRITE SSL_VERIFY_NONE SSL_VERIFY_PEER 
+		SSL_VERIFY_FAIL_IF_NO_PEER_CERT SSL_VERIFY_CLIENT_ONCE
+		$SSL_ERROR GEN_DNS GEN_IPADD 
+	);
 }
 
 my @caller_force_inet4; # in case inet4 gets forced we store here who forced it
@@ -66,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.30_3';
+	$VERSION = '1.31';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -206,18 +218,28 @@ sub configure_SSL {
 	my ($self, $arg_hash) = @_;
 
 	my $is_server = $arg_hash->{'SSL_server'} || $arg_hash->{'Listen'} || 0;
+
 	my %default_args = (
 		Proto => 'tcp',
 		SSL_server => $is_server,
 		SSL_use_cert => $is_server,
 		SSL_check_crl => 0,
 		SSL_version	=> 'sslv23',
-		SSL_verify_mode => Net::SSLeay::VERIFY_NONE(),
+		SSL_verify_mode => SSL_VERIFY_NONE,
 		SSL_verify_callback => undef,
 		SSL_verifycn_scheme => undef,  # don't verify cn
 		SSL_verifycn_name => undef,    # use from PeerAddr/PeerHost
 	);
-	 
+
+	# common problem forgetting SSL_use_cert
+	# if client cert is given but SSL_use_cert undef assume that it 
+	# should be set
+	if ( ! $is_server && ! defined $arg_hash->{SSL_use_cert} 
+		&& ( grep { $arg_hash->{$_} } qw(SSL_cert SSL_cert_file)) 
+		&& ( grep { $arg_hash->{$_} } qw(SSL_key SSL_key_file)) ) {
+		$arg_hash->{SSL_use_cert} = 1 
+	}
+
 	# SSL_key_file and SSL_cert_file will only be set in defaults if 
 	# SSL_key|SSL_key_file resp SSL_cert|SSL_cert_file are not set in
 	# $args_hash
@@ -1360,10 +1382,19 @@ sub new {
 
 	if ($arg_hash->{'SSL_check_crl'}) {
 		if (Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x0090702f) {
-			Net::SSLeay::X509_STORE_set_flags(
-				Net::SSLeay::CTX_get_cert_store($ctx),
-				Net::SSLeay::X509_V_FLAG_CRL_CHECK()
-			);
+                    Net::SSLeay::X509_STORE_set_flags(
+                        Net::SSLeay::CTX_get_cert_store($ctx),
+                        Net::SSLeay::X509_V_FLAG_CRL_CHECK()
+                      );
+                    if ($arg_hash->{'SSL_crl_file'}) {
+                        my $bio = Net::SSLeay::BIO_new_file($arg_hash->{'SSL_crl_file'}, 'r');
+                        my $crl = Net::SSLeay::PEM_read_bio_X509_CRL($bio);
+                        if ( $crl ) {
+                            Net::SSLeay::X509_STORE_add_crl(Net::SSLeay::CTX_get_cert_store($ctx), $crl);
+                        } else {
+                            return IO::Socket::SSL->error("Invalid certificate revocation list");
+                        }
+                    }
 		} else {
 			return IO::Socket::SSL->error("CRL not supported for OpenSSL < v0.9.7b");
 		}
@@ -1457,6 +1488,7 @@ sub session_cache {
 	my $ctx = shift;
 	my $cache = $ctx->{'session_cache'} || return;
 	my ($addr,$port,$session) = @_;
+	$port ||= $addr =~s{:(\w+)$}{} && $1; # host:port
 	my $key = "$addr:$port";
 	return defined($session) 
 		? $cache->add_session($key, $session)
@@ -1624,6 +1656,16 @@ If this is set, it forces IO::Socket::SSL to use a certificate and key, even if
 you are setting up an SSL client.  If this is set to 0 (the default), then you will
 only need a certificate and key if you are setting up a server.
 
+SSL_use_cert will implicitly be set if SSL_server is set.
+For convinience it is also set if it was not given but a cert was given for use
+(SSL_cert_file or similar).
+
+=item SSL_server
+
+Use this, if the socket should be used as a server.
+If this is not explicitly set it is assumed, if Listen with given when creating
+the socket.
+
 =item SSL_key_file
 
 If your RSA private key is not in default place (F<certs/server-key.pem> for servers,
@@ -1722,11 +1764,18 @@ with B<start_SSL> the name has to be given in B<SSL_verifycn_name>.
 
 =item SSL_check_crl
 
-If you want to verify that the peer certificate has not been revoked by the
-signing authority, set this value to true.	OpenSSL will search for the CRL
-in your SSL_ca_path.  See the Net::SSLeay documentation for more details.
-Note that this functionality appears to be broken with OpenSSL < v0.9.7b,
-so its use with lower versions will result in an error.
+If you want to verify that the peer certificate has not been revoked
+by the signing authority, set this value to true. OpenSSL will search
+for the CRL in your SSL_ca_path, or use the file specified by
+SSL_crl_file.  See the Net::SSLeay documentation for more details.
+Note that this functionality appears to be broken with OpenSSL <
+v0.9.7b, so its use with lower versions will result in an error.
+
+=item SSL_crl_file
+
+If you want to specify the CRL file to be used, set this value to the
+pathname to be used.  This must be used in addition to setting
+SSL_check_crl.
 
 =item SSL_reuse_ctx
 
