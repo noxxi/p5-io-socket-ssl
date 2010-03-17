@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.31';
+	$VERSION = '1.33';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1091,16 +1091,16 @@ sub dump_peer_certificate {
 
 		# is the given hostname an IP address? Then we have to convert to network byte order [RFC791][RFC2460]
 
-		my ($ip4,$ip6);
+		my $ipn;
 		if ( $identity =~m{:} ) {
 			# no IPv4 or hostname have ':'	in it, try IPv6.
 			#  make sure that Socket6 was loaded properly
 			UNIVERSAL::can( __PACKAGE__, 'inet_pton' ) or croak
 				q[Looks like IPv6 address, make sure that Socket6 is loaded or make "use IO::Socket::SSL 'inet6'];
-			$ip6 = inet_pton( $identity ) or croak "'$identity' is not IPv6, but neither IPv4 nor hostname";
+			$ipn = inet_pton( $identity ) or croak "'$identity' is not IPv6, but neither IPv4 nor hostname";
 		} elsif ( $identity =~m{^\d+\.\d+\.\d+\.\d+$} ) {
 			 # definitly no hostname, try IPv4
-			$ip4 = inet_aton( $identity ) or croak "'$identity' is not IPv4, but neither IPv6 nor hostname";
+			$ipn = inet_aton( $identity ) or croak "'$identity' is not IPv4, but neither IPv6 nor hostname";
 		} else {
 			# assume hostname, check for umlauts etc
 			if ( $identity =~m{[^a-zA-Z0-9_.\-]} ) {
@@ -1134,15 +1134,12 @@ sub dump_peer_certificate {
 		my $alt_dnsNames = 0;
 		while (@altNames) {
 			my ($type, $name) = splice (@altNames, 0, 2);
-			if ( $type == GEN_IPADD ) {
+			if ( $ipn and $type == GEN_IPADD ) {
 				# exakt match needed for IP
 				# $name is already packed format (inet_xton)
-				return 1 if 
-					$ip6 ? $ip6 eq $name : 
-					$ip4 ? $ip4 eq $name :
-					0;
+				return 1 if $ipn eq $name;
 
-			} elsif ( $type == GEN_DNS ) {
+			} elsif ( ! $ipn and $type == GEN_DNS ) {
 				$name =~s/\s+$//; $name =~s/^\s+//;
 				$alt_dnsNames++;
 				$check_name->($name,$identity,$scheme->{wildcards_in_alt})
@@ -1150,8 +1147,9 @@ sub dump_peer_certificate {
 			}
 		}
 
-		if ( $scheme->{check_cn} eq 'always' or 
-			$scheme->{check_cn} eq 'when_only' and !$alt_dnsNames) {
+		if ( ! $ipn and (
+			$scheme->{check_cn} eq 'always' or 
+			$scheme->{check_cn} eq 'when_only' and !$alt_dnsNames)) {
 			$check_name->($commonName,$identity,$scheme->{wildcards_in_cn})
 				and return 1;
 		}

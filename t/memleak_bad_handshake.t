@@ -61,9 +61,18 @@ for(100..200) {
 }
 my $size200 = getsize($pid);
 
+for(200..300) {
+	IO::Socket::INET->new( $addr ) or next;
+}
+my $size300 = getsize($pid);
+if ($size100>$size200 or $size200<$size300) {;
+	print "1..0 # skipped  - do we measure the right thing?\n";
+	exit;
+}
+
 print "1..1\n";
-print "not " if $size100 != $size200;
-print "ok # check memleak failed handshake ($size100,$size200)\n";
+print "not " if $size100 < $size200 and $size200 < $size300;
+print "ok # check memleak failed handshake ($size100,$size200,$size300)\n";
 
 kill(9,$pid);
 wait;

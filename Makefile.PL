@@ -53,10 +53,7 @@ $| = 1;
 # make sure that we have dualvar from the XS Version of Scalar::Util
 if ( eval { require Scalar::Util } ) {
 	eval { Scalar::Util::dualvar( 0,'' ) };
-	if ($@) {
-		warn "You need the XS Version of Scalar::Util for dualvar() support";
-		exit(0);
-	}
+	die "You need the XS Version of Scalar::Util for dualvar() support" if ($@);
 }
 
 # check if we have something which handles IDN
