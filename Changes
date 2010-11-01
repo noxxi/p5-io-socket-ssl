@@ -1,4 +1,12 @@
 
+v1.34 2010.11.01
+- schema http for certificate verification changed to 
+  wildcards_in_cn=1, because according to rfc2818 this is valid and
+  also seen in the wild
+- if upgrading socket from inet to ssl fails due to handshake problems
+  the socket gets downgraded, but is still open.
+  See https://rt.cpan.org/Ticket/Display.html?id=61466
+- depreceate kill_socket, just use close()
 v1.33 2010.03.17
 - attempt to make t/memleak_bad_handshake.t more stable, it fails 
   for unknown reason on various systems

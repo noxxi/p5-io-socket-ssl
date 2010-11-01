@@ -236,7 +236,7 @@ sub error_trap {
 	my $self = shift;
 	print $self "This server is SSL only";
 	$error_trapped = 1;
-	$self->kill_socket;
+	$self->close;
 }
 
 $error_trapped or print "not ";

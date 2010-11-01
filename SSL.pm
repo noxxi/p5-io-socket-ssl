@@ -1,13 +1,13 @@
 #!/usr/bin/perl -w
 #
-# IO::Socket::SSL: 
+# IO::Socket::SSL:
 #	 a drop-in replacement for IO::Socket::INET that encapsulates
 #	 data passed over a network with SSL.
 #
 # Current Code Shepherd: Steffen Ullrich <steffen at genua.de>
 # Code Shepherd before: Peter Behroozi, <behrooz at fas.harvard.edu>
 #
-# The original version of this module was written by 
+# The original version of this module was written by
 # Marko Asplund, <marko.asplund at kronodoc.fi>, who drew from
 # Crypt::SSLeay (Net::SSL) by Gisle Aas.
 #
@@ -31,19 +31,19 @@ use constant {
 	SSL_RECEIVED_SHUTDOWN => 2,
 };
 
-	
+
 
 # non-XS Versions of Scalar::Util will fail
 BEGIN{
 	eval { use Scalar::Util 'dualvar'; dualvar(0,'') };
-	die "You need the XS Version of Scalar::Util for dualvar() support" 
+	die "You need the XS Version of Scalar::Util for dualvar() support"
 		if $@;
 }
 
 use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 
 {
-	# These constants will be used in $! at return from SSL_connect, 
+	# These constants will be used in $! at return from SSL_connect,
 	# SSL_accept, generic_read and write, thus notifying the caller
 	# the usual way of problems. Like with EAGAIN, EINPROGRESS..
 	# these are especially important for non-blocking sockets
@@ -53,10 +53,10 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 	my $y = Net::SSLeay::ERROR_WANT_WRITE();
 	use constant SSL_WANT_WRITE => dualvar( \$y, 'SSL wants a write first' );
 
-	@EXPORT = qw( 
-		SSL_WANT_READ SSL_WANT_WRITE SSL_VERIFY_NONE SSL_VERIFY_PEER 
+	@EXPORT = qw(
+		SSL_WANT_READ SSL_WANT_WRITE SSL_VERIFY_NONE SSL_VERIFY_PEER
 		SSL_VERIFY_FAIL_IF_NO_PEER_CERT SSL_VERIFY_CLIENT_ONCE
-		$SSL_ERROR GEN_DNS GEN_IPADD 
+		$SSL_ERROR GEN_DNS GEN_IPADD
 	);
 }
 
@@ -65,7 +65,7 @@ my $can_ipv6;           # true if we successfully enabled ipv6 while loading
 
 BEGIN {
 	# Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
-	
+
 	# if we have IO::Socket::INET6 we will use this not IO::Socket::INET, because
 	# it can handle both IPv4 and IPv6. If we don't have INET6 available fall back
 	# to INET
@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.33';
+	$VERSION = '1.34';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -134,11 +134,11 @@ BEGIN {
 # Export some stuff
 # inet4|inet6|debug will be handeled by myself, everything
 # else will be handeld the Exporter way
-sub import { 
+sub import {
 	my $class = shift;
 
 	my @export;
-	foreach (@_) { 
+	foreach (@_) {
 		if ( /^inet4$/i ) {
 			# explicitly fall back to inet4
 			@ISA = 'IO::Socket::INET';
@@ -180,7 +180,7 @@ sub configure {
 	# work around Bug in IO::Socket::INET6 where it doesn't use the
 	# right family for the socket on BSD systems:
 	# http://rt.cpan.org/Ticket/Display.html?id=39550
-	if ( $can_ipv6 && ! $arg_hash->{Domain} && 
+	if ( $can_ipv6 && ! $arg_hash->{Domain} &&
 		! ( $arg_hash->{LocalAddr} || $arg_hash->{LocalHost} ) &&
 		(my $peer = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost})) {
 		# set Domain to AF_INET/AF_INET6 if there is only one choice
@@ -192,7 +192,7 @@ sub configure {
 		}
 	}
 
-	# force initial blocking 
+	# force initial blocking
 	# otherwise IO::Socket::SSL->new might return undef if the
 	# socket is nonblocking and it fails to connect immediatly
 	# for real nonblocking behavior one should create a nonblocking
@@ -201,7 +201,7 @@ sub configure {
 
 	# because Net::HTTPS simple redefines blocking() to {} (e.g
 	# return undef) and IO::Socket::INET does not like this we
-		
+
 	# set Blocking only explicitly if it was set
 	$arg_hash->{Blocking} = 1 if defined ($blocking);
 
@@ -232,24 +232,24 @@ sub configure_SSL {
 	);
 
 	# common problem forgetting SSL_use_cert
-	# if client cert is given but SSL_use_cert undef assume that it 
+	# if client cert is given but SSL_use_cert undef assume that it
 	# should be set
-	if ( ! $is_server && ! defined $arg_hash->{SSL_use_cert} 
-		&& ( grep { $arg_hash->{$_} } qw(SSL_cert SSL_cert_file)) 
+	if ( ! $is_server && ! defined $arg_hash->{SSL_use_cert}
+		&& ( grep { $arg_hash->{$_} } qw(SSL_cert SSL_cert_file))
 		&& ( grep { $arg_hash->{$_} } qw(SSL_key SSL_key_file)) ) {
-		$arg_hash->{SSL_use_cert} = 1 
+		$arg_hash->{SSL_use_cert} = 1
 	}
 
-	# SSL_key_file and SSL_cert_file will only be set in defaults if 
+	# SSL_key_file and SSL_cert_file will only be set in defaults if
 	# SSL_key|SSL_key_file resp SSL_cert|SSL_cert_file are not set in
 	# $args_hash
 	foreach my $k (qw( key cert )) {
 		next if exists $arg_hash->{ "SSL_${k}" };
 		next if exists $arg_hash->{ "SSL_${k}_file" };
-		$default_args{ "SSL_${k}_file" } = $is_server 
-			?  "certs/server-${k}.pem" 
+		$default_args{ "SSL_${k}_file" } = $is_server
+			?  "certs/server-${k}.pem"
 			:  "certs/client-${k}.pem";
-	}	
+	}
 
 	# add only SSL_ca_* if not in args
 	if ( ! exists $arg_hash->{SSL_ca_file} && ! exists $arg_hash->{SSL_ca_path} ) {
@@ -259,7 +259,7 @@ sub configure_SSL {
 			$default_args{SSL_ca_path} = 'ca/'
 		}
 	}
-		
+
 	#Replace nonexistent entries with defaults
 	%$arg_hash = ( %default_args, %$GLOBAL_CONTEXT_ARGS, %$arg_hash );
 
@@ -308,7 +308,7 @@ sub configure_SSL {
 sub _set_rw_error {
 	my ($self,$ssl,$rv) = @_;
 	my $err = Net::SSLeay::get_error($ssl,$rv);
-	$SSL_ERROR = 
+	$SSL_ERROR =
 		$err == Net::SSLeay::ERROR_WANT_READ()	? SSL_WANT_READ :
 		$err == Net::SSLeay::ERROR_WANT_WRITE() ? SSL_WANT_WRITE :
 		return;
@@ -371,8 +371,8 @@ sub connect_SSL {
 	$ssl ||= ${*$self}{'_SSL_object'};
 
 	$SSL_ERROR = undef;
-	my $timeout = exists $args->{Timeout} 
-		? $args->{Timeout} 
+	my $timeout = exists $args->{Timeout}
+		? $args->{Timeout}
 		: ${*$self}{io_socket_timeout}; # from IO::Socket
 	if ( defined($timeout) && $timeout>0 && $self->blocking(0) ) {
 		DEBUG(2, "set socket to non-blocking to enforce timeout=$timeout" );
@@ -380,7 +380,7 @@ sub connect_SSL {
 		# enforce timeout with now non-blocking socket
 	} else {
 		# timeout does not apply because invalid or socket non-blocking
-		$timeout = undef; 
+		$timeout = undef;
 	}
 
 	my $start = defined($timeout) && time();
@@ -408,7 +408,7 @@ sub connect_SSL {
 				my $vec = '';
 				vec($vec,$self->fileno,1) = 1;
 				DEBUG(2, "waiting for fd to become ready: $SSL_ERROR" );
-				$rv = 
+				$rv =
 					$SSL_ERROR == SSL_WANT_READ ? select( $vec,undef,undef,$timeout) :
 					$SSL_ERROR == SSL_WANT_WRITE ? select( undef,$vec,undef,$timeout) :
 					undef;
@@ -423,7 +423,7 @@ sub connect_SSL {
 				delete ${*$self}{'_SSL_opening'};
 				${*$self}{'_SSL_opened'} = -1;
 				$self->blocking(1); # was blocking before
-				return 
+				return
 			}
 
 			# socket is ready, try non-blocking connect again after recomputing timeout
@@ -528,15 +528,15 @@ sub accept_SSL {
 	$SSL_ERROR = undef;
 	#DEBUG(2,'calling ssleay::accept' );
 
-	my $timeout = exists $args->{Timeout} 
-		? $args->{Timeout} 
+	my $timeout = exists $args->{Timeout}
+		? $args->{Timeout}
 		: ${*$self}{io_socket_timeout}; # from IO::Socket
 	if ( defined($timeout) && $timeout>0 && $socket->blocking(0) ) {
 		# timeout was given and socket was blocking
 		# enforce timeout with now non-blocking socket
 	} else {
 		# timeout does not apply because invalid or socket non-blocking
-		$timeout = undef; 
+		$timeout = undef;
 	}
 
 	my $start = defined($timeout) && time();
@@ -560,7 +560,7 @@ sub accept_SSL {
 			if ( $timeout>0 ) {
 				my $vec = '';
 				vec($vec,$socket->fileno,1) = 1;
-				$rv = 
+				$rv =
 					$SSL_ERROR == SSL_WANT_READ ? select( $vec,undef,undef,$timeout) :
 					$SSL_ERROR == SSL_WANT_WRITE ? select( undef,$vec,undef,$timeout) :
 					undef;
@@ -573,7 +573,7 @@ sub accept_SSL {
 				delete ${*$self}{'_SSL_opening'};
 				${*$socket}{'_SSL_opened'} = -1;
 				$socket->blocking(1); # was blocking before
-				return 
+				return
 			}
 
 			# socket is ready, try non-blocking accept again after recomputing timeout
@@ -608,14 +608,14 @@ sub generic_read {
 	my ($self, $read_func, undef, $length, $offset) = @_;
 	my $ssl = $self->_get_ssl_object || return;
 	my $buffer=\$_[2];
-	
+
 	$SSL_ERROR = undef;
 	my $data = $read_func->($ssl, $length);
 	if ( !defined($data)) {
 		$self->_set_rw_error( $ssl,-1 ) || $self->error("SSL read error");
 		return;
 	}
-	
+
 	$length = length($data);
 	$$buffer = '' if !defined $$buffer;
 	$offset ||= 0;
@@ -629,9 +629,9 @@ sub generic_read {
 
 sub read {
 	my $self = shift;
-	return $self->generic_read( 
-		$self->blocking ? \&Net::SSLeay::ssl_read_all : \&Net::SSLeay::read, 
-		@_ 
+	return $self->generic_read(
+		$self->blocking ? \&Net::SSLeay::ssl_read_all : \&Net::SSLeay::read,
+		@_
 	);
 }
 
@@ -757,7 +757,7 @@ sub readline {
 		# find first occurence of \n\n
 		my $buf = '';
 		my $eon = 0;
-		while (1) { 
+		while (1) {
 			defined( Net::SSLeay::peek($ssl,1)) || last; # peek more, can block
 			my $pending = Net::SSLeay::pending($ssl);
 			$buf .= Net::SSLeay::peek( $ssl,$pending );	 # will not block
@@ -809,8 +809,7 @@ sub close {
 sub stop_SSL {
 	my $self = shift || return _invalid_object();
 	my $stop_args = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
-	return $self->error("SSL object not open") 
-		if ! ${*$self}{'_SSL_opened'};
+	$stop_args->{SSL_no_shutdown} = 1 if ! ${*$self}{_SSL_opened};
 
 	if (my $ssl = ${*$self}{'_SSL_object'}) {
 		my $shutdown_done;
@@ -819,7 +818,7 @@ sub stop_SSL {
 		} else {
 			my $fast = $stop_args->{SSL_fast_shutdown};
 			my $status = Net::SSLeay::get_shutdown($ssl);
-			if ( $status == SSL_RECEIVED_SHUTDOWN 
+			if ( $status == SSL_RECEIVED_SHUTDOWN
 				|| ( $status != 0 && $fast )) {
 				# shutdown done
 				$shutdown_done = 1;
@@ -881,14 +880,6 @@ sub stop_SSL {
 }
 
 
-sub kill_socket {
-	my $self = shift;
-	shutdown($self, 2);
-	$self->close(SSL_no_shutdown => 1) if ${*$self}{'_SSL_opened'};
-	delete(${*$self}{'_SSL_ctx'});
-	return;
-}
-
 sub fileno {
 	my $self = shift;
 	my $fn = ${*$self}{'_SSL_fileno'};
@@ -944,7 +935,7 @@ sub start_SSL {
 		return $result ? $socket : (bless($socket, $original_class) && ());
 	} else {
 		DEBUG(2, "dont start handshake: $socket" );
-		return $socket; # just return upgraded socket 
+		return $socket; # just return upgraded socket
 	}
 
 }
@@ -978,14 +969,14 @@ sub dump_peer_certificate {
 	);
 	if ( $Net::SSLeay::VERSION >= 1.30 ) {
 		# I think X509_NAME_get_text_by_NID got added in 1.30
-		$dispatcher{commonName} = sub { 
+		$dispatcher{commonName} = sub {
 			my $cn = Net::SSLeay::X509_NAME_get_text_by_NID(
 				Net::SSLeay::X509_get_subject_name( shift ), NID_CommonName);
 			$cn =~s{\0$}{}; # work around Bug in Net::SSLeay <1.33
 			$cn;
 		}
 	} else {
-		$dispatcher{commonName} = sub { 
+		$dispatcher{commonName} = sub {
 			croak "you need at least Net::SSLeay version 1.30 for getting commonName"
 		}
 	}
@@ -1008,12 +999,12 @@ sub dump_peer_certificate {
 		my ($self, $field) = @_;
 		my $ssl = $self->_get_ssl_object or return;
 
-		my $cert = ${*$self}{_SSL_certificate} 
-			||= Net::SSLeay::get_peer_certificate($ssl) 
+		my $cert = ${*$self}{_SSL_certificate}
+			||= Net::SSLeay::get_peer_certificate($ssl)
 			or return $self->error("Could not retrieve peer certificate");
 
 		if ($field) {
-			my $sub = $dispatcher{$field} or croak 
+			my $sub = $dispatcher{$field} or croak
 				"invalid argument for peer_certificate, valid are: ".join( " ",keys %dispatcher ).
 				"\nMaybe you need to upgrade your Net::SSLeay";
 			return $sub->($cert);
@@ -1036,7 +1027,7 @@ sub dump_peer_certificate {
 		},
 		# rfc 2818
 		http => {
-			wildcards_in_cn	 => 0,
+			wildcards_in_cn	 => 1,
 			wildcards_in_alt => 'anywhere',
 			check_cn         => 'when_only',
 		},
@@ -1045,7 +1036,7 @@ sub dump_peer_certificate {
 		# RFC3207 itself just says, that the client should expect the
 		# domain name of the server in the certificate. It doesn't say
 		# anything about wildcards, so I forbid them. It doesn't say
-		# anything about alt names, but other documents show, that alt 
+		# anything about alt names, but other documents show, that alt
 		# names should be possible. The check_cn value again is a guess.
 		# Fix the spec!
 		smtp => {
@@ -1148,7 +1139,7 @@ sub dump_peer_certificate {
 		}
 
 		if ( ! $ipn and (
-			$scheme->{check_cn} eq 'always' or 
+			$scheme->{check_cn} eq 'always' or
 			$scheme->{check_cn} eq 'when_only' and !$alt_dnsNames)) {
 			$check_name->($commonName,$identity,$scheme->{wildcards_in_cn})
 				and return 1;
@@ -1182,8 +1173,12 @@ sub fatal_ssl_error {
 	$@ = $self->errstr;
 	if (defined $error_trap and ref($error_trap) eq 'CODE') {
 		$error_trap->($self, $self->errstr()."\n".$self->get_ssleay_error());
-	} else { 
-		$self->kill_socket; 
+	} elsif ( ${*$self}{'_SSL_ioclass_upgraded'} ) {
+		# downgrade only
+		$self->stop_SSL;
+	} else {
+		# kill socket
+		$self->close
 	}
 	return;
 }
@@ -1207,7 +1202,7 @@ sub error {
 
 sub DESTROY {
 	my $self = shift || return;
-	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1) 
+	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
 		if ${*$self}{'_SSL_opened'};
 	delete(${*$self}{'_SSL_ctx'});
 }
@@ -1216,6 +1211,7 @@ sub DESTROY {
 #######Extra Backwards Compatibility Functionality#######
 sub socket_to_SSL { IO::Socket::SSL->start_SSL(@_); }
 sub socketToSSL { IO::Socket::SSL->start_SSL(@_); }
+sub kill_socket { shift->close }
 
 sub issuer_name { return(shift()->peer_certificate("issuer")) }
 sub subject_name { return(shift()->peer_certificate("subject")) }
@@ -1258,7 +1254,7 @@ sub want_write { shift->errstr == SSL_WANT_WRITE }
 
 #Redundant IO::Handle functionality
 sub getline { return(scalar shift->readline()) }
-sub getlines { 
+sub getlines {
 	return(shift->readline()) if wantarray();
 	croak("Use of getlines() not allowed in scalar context");
 }
@@ -1362,13 +1358,13 @@ sub new {
 	# buffer was written and not block for the rest
 	# SSL_MODE_ENABLE_PARTIAL_WRITE can be necessary for non-blocking because we
 	# cannot guarantee, that the location of the buffer stays constant
-	Net::SSLeay::CTX_set_mode( $ctx, 
+	Net::SSLeay::CTX_set_mode( $ctx,
 		SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER|SSL_MODE_ENABLE_PARTIAL_WRITE);
 
 
 	my $verify_mode = $arg_hash->{SSL_verify_mode};
-	if ( $verify_mode != Net::SSLeay::VERIFY_NONE() and 
-		! Net::SSLeay::CTX_load_verify_locations( 
+	if ( $verify_mode != Net::SSLeay::VERIFY_NONE() and
+		! Net::SSLeay::CTX_load_verify_locations(
 			$ctx, $arg_hash->{SSL_ca_file} || '',$arg_hash->{SSL_ca_path} || '') ) {
 		if ( ! $arg_hash->{SSL_ca_file} && ! $arg_hash->{SSL_ca_path} ) {
 			carp("No certificate verification because neither SSL_ca_file nor SSL_ca_path known");
@@ -1380,19 +1376,19 @@ sub new {
 
 	if ($arg_hash->{'SSL_check_crl'}) {
 		if (Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x0090702f) {
-                    Net::SSLeay::X509_STORE_set_flags(
-                        Net::SSLeay::CTX_get_cert_store($ctx),
-                        Net::SSLeay::X509_V_FLAG_CRL_CHECK()
-                      );
-                    if ($arg_hash->{'SSL_crl_file'}) {
-                        my $bio = Net::SSLeay::BIO_new_file($arg_hash->{'SSL_crl_file'}, 'r');
-                        my $crl = Net::SSLeay::PEM_read_bio_X509_CRL($bio);
-                        if ( $crl ) {
-                            Net::SSLeay::X509_STORE_add_crl(Net::SSLeay::CTX_get_cert_store($ctx), $crl);
-                        } else {
-                            return IO::Socket::SSL->error("Invalid certificate revocation list");
-                        }
-                    }
+		    Net::SSLeay::X509_STORE_set_flags(
+			Net::SSLeay::CTX_get_cert_store($ctx),
+			Net::SSLeay::X509_V_FLAG_CRL_CHECK()
+		      );
+		    if ($arg_hash->{'SSL_crl_file'}) {
+			my $bio = Net::SSLeay::BIO_new_file($arg_hash->{'SSL_crl_file'}, 'r');
+			my $crl = Net::SSLeay::PEM_read_bio_X509_CRL($bio);
+			if ( $crl ) {
+			    Net::SSLeay::X509_STORE_add_crl(Net::SSLeay::CTX_get_cert_store($ctx), $crl);
+			} else {
+			    return IO::Socket::SSL->error("Invalid certificate revocation list");
+			}
+		    }
 		} else {
 			return IO::Socket::SSL->error("CRL not supported for OpenSSL < v0.9.7b");
 		}
@@ -1420,10 +1416,10 @@ sub new {
 			# a chain of certificates
 			my @x509 = ref($x509) eq 'ARRAY' ? @$x509: ($x509);
 			my $cert = shift @x509;
-			Net::SSLeay::CTX_use_certificate( $ctx,$cert ) 
+			Net::SSLeay::CTX_use_certificate( $ctx,$cert )
 				|| return IO::Socket::SSL->error("Failed to use Certificate");
 			foreach my $ca (@x509) {
-				Net::SSLeay::CTX_add_extra_chain_cert( $ctx,$ca ) 
+				Net::SSLeay::CTX_add_extra_chain_cert( $ctx,$ca )
 					|| return IO::Socket::SSL->error("Failed to use Certificate");
 			}
 		} elsif ( my $f = $arg_hash->{SSL_cert_file} ) {
@@ -1436,7 +1432,7 @@ sub new {
 			Net::SSLeay::CTX_set_tmp_dh( $ctx,$dh )
 				|| return IO::Socket::SSL->error( "Failed to set DH from SSL_dh" );
 		} elsif ( my $f = $arg_hash->{SSL_dh_file} ) {
-			my $bio = Net::SSLeay::BIO_new_file( $f,'r' ) 
+			my $bio = Net::SSLeay::BIO_new_file( $f,'r' )
 				|| return IO::Socket::SSL->error( "Failed to open DH file $f" );
 			my $dh = Net::SSLeay::PEM_read_bio_DHparams($bio);
 			Net::SSLeay::BIO_free($bio);
@@ -1488,7 +1484,7 @@ sub session_cache {
 	my ($addr,$port,$session) = @_;
 	$port ||= $addr =~s{:(\w+)$}{} && $1; # host:port
 	my $key = "$addr:$port";
-	return defined($session) 
+	return defined($session)
 		? $cache->add_session($key, $session)
 		: $cache->get_session($key);
 }
@@ -1503,7 +1499,7 @@ sub DESTROY {
 	my $self = shift;
 	if ( my $ctx = $self->{context} ) {
 		DEBUG( 3,"free ctx $ctx open=".join( " ",keys %CTX_CREATED_IN_THIS_THREAD ));
-		if ( %CTX_CREATED_IN_THIS_THREAD and 
+		if ( %CTX_CREATED_IN_THIS_THREAD and
 			delete $CTX_CREATED_IN_THIS_THREAD{$ctx} ) {
 			# remove any verify callback for this context
 			if ( $self->{has_verifycb}) {
@@ -1587,7 +1583,7 @@ IO::Socket::SSL -- Nearly transparent SSL encapsulation for IO::Socket::INET.
 	use strict;
 	use IO::Socket::SSL;
 
-	my $client = IO::Socket::SSL->new("www.example.com:https") 
+	my $client = IO::Socket::SSL->new("www.example.com:https")
 		|| warn "I encountered a problem: ".IO::Socket::SSL::errstr();
 	$client->verify_hostname( 'www.example.com','http' )
 		|| die "hostname verification failed";
@@ -1642,7 +1638,7 @@ which auto-negotiates between SSLv2 and SSLv3.	You may specify 'SSLv2', 'SSLv3',
 =item SSL_cipher_list
 
 If this option is set the cipher list for the connection will be set to the
-given value, e.g. something like 'ALL:!LOW:!EXP:!ADH'. Look into the OpenSSL 
+given value, e.g. something like 'ALL:!LOW:!EXP:!ADH'. Look into the OpenSSL
 documentation (L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>)
 for more details.
 If this option is not used the openssl builtin default is used which is suitable
@@ -1797,7 +1793,7 @@ positive cache size.  For successive connections, pass the SSL_reuse_ctx option 
 the new() calls (or use set_default_context()) to make use of the cached sessions.
 The session cache size refers to the number of unique host/port pairs that can be
 stored at one time; the oldest sessions in the cache will be removed if new ones are
-added.	
+added.
 
 =item SSL_session_cache
 
@@ -1806,7 +1802,7 @@ Overrules SSL_session_cache_size.
 This option is useful if you want to reuse the cache, but not the rest of
 the context.
 
-A session cache object can be created using 
+A session cache object can be created using
 C<< IO::Socket::SSL::Session_Cache->new( cachesize ) >>.
 
 Use set_default_session_cache() to set a global cache object.
@@ -1845,7 +1841,7 @@ if you have used shutdown() or are working on a copy of a socket.
 
 =item SSL_fast_shutdown
 
-If set to true only a unidirectional shutdown will be done, e.g. only the 
+If set to true only a unidirectional shutdown will be done, e.g. only the
 close_notify (see SSL_shutdown(3)) will be called. Otherwise a bidrectional
 shutdown will be done. If used within close() it defaults to true, if used
 within stop_SSL() it defaults to false.
@@ -1883,7 +1879,7 @@ method directly returns the result of the dump_peer_certificate() method of Net:
 
 =item B<peer_certificate($field)>
 
-If a peer certificate exists, this function can retrieve values from it. 
+If a peer certificate exists, this function can retrieve values from it.
 If no field is given the internal representation of certificate from Net::SSLeay is
 returned.
 The following fields can be queried:
@@ -1908,7 +1904,7 @@ Alternative names for the subject, usually different names for the same
 server, like example.org, example.com, *.example.com.
 
 It returns a list of (typ,value) with typ GEN_DNS, GEN_IPADD etc (these
-constants are exported from IO::Socket::SSL). 
+constants are exported from IO::Socket::SSL).
 See Net::SSLeay::X509_get_subjectAltNames.
 
 =back
@@ -1945,23 +1941,23 @@ that subjectAltNames are possible, but no wildcards are possible anywhere.
 
 =back
 
-The scheme can be given either by specifying the name for one of the above predefined 
-schemes, by using a callback (see below) or by using a hash which can have the 
+The scheme can be given either by specifying the name for one of the above predefined
+schemes, by using a callback (see below) or by using a hash which can have the
 following keys and values:
 
 =over 8
 
 =item check_cn:  0|'always'|'when_only'
 
-Determines if the common name gets checked. If 'always' it will always be checked 
+Determines if the common name gets checked. If 'always' it will always be checked
 (like in ldap), if 'when_only' it will only be checked if no names are given in
 subjectAltNames (like in http), for any other values the common name will not be checked.
 
 =item wildcards_in_alt: 0|'leftmost'|'anywhere'
 
 Determines if and where wildcards in subjectAltNames are possible. If 'leftmost'
-only cases like *.example.org will be possible (like in ldap), for 'anywhere' 
-www*.example.org is possible too (like http), dangerous things like but www.*.org 
+only cases like *.example.org will be possible (like in ldap), for 'anywhere'
+www*.example.org is possible too (like http), dangerous things like but www.*.org
 or even '*' will not be allowed.
 
 =item wildcards_in_cn: 0|'leftmost'|'anywhere'
@@ -1984,7 +1980,7 @@ object to perform this method on, call IO::Socket::SSL::errstr() instead.
 For read and write errors on non-blocking sockets, this method may include the string
 C<SSL wants a read first!> or C<SSL wants a write first!> meaning that the other side
 is expecting to read from or write to the socket and wants to be satisfied before you
-get to do anything. But with version 0.98 you are better comparing the global exported 
+get to do anything. But with version 0.98 you are better comparing the global exported
 variable $SSL_ERROR against the exported symbols SSL_WANT_READ and SSL_WANT_WRITE.
 
 =item B<opened()>
@@ -2002,8 +1998,8 @@ set the parameter "SSL_server" to 1, i.e. IO::Socket::SSL->start_SSL($socket, SS
 If you have a class that inherits from IO::Socket::SSL and you want the $socket to be blessed
 into your own class instead, use MyClass->start_SSL($socket) to achieve the desired effect.
 
-Note that if start_SSL() fails in SSL negotiation, $socket will remain blessed in its 
-original class.	 For non-blocking sockets you better just upgrade the socket to 
+Note that if start_SSL() fails in SSL negotiation, $socket will remain blessed in its
+original class.	 For non-blocking sockets you better just upgrade the socket to
 IO::Socket::SSL and call accept_SSL or connect_SSL and the upgraded object. To
 just upgrade the socket set B<SSL_startHandshake> explicitly to 0. If you call start_SSL
 w/o this parameter it will revert to blocking behavior for accept_SSL and connect_SSL.
@@ -2020,7 +2016,7 @@ in fact close() calls stop_SSL() (but without downgrading the class).
 
 Will return true if it suceeded and undef if failed. This might be the case for
 non-blocking sockets. In this case $! is set to EAGAIN and the ssl error to
-SSL_WANT_READ or SSL_WANT_WRITE. In this case the call should be retried again with 
+SSL_WANT_READ or SSL_WANT_WRITE. In this case the call should be retried again with
 the same arguments once the socket is ready is until it succeeds.
 
 =item B<< IO::Socket::SSL->new_from_fd($fd, ...) >>
@@ -2098,12 +2094,12 @@ and read/sysread families instead.
 =head1 IPv6
 
 Support for IPv6 with IO::Socket::SSL is expected to work and basic testing is done.
-If IO::Socket::INET6 is available it will automatically use it instead of 
-IO::Socket::INET4. 
+If IO::Socket::INET6 is available it will automatically use it instead of
+IO::Socket::INET4.
 
 Please be aware of the associated problems: If you give a name as a host and the
 host resolves to both IPv6 and IPv4 it will try IPv6 first and if there is no IPv6
-connectivity it will fail. 
+connectivity it will fail.
 
 To avoid these problems you can either force IPv4 by specifying and AF_INET as the
 Domain (this is per socket) or load IO::Socket::SSL with the option 'inet4'
@@ -2125,7 +2121,7 @@ using them in any way that you consider meaningful.
 If you are having problems using IO::Socket::SSL despite the fact that can recite backwards
 the section of this documentation labelled 'Using SSL', you should try enabling debugging.	To
 specify the debug level, pass 'debug#' (where # is a number from 0 to 3) to IO::Socket::SSL
-when calling it. 
+when calling it.
 The debug level will also be propagated to Net::SSLeay::trace, see also L<Net::SSLeay>:
 
 =over 4
@@ -2156,7 +2152,7 @@ See the 'example' directory.
 =head1 BUGS
 
 IO::Socket::SSL is not threadsafe.
-This is because IO::Socket::SSL is based on Net::SSLeay which 
+This is because IO::Socket::SSL is based on Net::SSLeay which
 uses a global object to access some of the API of openssl
 and is therefore not threadsafe.
 It might probably work if you don't use SSL_verify_callback and
@@ -2196,6 +2192,9 @@ use the SSL_reuse_ctx option if you want to re-use a context
 
 use IO::Socket::SSL->start_SSL() instead
 
+=item kill_socket()
+
+use close() instead
 
 =item get_peer_certificate()
 

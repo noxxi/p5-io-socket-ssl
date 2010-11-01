@@ -34,6 +34,7 @@ t/cert_no_file.t
 t/dhe.t
 t/readline.t
 t/start-stopssl.t
+t/startssl-failed.t
 t/acceptSSL-timeout.t
 t/connectSSL-timeout.t
 t/verify_hostname.t
