@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.34';
+	$VERSION = '1.35';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1366,12 +1366,7 @@ sub new {
 	if ( $verify_mode != Net::SSLeay::VERIFY_NONE() and
 		! Net::SSLeay::CTX_load_verify_locations(
 			$ctx, $arg_hash->{SSL_ca_file} || '',$arg_hash->{SSL_ca_path} || '') ) {
-		if ( ! $arg_hash->{SSL_ca_file} && ! $arg_hash->{SSL_ca_path} ) {
-			carp("No certificate verification because neither SSL_ca_file nor SSL_ca_path known");
-			$verify_mode = Net::SSLeay::VERIFY_NONE();
-		} else {
-			return IO::Socket::SSL->error("Invalid certificate authority locations");
-		}
+		return IO::Socket::SSL->error("Invalid certificate authority locations");
 	}
 
 	if ($arg_hash->{'SSL_check_crl'}) {

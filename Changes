@@ -1,4 +1,10 @@
 
+v1.35 2010.12.06
+- if verify_mode is not VERIFY_NONE and the ca_file/ca_path cannot be
+  verified as valid it will no longer fall back to VERIFY_NONE but throw
+  an error. Thanks to Salvatore Bonaccorso and Daniel Kahn Gillmor for
+  pointing out the problem, see also 
+  http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=606058
 v1.34 2010.11.01
 - schema http for certificate verification changed to 
   wildcards_in_cn=1, because according to rfc2818 this is valid and
