@@ -1,4 +1,8 @@
 
+v1.36 2010.12.08
+- update documentation for SSL_verify_callback based on 
+  https://rt.cpan.org/Ticket/Display.html?id=63743
+  https://rt.cpan.org/Ticket/Display.html?id=63740
 v1.35 2010.12.06
 - if verify_mode is not VERIFY_NONE and the ca_file/ca_path cannot be
   verified as valid it will no longer fall back to VERIFY_NONE but throw

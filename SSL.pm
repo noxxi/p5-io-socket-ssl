@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.35';
+	$VERSION = '1.36';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1722,18 +1722,40 @@ This option sets the verification mode for the peer certificate.  The default
 (0x00) does no authentication.	You may combine 0x01 (verify peer), 0x02 (fail
 verification if no peer certificate exists; ignored for clients), and 0x04
 (verify client once) to change the default.
+
 See OpenSSL man page for SSL_CTX_set_verify for more information.
 
 =item SSL_verify_callback
 
 If you want to verify certificates yourself, you can pass a sub reference along
 with this parameter to do so.  When the callback is called, it will be passed:
-1) a true/false value that indicates what OpenSSL thinks of the certificate,
-2) a C-style memory address of the certificate store,
-3) a string containing the certificate's issuer attributes and owner attributes, and
-4) a string containing any errors encountered (0 if no errors).
+
+=over 4
+
+=item 1.
+a true/false value that indicates what OpenSSL thinks of the certificate,
+
+=item 2.
+a C-style memory address of the certificate store,
+
+=item 3.
+a string containing the certificate's issuer attributes and owner attributes, and
+
+=item 4.
+a string containing any errors encountered (0 if no errors).
+
+=item 5.
+a C-style memory address of the peer's own certificate (convertible to
+PEM form with Net::SSLeay::PEM_get_string_X509()).
+
+=back
+
 The function should return 1 or 0, depending on whether it thinks the certificate
 is valid or invalid.  The default is to let OpenSSL do all of the busy work.
+
+The callback will be called for each element in the certificate chain.
+
+See the OpenSSL documentation for SSL_CTX_set_verify for more information.
 
 =item SSL_verifycn_scheme
 
