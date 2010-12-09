@@ -1,4 +1,9 @@
 
+v1.37 2010.12.09
+- don't complain about invalid certificate locations if user explicitly 
+  set SSL_ca_path and SSL_ca_file to undef. Assume that user knows what
+  he is doing and will work around the problems by itself.
+  http://rt.cpan.org/Ticket/Display.html?id=63741
 v1.36 2010.12.08
 - update documentation for SSL_verify_callback based on 
   https://rt.cpan.org/Ticket/Display.html?id=63743

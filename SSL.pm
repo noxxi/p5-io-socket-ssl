@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.36';
+	$VERSION = '1.37';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1364,6 +1364,7 @@ sub new {
 
 	my $verify_mode = $arg_hash->{SSL_verify_mode};
 	if ( $verify_mode != Net::SSLeay::VERIFY_NONE() and
+	    ( defined $arg_hash->{SSL_ca_file} || defined $arg_hash->{SSL_ca_path}) and
 		! Net::SSLeay::CTX_load_verify_locations(
 			$ctx, $arg_hash->{SSL_ca_file} || '',$arg_hash->{SSL_ca_path} || '') ) {
 		return IO::Socket::SSL->error("Invalid certificate authority locations");
@@ -1707,6 +1708,7 @@ If you want to verify that the peer certificate has been signed by a reputable
 certificate authority, then you should use this option to locate the file
 containing the certificateZ<>(s) of the reputable certificate authorities if it is
 not already in the file F<certs/my-ca.pem>.
+If you definitly want no SSL_ca_file used you should set it to undef.
 
 =item SSL_ca_path
 
@@ -1715,6 +1717,7 @@ yourself up a directory containing several trusted certificates as separate file
 as well as an index of the certificates.  If you want to use that directory for
 validation purposes, and that directory is not F<ca/>, then use this option to
 point IO::Socket::SSL to the right place to look.
+If you definitly want no SSL_ca_path used you should set it to undef.
 
 =item SSL_verify_mode
 
