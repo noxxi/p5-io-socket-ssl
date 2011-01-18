@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.37';
+	$VERSION = '1.38';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1027,7 +1027,7 @@ sub dump_peer_certificate {
 		},
 		# rfc 2818
 		http => {
-			wildcards_in_cn	 => 1,
+			wildcards_in_cn	 => 'anywhere',
 			wildcards_in_alt => 'anywhere',
 			check_cn         => 'when_only',
 		},
