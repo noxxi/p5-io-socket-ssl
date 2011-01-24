@@ -1,4 +1,7 @@
 
+v1.38_1 2011.01.24
+- close should undef _SSL_fileno, because the fileno is no longer
+  valid (SSL connection and socket are closed)
 v1.38 2011.01.18
 - fixed wildcards_in_cn setting for http (wrongly set in 1.34 to 1
   instead of anywhere). Thanks to dagolden[AT]cpan[DOT]org for

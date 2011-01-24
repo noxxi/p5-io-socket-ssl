@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.38';
+	$VERSION = '1.38_1';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -801,6 +801,7 @@ sub close {
 
 	if ( ! $close_args->{_SSL_in_DESTROY} ) {
 		untie( *$self );
+		undef ${*$self}{_SSL_fileno};
 		return $self->SUPER::close;
 	}
 	return 1;
