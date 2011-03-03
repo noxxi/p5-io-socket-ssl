@@ -1,4 +1,6 @@
 
+v1.39 2011.03.03
+- fixed documentation of http verification: wildcards in cn is allowed
 v1.38_1 2011.01.24
 - close should undef _SSL_fileno, because the fileno is no longer
   valid (SSL connection and socket are closed)

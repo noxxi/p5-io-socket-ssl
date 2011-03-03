@@ -1951,8 +1951,8 @@ match it checks against the common name, but there are no wildcards allowed.
 
 =item http (rfc2818), alias is www
 
-Extended wildcards in subjectAltNames are possible, e.g. *.example.org or
-even www*.example.org. Wildcards in the common name are not allowed. The common
+Extended wildcards in subjectAltNames and common name are possible, e.g. 
+*.example.org or even www*.example.org. The common
 name will be only checked if no names are given in subjectAltNames.
 
 =item smtp (rfc3207)
