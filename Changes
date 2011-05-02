@@ -1,4 +1,7 @@
 
+v1.39_1 2011.05.02
+- fix in exampel/async_https_server.
+  Thanks to DetlefPilzecker[AT]web[DOT]de for reporting
 v1.39 2011.03.03
 - fixed documentation of http verification: wildcards in cn is allowed
 v1.38_1 2011.01.24

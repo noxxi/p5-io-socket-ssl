@@ -134,7 +134,7 @@ sub _client_write_response {
 		DEBUG( $SSL_ERROR );
 		if ( $SSL_ERROR == SSL_WANT_READ ) {
 			# retry write once we can read
-			event_new( $fdc, EV_READ, \&_client_write )->add;
+			event_new( $fdc, EV_READ, \&_client_write_response )->add;
 		} else {
 			$event->add; # retry again
 		}
