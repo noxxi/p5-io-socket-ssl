@@ -57,14 +57,14 @@ if ( eval { require Scalar::Util } ) {
 }
 
 # check if we have something which handles IDN
-if ( ! eval { require Net::IDN::Encode } and ! eval { require Net::LibIDN }) {
+if ( ! eval { require Net::IDN::Encode } and ! eval { require Net::LibIDN } and ! eval { require URI; URI->VERSION(1.50) }) {
 	warn <<'EOM';
 
 WARNING
 No library for handling international domain names found.
 It will work but croak if you try to verify an international name against
 a certificate.
-It's recommended to install either Net::IDN::Encode or Net::LibIDN
+It's recommended to install either Net::IDN::Encode, Net::LibIDN or URI version>=1.50
 
 EOM
 }

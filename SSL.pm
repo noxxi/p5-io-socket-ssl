@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.39';
+	$VERSION = '1.40';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -121,12 +121,14 @@ BEGIN {
 		*{idn_to_ascii} = \&Net::IDN::Encode::domain_to_ascii;
 	} elsif ( eval { require Net::LibIDN }) {
 		*{idn_to_ascii} = \&Net::LibIDN::idn_to_ascii;
+	} elsif ( eval { require URI; URI->VERSION(1.50) }) {
+	        *{idn_to_ascii} = sub { URI->new("http://" . shift)->host }
 	} else {
 		# default: croak if we really got an unencoded international domain
 		*{idn_to_ascii} = sub {
 			my $domain = shift;
 			return $domain if $domain =~m{^[a-zA-Z0-9-_\.]+$};
-			croak "cannot handle international domains, please install Net::LibIDN or Net::IDN::Encode"
+			croak "cannot handle international domains, please install Net::LibIDN, Net::IDN::Encode or URI"
 		}
 	}
 }

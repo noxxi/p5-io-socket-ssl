@@ -1,4 +1,7 @@
 
+v1.40 2011.05.02
+- integrated patch from GAAS to get IDN support from URI.
+  https://rt.cpan.org/Ticket/Display.html?id=67676
 v1.39_1 2011.05.02
 - fix in exampel/async_https_server.
   Thanks to DetlefPilzecker[AT]web[DOT]de for reporting

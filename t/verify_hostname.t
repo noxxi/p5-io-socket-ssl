@@ -22,7 +22,7 @@ do "t/ssl_settings.req" || do "ssl_settings.req";
 
 # if we have an IDN library max the IDN tests too
 my $can_idn  = eval { require Encode } &&
-	( eval { require Net::LibIDN } || eval { require Net::IDN::Encode } );
+	( eval { require Net::LibIDN } || eval { require Net::IDN::Encode } || eval { require URI; URI->VERSION(1.50) } );
 
 $|=1;
 my $max = 40;
