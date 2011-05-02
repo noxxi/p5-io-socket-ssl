@@ -21,6 +21,7 @@ my $server = IO::Socket::INET->new(
 	LocalAddr => '0.0.0.0:9000',
 	Listen => 10,
 	Reuse => 1,
+	Blocking => 0,
 ) || die $!;
 
 event_new( $server, EV_READ|EV_PERSIST, \&_s_accept )->add();
