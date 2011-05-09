@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.40';
+	$VERSION = '1.40_1';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -821,13 +821,14 @@ sub stop_SSL {
 		} else {
 			my $fast = $stop_args->{SSL_fast_shutdown};
 			my $status = Net::SSLeay::get_shutdown($ssl);
-			if ( $status == SSL_RECEIVED_SHUTDOWN
-				|| ( $status != 0 && $fast )) {
-				# shutdown done
+			if ( $fast && $status != 0) {
+				# shutdown done, either status has  
+				# SSL_SENT_SHUTDOWN or SSL_RECEIVED_SHUTDOWN or both,
+				# so the handshake is at least in process
 				$shutdown_done = 1;
-			} else {
+			} elsif ( ( $status & SSL_SENT_SHUTDOWN ) == 0 ) {
 				# need to initiate/continue shutdown
-				local $SIG{PIPE} = sub{};
+				local $SIG{PIPE} = 'IGNORE';
 				for my $try (1,2 ) {
 					my $rv = Net::SSLeay::shutdown($ssl);
 					if ( $rv < 0 ) {
@@ -841,10 +842,15 @@ sub stop_SSL {
 						$shutdown_done = 1;
 						last;
 					} else {
-						# shutdown partly finished (e.g. one direction)
+						# shutdown partly initiated (e.g. one direction)
 						# call again
 					}
 				}
+			} elsif ( $status & SSL_RECEIVED_SHUTDOWN ) {
+				# SSL_SENT_SHUTDOWN is done already (previous if-case)
+				# and because SSL_RECEIVED_SHUTDOWN is done also we
+				# consider the shutdown done
+				$shutdown_done = 1;
 			}
 		}
 
