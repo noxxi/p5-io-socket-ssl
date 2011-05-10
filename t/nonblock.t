@@ -43,6 +43,10 @@ my %extra_options = $Net::SSLeay::VERSION>=1.16 ?
     ) : (
 	SSL_key_file => "certs/client-key.pem"
     );
+%extra_options = ( %extra_options,
+    SSL_version => 'TLSv1',
+    SSL_cipher_list => 'HIGH',
+);
 
 
 # first create simple non-blocking tcp-server
@@ -124,8 +128,6 @@ if ( $pid == 0 ) {
 	# upgrade to SSL socket w/o connection yet
 	if ( ! IO::Socket::SSL->start_SSL( $to_server,
 	    SSL_startHandshake => 0,
-	    SSL_version => 'TLSv1',
-	    SSL_cipher_list => 'HIGH',
 	    %extra_options
 	)) {
 	    diag( 'start_SSL return undef' );
@@ -149,7 +151,7 @@ if ( $pid == 0 ) {
 	    } elsif ( $SSL_ERROR == SSL_WANT_WRITE ) {
 		IO::Select->new($to_server)->can_write(30) && next; # retry if can write
 	    }
-	    diag( "failed to connect: ".$to_server->errstr );
+	    diag( "failed to connect: $@" );
 	    print "not ";
 	    last;
 	}
@@ -183,29 +185,36 @@ if ( $pid == 0 ) {
 	    $test_might_fail = 1;
 	}
 
+	my $can;
 	WRITE:
 	for( my $i=0;$i<50000;$i++ ) {
 	    my $offset = 0;
 	    while (1) {
+	        if ( $can && ! IO::Select->new($to_server)->$can(30)) {
+		    diag("fail $can");
+		    print "not ";
+		    last WRITE;
+		};
 		my $n = syswrite( $to_server,$msg,length($msg)-$offset,$offset );
 		if ( !defined($n) ) {
 		    diag( "\$!=$! \$SSL_ERROR=$SSL_ERROR send=$bytes_send" );
 		    if ( $! == EAGAIN ) {
 			if ( $SSL_ERROR == SSL_WANT_WRITE ) {
 			    diag( 'wait for write' );
+			    $can = 'can_write';
 			    $attempts++;
-			    IO::Select->new($to_server)->can_write(30);
-			    diag( "can write again" );
 			} elsif ( $SSL_ERROR == SSL_WANT_READ ) {
 			    diag( 'wait for read' );
-			    IO::Select->new($to_server)->can_read(30);
+			    $can = 'can_read';
+			} else {
+			    $can = 'can_write';
 			}
 		    } elsif ( ( $! == EPIPE || $! == ECONNRESET ) && $bytes_send > 30000 ) {
 			diag( "connection closed hard" );
 			last WRITE;
 		    } else {
 			print "not ";
-			last WRITE;
+		    	last WRITE;
 		    }
 		    next;
 		} elsif ( $n == 0 ) {
@@ -228,13 +237,10 @@ if ( $pid == 0 ) {
 	}
 	ok( "syswrite" );
 	
-	if ( ! $attempts ) {
-	    if ( $test_might_fail ) {
-	    	ok( " write attempts failed, but OK nevertheless because setsockopt failed" );
-	    } else {
-	    	print "not " if !$attempts;
-	    }
+	if ( ! $attempts && $test_might_fail ) {
+		ok( " write attempts failed, but OK nevertheless because setsockopt failed" );
 	} else {
+	   	print "not " if !$attempts;
 	    ok( "multiple write attempts" );
 	}
 
@@ -268,9 +274,9 @@ if ( $pid == 0 ) {
 	$from_client->blocking(0);
 
 	# read plain text data
-	my $buf;
-	while (1) {
-	    sysread( $from_client, $buf,9 ) && last;
+	my $buf = '';
+	while ( length($buf) <9 ) {
+	    sysread( $from_client, $buf,9-length($buf),length($buf) ) && next;
 	    die "sysread failed: $!" if $! != EAGAIN;
 	    IO::Select->new( $from_client )->can_read(30);
 	}
@@ -286,8 +292,6 @@ if ( $pid == 0 ) {
 	    SSL_ca_file => "certs/test-ca.pem",
 	    SSL_use_cert => 1,
 	    SSL_cert_file => "certs/client-cert.pem",
-	    SSL_version => 'TLSv1',
-	    SSL_cipher_list => 'HIGH',
 	    %extra_options
 	)) {
 	    diag( 'start_SSL return undef' );
@@ -306,7 +310,6 @@ if ( $pid == 0 ) {
 	my $attempts = 0;
 	while ( 1 ) {
 	    $from_client->accept_SSL && last;
-	    diag( $SSL_ERROR );
 	    if ( $SSL_ERROR == SSL_WANT_READ ) {
 		$attempts++;
 		IO::Select->new($from_client)->can_read(30) && next; # retry if can read
@@ -314,7 +317,7 @@ if ( $pid == 0 ) {
 		$attempts++;
 		IO::Select->new($from_client)->can_write(30) && next; # retry if can write
 	    }
-	    diag( "failed to accept: ".$from_client->errstr );
+	    diag( "failed to accept: $@" );
 	    print "not ";
 	    last;
 	}
@@ -338,18 +341,26 @@ if ( $pid == 0 ) {
 	my $bytes_received = 10;
 
 	# read up to 30000 bytes from client, then close the socket
+	my $can;
 	READ:
 	while ( ( my $diff = 30000 - $bytes_received ) > 0 ) {
+	    if ( $can && ! IO::Select->new($from_client)->$can(30)) {
+	    	diag("failed $can");
+		print "not ";
+		last READ;
+	    }
 	    my $n = sysread( $from_client,my $buf,$diff );
 	    if ( !defined($n) ) {
 		diag( "\$!=$! \$SSL_ERROR=$SSL_ERROR" );
 		if ( $! == EAGAIN ) {
 		    if ( $SSL_ERROR == SSL_WANT_READ ) {
 			$attempts++;
-			IO::Select->new($from_client)->can_read(30);
+			$can = 'can_read';
 		    } elsif ( $SSL_ERROR == SSL_WANT_WRITE ) {
 			$attempts++;
-			IO::Select->new($from_client)->can_write(30);
+			$can = 'can_write';
+		    } else {
+			$can = 'can_read';
 		    }
 		} else {
 		    print "not ";
@@ -366,10 +377,10 @@ if ( $pid == 0 ) {
 	    }
 
 	    $bytes_received += $n;
-	    diag( "read of $n bytes" );
+	    #diag( "read of $n bytes" );
 	}
 
-	diag( "read $bytes_received" );
+	diag( "read $bytes_received ($attempts r/w attempts)" );
 	close($from_client);
     }
 

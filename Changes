@@ -1,8 +1,10 @@
 
-v1.40_1 2011.05.09
+v1.41 2011.05.09
 - fix issue in stop_SSL where it did not issue a shutdown of the 
   SSL connection if it first received the shutdown from the other
   side. Thanks to fencingleo[AT]gmail[DOT]com for reporting
+- try to make t/nonblock.t more reliable, at least report the real
+  cause of ssl connection errors
 v1.40 2011.05.02
 - integrated patch from GAAS to get IDN support from URI.
   https://rt.cpan.org/Ticket/Display.html?id=67676
