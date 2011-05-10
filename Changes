@@ -1,4 +1,9 @@
 
+v1.42 2011.05.10
+- add SSL_create_ctx_callback to have a way to adjust context on
+  creation. https://rt.cpan.org/Ticket/Display.html?id=67799
+- describe problem of fake memory leak because of big session cache
+  and how to fix it, see https://rt.cpan.org/Ticket/Display.html?id=68073
 v1.41 2011.05.09
 - fix issue in stop_SSL where it did not issue a shutdown of the 
   SSL connection if it first received the shutdown from the other

@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.41';
+	$VERSION = '1.42';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -905,6 +905,13 @@ sub _get_ssl_object {
 	return $ssl;
 }
 
+# _get_ctx_object is for internal use ONLY!
+sub _get_ctx_object {
+	my $self = shift;
+	my $ctx_object = ${*$self}{_SSL_ctx};
+	return $ctx_object && $ctx_object->{context};
+}
+
 # default error for undefined arguments
 sub _invalid_object {
 	return IO::Socket::SSL->error("Undefined IO::Socket::SSL object");
@@ -1465,6 +1472,10 @@ sub new {
 
 	Net::SSLeay::CTX_set_verify($ctx, $verify_mode, $verify_callback);
 
+	if ( my $cb = $arg_hash->{SSL_create_ctx_callback} ) {
+		$cb->($ctx);
+	}
+
 	$ctx_object = { context => $ctx };
 	$ctx_object->{has_verifycb} = 1 if $verify_callback;
 	DEBUG(3, "new ctx $ctx" );
@@ -1478,6 +1489,7 @@ sub new {
 			if $Net::SSLeay::VERSION < 1.26;
 		$ctx_object->{session_cache} = IO::Socket::SSL::Session_Cache->new( $size );
 	}
+
 
 	return bless $ctx_object, $class;
 }
@@ -1813,6 +1825,20 @@ If you use this option, all other context-related options that you pass
 in the same call to new() will be ignored unless the context supplied was invalid.
 Note that, contrary to versions of IO::Socket::SSL below v0.90, a global SSL context
 will not be implicitly used unless you use the set_default_context() function.
+
+=item SSL_create_ctx_callback
+
+With this callback you can make individual settings to the context after it
+got created and the default setup was done.
+The callback will be called with the CTX object from Net::SSLeay as the single
+argument.
+
+Example for limiting the server session cache size:
+
+  SSL_create_ctx_callback => sub { 
+      my $ctx = shift;
+	  Net::SSLeay::CTX_sess_set_cache_size($ctx,128);
+  }
 
 =item SSL_session_cache_size
 
@@ -2193,6 +2219,10 @@ See BUGS file for more information and how to work around the problem.
 Non-blocking and timeouts (which are based on non-blocking) are not
 supported on Win32, because the underlying IO::Socket::INET does not support
 non-blocking on this platform.
+
+If you have a server and it looks like you have a memory leak you might 
+check the size of your session cache. Default for Net::SSLeay seems to be 
+20480, see the example for SSL_create_ctx_callback for how to limit it.
 
 =head1 LIMITATIONS
 
