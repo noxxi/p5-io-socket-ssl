@@ -36,14 +36,7 @@ print "1..27\n";
 # create Server socket before forking client, so that it is
 # guaranteed to be listening
 #################################################################
-my %extra_options = $Net::SSLeay::VERSION>=1.16 ?
-    (
-	SSL_key_file => "certs/client-key.enc", 
-	SSL_passwd_cb => sub { return "opossum" }
-    ) : (
-	SSL_key_file => "certs/client-key.pem"
-    );
-%extra_options = ( %extra_options,
+my %tls_options = (
     SSL_version => 'TLSv1',
     SSL_cipher_list => 'HIGH',
 );
@@ -128,7 +121,8 @@ if ( $pid == 0 ) {
 	# upgrade to SSL socket w/o connection yet
 	if ( ! IO::Socket::SSL->start_SSL( $to_server,
 	    SSL_startHandshake => 0,
-	    %extra_options
+	    %extra_options,
+	    %tls_options,
 	)) {
 	    diag( 'start_SSL return undef' );
 	    print "not ";
@@ -253,6 +247,13 @@ if ( $pid == 0 ) {
     ############################################################
     # SERVER == parent process
     ############################################################
+    my %extra_options = $Net::SSLeay::VERSION>=1.16 ?
+	(
+	    SSL_key_file => "certs/client-key.enc", 
+	    SSL_passwd_cb => sub { return "opossum" }
+	) : (
+	    SSL_key_file => "certs/client-key.pem"
+	);
 
     # pendant to tests in client. Where client is slow (sleep
     # between plain text sending and connect_SSL) I need to 
@@ -266,7 +267,7 @@ if ( $pid == 0 ) {
 	my $from_client = $server->accept or print "not ";
 	ok( "tcp accept" );
 	$from_client || do {
-	    diag( "failed to accept: $!" );
+	    diag( "failed to tcp accept: $!" );
 	    next;
 	};
 
@@ -292,7 +293,8 @@ if ( $pid == 0 ) {
 	    SSL_ca_file => "certs/test-ca.pem",
 	    SSL_use_cert => 1,
 	    SSL_cert_file => "certs/client-cert.pem",
-	    %extra_options
+	    %extra_options,
+	    %tls_options,
 	)) {
 	    diag( 'start_SSL return undef' );
 	    print "not ";
@@ -316,10 +318,11 @@ if ( $pid == 0 ) {
 	    } elsif ( $SSL_ERROR == SSL_WANT_WRITE ) {
 		$attempts++;
 		IO::Select->new($from_client)->can_write(30) && next; # retry if can write
+	    } else {
+		diag( "failed to ssl accept ($test): $@" );
+		print "not ";
+		last;
 	    }
-	    diag( "failed to accept: $@" );
-	    print "not ";
-	    last;
 	}
 	ok( "ssl accept handshake done" );
 
@@ -334,7 +337,7 @@ if ( $pid == 0 ) {
 	
 	IO::Select->new( $from_client )->can_read(30);
 	( sysread( $from_client, $buf,10 ) == 10 ) || print "not ";
-	diag($buf);
+	#diag($buf);
 	ok( "received client message" );
 
 	sleep(5);
