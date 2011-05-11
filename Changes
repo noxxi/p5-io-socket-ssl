@@ -1,6 +1,7 @@
 
 v1.43 2011.05.11
 - fix t/nonblock.t
+- stability improvements t/inet6.t
 v1.42 2011.05.10
 - add SSL_create_ctx_callback to have a way to adjust context on
   creation. https://rt.cpan.org/Ticket/Display.html?id=67799

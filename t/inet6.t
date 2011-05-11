@@ -43,7 +43,6 @@ my $ID = 'server';
 my $server = IO::Socket::SSL->new(
     LocalAddr => $addr,
     Listen => 2,
-    ReuseAddr => 1,
     SSL_cert_file => "certs/server-cert.pem",
     SSL_key_file  => "certs/server-key.pem",
 ) || do {
@@ -53,7 +52,8 @@ my $server = IO::Socket::SSL->new(
 ok("Server Initialization at $addr");
 
 # add server port to addr
-$addr.= ':'.$server->sockport;
+$addr = "[$addr]:".$server->sockport;
+print "# server at $addr\n";
 
 my $pid = fork();
 if ( !defined $pid ) {
