@@ -91,11 +91,21 @@ if ( $pid == 0 ) {
 
 	# nonblocking connect of tcp socket
 	while (1) {
-	    $to_server->connect( $server_addr ) && last;
-	    if ( $! == EINPROGRESS ) {
+	    connect($to_server,$server_addr ) && last;
+	    if ( $!{EINPROGRESS} ) {
 		diag( 'connect in progress' );
-		IO::Select->new( $to_server )->can_read(30) && next;
+		IO::Select->new( $to_server )->can_write(30) && next;
 		print "not ";
+		last;
+	    } elsif ( $!{EALREADY} ) {	
+		diag( 'connect not yet completed'); 
+		# just wait
+		select(undef,undef,undef,0.1);
+		next;
+	    } elsif ( $!{EISCONN} ) {
+		diag('claims that socket is already connected');
+		# found on Mac OS X, dunno why it does not tell me that
+		# the connect succeeded before
 		last;
 	    }
 	    diag( 'connect failed: '.$! );
@@ -111,7 +121,27 @@ if ( $pid == 0 ) {
 	$to_server->blocking(0);
 
 	# send some plain text on non-ssl socket
-	syswrite( $to_server,'plaintext' ) || print "not ";
+	my $pmsg = 'plaintext';
+	while ( $pmsg ne '' ) {
+	    my $w = syswrite( $to_server,$pmsg );
+	    if ( ! defined $w ) {
+	    	if ( ! $!{EAGAIN} ) {
+		    diag("syswrite failed with $!");
+		    print "not ";
+		    last;
+		}
+		IO::Select->new($to_server)->can_write(30) or do {
+		    diag("failed to get write ready");
+		    print "not ";
+		    last;
+		};
+	    } elsif ( $w>0 ) {
+	    	diag("wrote $w bytes");
+		substr($pmsg,0,$w,'');
+	    } else {
+		die "syswrite returned 0";
+	    }
+	}
 	ok( "write plain text" );
 
 	# let server catch up, so that it awaits my connection

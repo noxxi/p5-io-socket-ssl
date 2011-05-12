@@ -1,4 +1,6 @@
 
+v1.43_1 2011.05.12
+- try to make t/nonblock.t more stable, especially on Mac OS X
 v1.43 2011.05.11
 - fix t/nonblock.t
 - stability improvements t/inet6.t
