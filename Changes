@@ -1,4 +1,8 @@
 
+v1.44 2011.05.27
+- fix invalid call to inet_pton in verify_hostname_of_cert when 
+  identity should be verified as ipv6 address, because it contains
+  colon.
 v1.43_1 2011.05.12
 - try to make t/nonblock.t more stable, especially on Mac OS X
 v1.43 2011.05.11

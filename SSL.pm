@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.43_1';
+	$VERSION = '1.44';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1104,7 +1104,8 @@ sub dump_peer_certificate {
 			#  make sure that Socket6 was loaded properly
 			UNIVERSAL::can( __PACKAGE__, 'inet_pton' ) or croak
 				q[Looks like IPv6 address, make sure that Socket6 is loaded or make "use IO::Socket::SSL 'inet6'];
-			$ipn = inet_pton( $identity ) or croak "'$identity' is not IPv6, but neither IPv4 nor hostname";
+			$ipn = inet_pton(AF_INET6,$identity) 
+				or croak "'$identity' is not IPv6, but neither IPv4 nor hostname";
 		} elsif ( $identity =~m{^\d+\.\d+\.\d+\.\d+$} ) {
 			 # definitly no hostname, try IPv4
 			$ipn = inet_aton( $identity ) or croak "'$identity' is not IPv4, but neither IPv6 nor hostname";
