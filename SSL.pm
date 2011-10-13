@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.44';
+	$VERSION = '1.45';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -718,14 +718,27 @@ sub getc {
 
 sub readline {
 	my $self = shift;
-	my $ssl = $self->_get_ssl_object || return;
 
-	if (wantarray) {
-		my ($buf,$err) = Net::SSLeay::ssl_read_all($ssl);
-		return $self->error( "SSL read error" ) if $err;
-		if ( !defined($/) ) {
-			return $buf;
-		} elsif ( ref($/) ) {
+	if ( not defined $/ or wantarray) {
+		# read all and split
+
+		my $buf = '';
+		my $was_blocking = $self->blocking(1);
+		while (1) {
+			my $rv = $self->sysread($buf,2**16,length($buf));
+			if ( ! defined $rv ) {
+				next if $!{EINTR} or $!{EAGAIN};
+				$self->blocking(0) if ! $was_blocking;
+				return;
+			} elsif ( ! $rv ) {
+				last
+			}
+		}
+		$self->blocking(0) if ! $was_blocking;
+
+		if ( ! defined $/ ) {
+			return $buf
+		} elsif ( ref($/)) {
 			my $size = ${$/};
 			die "bad value in ref \$/: $size" unless $size>0;
 			return $buf=~m{\G(.{1,$size})}g;
@@ -736,59 +749,108 @@ sub readline {
 		}
 	}
 
-	if ( !defined($/) ) {
-		my ($buf,$err) = Net::SSLeay::ssl_read_all($ssl);
-		return $self->error( "SSL read error" ) if $err;
-		return $buf;
-	} elsif ( ref($/) ) {
+	# read only one line
+	if ( ref($/) ) {
 		my $size = ${$/};
+		# read record of $size bytes
 		die "bad value in ref \$/: $size" unless $size>0;
-		my ($buf,$err) = Net::SSLeay::ssl_read_all($ssl,$size);
-		return $self->error( "SSL read error" ) if $err;
-		return $buf;
-	} elsif ( $/ ne '' ) {
-		my $line = Net::SSLeay::ssl_read_until($ssl,$/);
-		return $self->error( "SSL read error" ) if $line eq '';
-		return $line;
-	} else {
-		# $/ is ''
-		# ^.*?\n\n+, need peek to find all \n at the end
-		die "empty \$/ is not supported if I don't have peek"
-			if Net::SSLeay::OPENSSL_VERSION_NUMBER() < 0x0090601f;
-
-		# find first occurence of \n\n
 		my $buf = '';
-		my $eon = 0;
-		while (1) {
-			defined( Net::SSLeay::peek($ssl,1)) || last; # peek more, can block
-			my $pending = Net::SSLeay::pending($ssl);
-			$buf .= Net::SSLeay::peek( $ssl,$pending );	 # will not block
-			if ( !$eon ) {
-				my $pos = index( $buf,"\n\n");
-				next if $pos<0; # newlines not found
-				$eon = $pos+2;	# pos after second newline
+		my $was_blocking = $self->blocking(1);
+		while ( $size>length($buf)) {
+			my $rv = $self->sysread($buf,$size-length($buf),length($buf));
+			if ( ! defined $rv ) {
+				next if $!{EINTR} or $!{EAGAIN};
+				$self->blocking(0) if ! $was_blocking;
+				return;
+			} elsif ( ! $rv ) {
+				last
 			}
-			# $eon >= 2	 == bytes incl last known \n
-			while ( index( $buf,"\n",$eon ) == $eon ) {
-				# the next char ist \n too
-				$eon++;
-			}
-			last if $eon < length($buf); # found last \n before end of buf
 		}
-		if ( $eon > 0 ) {
-			# found something
-			# readed peeked data until $eon from $ssl
-			return Net::SSLeay::ssl_read_all( $ssl,$eon );
-		} else {
-			# found nothing
-			# return all what we have
-			if ( my $l = length($buf)) {
-				return Net::SSLeay::ssl_read_all( $ssl,$l );
-			} else {
-				return $self->error( "SSL read error" );
+		$self->blocking(0) if ! $was_blocking;
+		return $buf;
+	}
+
+	my ($delim0,$delim1) = $/ eq '' ? ("\n\n","\n"):($/,'');
+
+	if ( Net::SSLeay::OPENSSL_VERSION_NUMBER() < 0x0090601f ) {
+		# no usable peek - need to read byte after byte
+		die "empty \$/ is not supported if I don't have peek" if $delim1 ne '';
+		my $buf = '';
+		my $was_blocking = $self->blocking(1);
+		while (1) {
+			my $rv = $self->sysread($buf,1,length($buf));
+			if ( ! defined $rv ) {
+				next if $!{EINTR} or $!{EAGAIN};
+				$self->blocking(0) if ! $was_blocking;
+				return;
+			} elsif ( ! $rv ) {
+				last
 			}
+			index($buf,$delim0) >= 0 and last;
+		}
+		$self->blocking(0) if ! $was_blocking;
+		return $buf;
+	}
+
+
+	# find first occurence of $delim0 followed by as much as possible $delim1
+	my $buf = '';
+	my $eod = 0;  # pointer into $buf after $delim0 $delim1*
+	my $was_blocking = $self->blocking(1);
+	my $ssl = $self->_get_ssl_object or return;
+	while (1) {
+
+		# block until we have more data or eof
+		my $poke = Net::SSLeay::peek($ssl,1);
+		if ( ! defined $poke or $poke eq '' ) {
+			next if $!{EINTR} or $!{EAGAIN};
+		}
+
+		my $skip = 0;
+
+		# peek into available data w/o reading
+		my $pending = Net::SSLeay::pending($ssl);
+		if ( $pending and my $pb = Net::SSLeay::peek( $ssl,$pending ) ) {
+			$buf .= $pb
+		} else {
+			$self->blocking(0) if ! $was_blocking;
+			return;
+		};
+		if ( !$eod ) {
+			my $pos = index( $buf,$delim0 );
+			if ( $pos<0 ) {
+				$skip = $pending
+			} else {
+				$eod = $pos + length($delim0); # pos after delim0
+			}
+		}
+
+		if ( $eod ) {
+			if ( $delim1 ne '' ) {
+				# delim0 found, check for as much delim1 as possible
+				while ( index( $buf,$delim1,$eod ) == $eod ) {
+					$eod+= length($delim1);
+				}
+			}
+			$skip = $pending - ( length($buf) - $eod );
+		}
+
+		# remove data from $self which I already have in buf
+		while ( $skip>0 ) {
+			if ($self->sysread(my $p,$skip,0)) {
+				$skip -= length($p);
+				next;
+			}
+			$!{EINTR} or $!{EAGAIN} or last;
+		}
+
+		if ( $eod and ( $delim1 eq '' or $eod < length($buf))) {
+			# delim0 found and there can be no more delim1 pending
+			last
 		}
 	}
+	$self->blocking(0) if ! $was_blocking;
+	return substr($buf,0,$eod);
 }
 
 sub close {

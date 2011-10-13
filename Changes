@@ -1,4 +1,7 @@
 
+v1.45 2011.10.12
+- fix readline to continue when getting interrupt waiting for more
+  data. Thanks to kgc[AT]corp[DOT]sonic[DOT]net for reporting problem
 v1.44 2011.05.27
 - fix invalid call to inet_pton in verify_hostname_of_cert when 
   identity should be verified as ipv6 address, because it contains
