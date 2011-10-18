@@ -10,6 +10,11 @@ if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
 	exit
 }
 
+if ( $^O =~m{mswin32} ) {
+	print "1..0 # Skipped: signals not relevant on this platform\n";
+	exit
+}
+
 use vars qw( $SSL_SERVER_ADDR );
 do "t/ssl_settings.req" || do "ssl_settings.req";
 

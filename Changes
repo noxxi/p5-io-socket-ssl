@@ -1,4 +1,7 @@
 
+v1.46 2011.10.18
+- disable test t/signal-readline.t on windows, because signals are
+  not relevant for this platform and test does not work
 v1.45 2011.10.12
 - fix readline to continue when getting interrupt waiting for more
   data. Thanks to kgc[AT]corp[DOT]sonic[DOT]net for reporting problem
