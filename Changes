@@ -1,12 +1,16 @@
 
-v1.47 2011.10.26
+v1.48 2011.10.26
 - bugfix for readline fix in 1.45. If the pending data where false
   (like '0') it failed to read rest of line.
   Thanks to Victor Popov for reporting
   https://rt.cpan.org/Ticket/Display.html?id=71953
+v1.47 2011.10.21
+- fix for 1.46 - check for mswin32 needs to be /i. Thanks to
+  Alexandr Ciornii for reporting
 v1.46 2011.10.18
 - disable test t/signal-readline.t on windows, because signals are
-  not relevant for this platform and test does not work
+  not relevant for this platform and test does not work.
+  https://rt.cpan.org/Ticket/Display.html?id=71699
 v1.45 2011.10.12
 - fix readline to continue when getting interrupt waiting for more
   data. Thanks to kgc[AT]corp[DOT]sonic[DOT]net for reporting problem

@@ -10,7 +10,7 @@ if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
 	exit
 }
 
-if ( $^O =~m{mswin32} ) {
+if ( $^O =~m{mswin32}i ) {
 	print "1..0 # Skipped: signals not relevant on this platform\n";
 	exit
 }
