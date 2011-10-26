@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.46';
+	$VERSION = '1.47';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -810,7 +810,8 @@ sub readline {
 
 		# peek into available data w/o reading
 		my $pending = Net::SSLeay::pending($ssl);
-		if ( $pending and my $pb = Net::SSLeay::peek( $ssl,$pending ) ) {
+		if ( $pending and 
+			( my $pb = Net::SSLeay::peek( $ssl,$pending )) ne '' ) {
 			$buf .= $pb
 		} else {
 			$self->blocking(0) if ! $was_blocking;
