@@ -91,6 +91,19 @@ push @tests, [
     },
 ];
 
+push @tests, [
+    [ "bla\n","0","blubb\n","no newline" ],
+    sub {
+    	my $c = shift;
+	my $l = <$c>;
+	$l eq "bla\n" or die "'bla\\n' failed";
+	$l = <$c>;
+	$l eq "0blubb\n" or die "'0blubb\\n' failed";
+	$l = <$c>;
+	$l eq "no newline" or die "'no newline' failed";
+    },
+];
+
 $|=1;
 print "1..".(1+3*@tests)."\n";
 
@@ -126,7 +139,13 @@ if ( !defined $pid ) {
 	    exit;
 	};
 	ok( "Server accepted" );
-	$to_client->print($test->[0]);
+	$to_client->autoflush;
+	my $t = $test->[0];
+	$t = [$t] if ! ref($t);
+	for(@$t) {
+	    $to_client->print($_);
+	    select(undef,undef,undef,0.1);
+	}
     }
     wait;
     exit;

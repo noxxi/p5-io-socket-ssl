@@ -1,4 +1,8 @@
-
+v1.49 2011.10.28
+- another regression for readline fix, this time it failed to return lines
+  at eof which don't end with newline. Extended t/readline.t to catch this
+  case and the fix for 1.48
+  Thanks to christoph[DOT]mallon[AT]gmx[DOT]de for reporting
 v1.48 2011.10.26
 - bugfix for readline fix in 1.45. If the pending data where false
   (like '0') it failed to read rest of line.

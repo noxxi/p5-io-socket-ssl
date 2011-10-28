@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.48';
+	$VERSION = '1.49';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -815,7 +815,7 @@ sub readline {
 			$buf .= $pb
 		} else {
 			$self->blocking(0) if ! $was_blocking;
-			return;
+			return $buf eq '' ? ():$buf;
 		};
 		if ( !$eod ) {
 			my $pos = index( $buf,$delim0 );
