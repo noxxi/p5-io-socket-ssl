@@ -198,11 +198,16 @@ if ( $pid == 0 ) {
 	my $bytes_send = 0;
 
 	# set send buffer to 8192 so it will definitly fail writing all 500000 bytes in it
-	# linux allocates twice as much (see tcp(7)) but it's small enough anyway
-	eval q{ 
-	    setsockopt( $to_server, SOL_SOCKET, SO_SNDBUF, pack( "I",8192 ));
-	    diag( "sndbuf=".unpack( "I",getsockopt( $to_server, SOL_SOCKET, SO_SNDBUF )));
-	};
+	# beware that linux allocates twice as much (see tcp(7))
+	# AIX seems to get very slow if you set the sndbuf on localhost, so don't to it
+	# https://rt.cpan.org/Public/Bug/Display.html?id=72305
+	if ( $^O !~m/aix/i ) {
+	    eval q{ 
+		setsockopt( $to_server, SOL_SOCKET, SO_SNDBUF, pack( "I",8192 ));  
+		diag( "sndbuf=".unpack( "I",getsockopt( $to_server, SOL_SOCKET, SO_SNDBUF )));
+	    };
+	}
+
 	my $test_might_fail;
 	if ( $@ ) {
 	    # the next test might fail because setsockopt(... SO_SNDBUF...) failed
@@ -410,7 +415,7 @@ if ( $pid == 0 ) {
 	    }
 
 	    $bytes_received += $n;
-	    #diag( "read of $n bytes" );
+	    #diag( "read of $n bytes total $bytes_received" );
 	}
 
 	diag( "read $bytes_received ($attempts r/w attempts)" );
