@@ -1,5 +1,10 @@
+v1.52 2011.12.07
+- fix syntax error in t/memleak_bad_handshake.t
+  thanks to cazzaniga[DOT]sandro[AT]gmail[DOT]com for reporting
+v1.51 2011.12.06
+- disable t/memleak_bad_handshake.t on AIX, because it might hang
+  https://rt.cpan.org/Ticket/Display.html?id=72170
 v1.50 2011.12.06
-- AIX test workaround for https://rt.cpan.org/Public/Bug/Display.html?id=72305
   Thanks to HMBRAND for reporting and Rainer Tammer tammer[AT]tammer[DOT]net for
   providing access to AIX system
 v1.49 2011.10.28 

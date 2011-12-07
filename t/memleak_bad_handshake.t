@@ -15,6 +15,12 @@ if ( grep { $^O =~m{$_}i } qw( MacOS VOS vmesa riscos amigaos mswin32) ) {
     exit
 }
 
+if ( $^O =~m{aix}i ) {
+    print "1..0 # Skipped: might hang, see https://rt.cpan.org/Ticket/Display.html?id=72170\n";
+    exit
+}
+
+
 $|=1;
 use vars qw( $SSL_SERVER_ADDR );
 do "t/ssl_settings.req" || do "ssl_settings.req";
