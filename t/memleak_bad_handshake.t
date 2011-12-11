@@ -39,7 +39,7 @@ my $addr = $SSL_SERVER_ADDR.':'.$server->sockport;
 
 defined( my $pid = fork()) or do {
 	print "1..0 # Skipped: fork failed\n";
-	exit;
+	goto done;
 };
 
 if ( $pid == 0 ) {
@@ -48,8 +48,9 @@ if ( $pid == 0 ) {
 		# socket accept, client handshake and client close 
 		$server->accept;
 	}
-	exit
+	goto done;
 }
+
 
 close($server);
 # plain non-SSL connect and close w/o sending data
@@ -59,7 +60,7 @@ for(1..100) {
 my $size100 = getsize($pid);
 if ( ! $size100 ) {
 	print "1..0 # Skipped: cannot get size of child process\n";
-	exit
+	goto done;
 }
 
 for(100..200) {
@@ -73,13 +74,14 @@ for(200..300) {
 my $size300 = getsize($pid);
 if ($size100>$size200 or $size200<$size300) {;
 	print "1..0 # skipped  - do we measure the right thing?\n";
-	exit;
+	goto done;
 }
 
 print "1..1\n";
 print "not " if $size100 < $size200 and $size200 < $size300;
 print "ok # check memleak failed handshake ($size100,$size200,$size300)\n";
 
+done:
 kill(9,$pid);
 wait;
 exit;

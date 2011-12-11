@@ -1,3 +1,7 @@
+v1.53 2011.12.11
+- kill child in t/memleak_bad_hanshake.t if test fails 
+  https://rt.cpan.org/Ticket/Display.html?id=73146
+  Thanks to CLEACH ofr reporting
 v1.52 2011.12.07
 - fix syntax error in t/memleak_bad_handshake.t
   thanks to cazzaniga[DOT]sandro[AT]gmail[DOT]com for reporting
