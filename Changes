@@ -1,3 +1,8 @@
+v1.54 2012.01.11
+- return 0 instead of undef in SSL_verify_callback to fix unitialized
+  warnings.  Thanks to d[DOT]thomas[AT]its[DOT]uq[DOT]edu[DOT]au for 
+  reporting the bug and MIKEM for the fix.
+  https://rt.cpan.org/Ticket/Display.html?id=73629
 v1.53 2011.12.11
 - kill child in t/memleak_bad_hanshake.t if test fails 
   https://rt.cpan.org/Ticket/Display.html?id=73146

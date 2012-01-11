@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.53';
+	$VERSION = '1.54';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -287,7 +287,7 @@ sub configure_SSL {
 		$arg_hash->{SSL_verify_callback} = sub {
 			my ($ok,$ctx_store,$certname,$error,$cert) = @_;
 			$ok = $vcb->($ok,$ctx_store,$certname,$error,$cert) if $vcb;
-			$ok or return;
+			$ok or return 0;
 			my $depth = Net::SSLeay::X509_STORE_CTX_get_error_depth($ctx_store);
 			return $ok if $depth != 0;
 
