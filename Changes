@@ -1,3 +1,9 @@
+v1.55 2012.02.22
+- work around IO::Sockets work around for systems returning EISCONN etc
+  on connect retry for non-blocking sockets by clearing $! if SUPER::connect
+  returned true.
+  https://rt.cpan.org/Ticket/Display.html?id=75101
+  Thanks for Manoj Kumar for reporting.
 v1.54 2012.01.11
 - return 0 instead of undef in SSL_verify_callback to fix unitialized
   warnings.  Thanks to d[DOT]thomas[AT]its[DOT]uq[DOT]edu[DOT]au for 

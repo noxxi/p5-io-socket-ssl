@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.54';
+	$VERSION = '1.55';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -334,6 +334,11 @@ sub connect {
 		DEBUG(2, 'socket not yet connected' );
 		$self->SUPER::connect(@_) || return;
 		DEBUG(2,'socket connected' );
+
+		# IO::Socket works around systems, which return EISCONN or similar
+		# on non-blocking re-connect by returning true, even if $! is set
+		# but it does not clear $!, so do it here
+		$! = undef;
 	}
 	return $self->connect_SSL;
 }
