@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.55';
+	$VERSION = '1.56';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -368,6 +368,23 @@ sub connect_SSL {
 		if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
 			Net::SSLeay::set_cipher_list($ssl, $cl )
 				|| return $self->error("Failed to set SSL cipher list");
+		}
+
+		if (Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x009080ef) {
+			my $host;
+			if ( exists $arg_hash->{SSL_hostname} ) {
+				# explicitly given
+				# can be set to undef/'' to not use extension
+				$host = $arg_hash->{SSL_hostname}
+			} elsif ( $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} ) {
+				# implicitly given
+				$host =~s{:[a-zA-Z0-9_\-]+$}{};
+				# should be hostname, not IPv4/6
+				$host = undef if $host !~m{[a-z_]} or $host =~m{:};
+			}
+			# define SSL_CTRL_SET_TLSEXT_HOSTNAME 55
+			# define TLSEXT_NAMETYPE_host_name 0
+			Net::SSLeay::ctrl($ssl,55,0,$host) if $host;
 		}
 
 		$arg_hash->{PeerAddr} || $self->_update_peer;
@@ -1714,6 +1731,18 @@ Creates a new IO::Socket::SSL object.  You may use all the friendly options
 that came bundled with IO::Socket::INET, plus (optionally) the ones that follow:
 
 =over 2
+
+=item SSL_hostname
+
+This can be given to specifiy the hostname used for SNI, which is needed if you
+have multiple SSL hostnames on the same IP address. If not given it will try to
+determine hostname from PeerAddr, which will fail if only IP was given or if
+this argument is used within start_SSL.
+
+If you want to disable SNI set this argument to ''.
+
+Currently only supported for the client side and will be ignored for the server
+side.
 
 =item SSL_version
 
