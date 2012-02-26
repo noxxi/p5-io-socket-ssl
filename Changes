@@ -1,3 +1,8 @@
+v1.57 2012.02.26
+- fix t/dhe.t for openssl 1.0.1 beta by forcing tlsv1, so that it does
+  not complain about the too small rsa key which it should not use anyway.
+  Thanks to paul[AT]city-fan[DOT]org  for reporting.
+  https://rt.cpan.org/Ticket/Display.html?id=75165
 v1.56 2012.02.22
 - add automatic or explicit (via SSL_hostname) SNI support, needed for
   multiple SSL hostnames with same IP. Currently only supported for the 
