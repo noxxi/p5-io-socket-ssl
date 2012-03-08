@@ -21,17 +21,14 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-use constant {
-	SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE(),
-	SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER(),
-	SSL_VERIFY_FAIL_IF_NO_PEER_CERT => Net::SSLeay::VERIFY_FAIL_IF_NO_PEER_CERT(),
-	SSL_VERIFY_CLIENT_ONCE => Net::SSLeay::VERIFY_CLIENT_ONCE(),
-	# from openssl/ssl.h, should be better in Net::SSLeay
-	SSL_SENT_SHUTDOWN => 1,
-	SSL_RECEIVED_SHUTDOWN => 2,
-};
+use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
+use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
+use constant SSL_VERIFY_FAIL_IF_NO_PEER_CERT => Net::SSLeay::VERIFY_FAIL_IF_NO_PEER_CERT();
+use constant SSL_VERIFY_CLIENT_ONCE => Net::SSLeay::VERIFY_CLIENT_ONCE();
 
-
+# from openssl/ssl.h; should be better in Net::SSLeay
+use constant SSL_SENT_SHUTDOWN => 1;
+use constant SSL_RECEIVED_SHUTDOWN => 2;
 
 # non-XS Versions of Scalar::Util will fail
 BEGIN{
@@ -78,7 +75,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.58';
+	$VERSION = '1.59';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1294,7 +1291,7 @@ sub get_ssleay_error {
 
 sub error {
 	my ($self, $error, $destroy_socket) = @_;
-	$error .= Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error());
+	$error .= ' '.Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error());
 	DEBUG(2, $error."\n".$self->get_ssleay_error());
 	$SSL_ERROR = dualvar( -1, $error );
 	${*$self}{'_SSL_last_err'} = $SSL_ERROR if (ref($self));
@@ -1444,15 +1441,14 @@ sub new {
 		return $ctx_object if ($ctx_object = ${*$ctx_object}{'_SSL_ctx'});
 	}
 
-	my $ctx;
-	foreach ($arg_hash->{'SSL_version'}) {
-		$ctx = /^sslv2$/i ? Net::SSLeay::CTX_v2_new()	 :
-			   /^sslv3$/i ? Net::SSLeay::CTX_v3_new()	 :
-			   /^tlsv1$/i ? Net::SSLeay::CTX_tlsv1_new() :
-							Net::SSLeay::CTX_new();
-	}
-
-	$ctx || return IO::Socket::SSL->error("SSL Context init failed");
+	my $sub = UNIVERSAL::can('Net::SSLeay',
+	    $arg_hash->{SSL_version} =~m{^(?:ssl(v2)|ssl(v3)|(tlsv1))$}i ? 
+		"CTX_".lc($1||$2||$3)."_new" : "CTX_new" );
+	return IO::Socket::SSL->error(
+	    "SSL Version $arg_hash->{SSL_version} not supported")
+	    if ! $sub;
+	my $ctx = $sub->() or return IO::Socket::SSL->error(
+	    "SSL Context init failed");
 
 	Net::SSLeay::CTX_set_options($ctx, Net::SSLeay::OP_ALL());
 

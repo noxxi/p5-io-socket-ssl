@@ -1,3 +1,7 @@
+v1.59 2012.03.08
+- if SSLv2 is not supported by Net::SSLeay set SSL_ERROR with useful 
+  message when attempting to use it. 
+- modify constant declarations so that 5.6.1 should work again
 v1.58 2012.02.26
 - fix t/dhe.t again to enable the workaround only for newer openssl
   versions, because this would cause failures on older versions
