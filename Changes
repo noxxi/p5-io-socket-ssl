@@ -1,3 +1,10 @@
+v1.59 2012.03.20
+- don't make blocking readline if socket was set nonblocking, but return as
+  soon no more data are available
+  https://rt.cpan.org/Ticket/Display.html?id=75910
+- fix BUG section about threading so that it shows package as thread safe
+  as long as Net::SSLeay >= 1.43 is used
+  https://rt.cpan.org/Ticket/Display.html?id=75749
 v1.58 2012.02.26
 - fix t/dhe.t again to enable the workaround only for newer openssl
   versions, because this would cause failures on older versions

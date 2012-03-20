@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.58';
+	$VERSION = '1.59';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -745,18 +745,15 @@ sub readline {
 		# read all and split
 
 		my $buf = '';
-		my $was_blocking = $self->blocking(1);
 		while (1) {
 			my $rv = $self->sysread($buf,2**16,length($buf));
 			if ( ! defined $rv ) {
-				next if $!{EINTR} or $!{EAGAIN};
-				$self->blocking(0) if ! $was_blocking;
+				next if $!{EINTR};
 				return;
 			} elsif ( ! $rv ) {
 				last
 			}
 		}
-		$self->blocking(0) if ! $was_blocking;
 
 		if ( ! defined $/ ) {
 			return $buf
@@ -777,18 +774,15 @@ sub readline {
 		# read record of $size bytes
 		die "bad value in ref \$/: $size" unless $size>0;
 		my $buf = '';
-		my $was_blocking = $self->blocking(1);
 		while ( $size>length($buf)) {
 			my $rv = $self->sysread($buf,$size-length($buf),length($buf));
 			if ( ! defined $rv ) {
-				next if $!{EINTR} or $!{EAGAIN};
-				$self->blocking(0) if ! $was_blocking;
+				next if $!{EINTR};
 				return;
 			} elsif ( ! $rv ) {
 				last
 			}
 		}
-		$self->blocking(0) if ! $was_blocking;
 		return $buf;
 	}
 
@@ -798,19 +792,16 @@ sub readline {
 		# no usable peek - need to read byte after byte
 		die "empty \$/ is not supported if I don't have peek" if $delim1 ne '';
 		my $buf = '';
-		my $was_blocking = $self->blocking(1);
 		while (1) {
 			my $rv = $self->sysread($buf,1,length($buf));
 			if ( ! defined $rv ) {
-				next if $!{EINTR} or $!{EAGAIN};
-				$self->blocking(0) if ! $was_blocking;
+				next if $!{EINTR};
 				return;
 			} elsif ( ! $rv ) {
 				last
 			}
 			index($buf,$delim0) >= 0 and last;
 		}
-		$self->blocking(0) if ! $was_blocking;
 		return $buf;
 	}
 
@@ -818,14 +809,13 @@ sub readline {
 	# find first occurence of $delim0 followed by as much as possible $delim1
 	my $buf = '';
 	my $eod = 0;  # pointer into $buf after $delim0 $delim1*
-	my $was_blocking = $self->blocking(1);
 	my $ssl = $self->_get_ssl_object or return;
 	while (1) {
 
 		# block until we have more data or eof
 		my $poke = Net::SSLeay::peek($ssl,1);
 		if ( ! defined $poke or $poke eq '' ) {
-			next if $!{EINTR} or $!{EAGAIN};
+			next if $!{EINTR};
 		}
 
 		my $skip = 0;
@@ -836,7 +826,6 @@ sub readline {
 			( my $pb = Net::SSLeay::peek( $ssl,$pending )) ne '' ) {
 			$buf .= $pb
 		} else {
-			$self->blocking(0) if ! $was_blocking;
 			return $buf eq '' ? ():$buf;
 		};
 		if ( !$eod ) {
@@ -864,7 +853,7 @@ sub readline {
 				$skip -= length($p);
 				next;
 			}
-			$!{EINTR} or $!{EAGAIN} or last;
+			$!{EINTR} or last;
 		}
 
 		if ( $eod and ( $delim1 eq '' or $eod < length($buf))) {
@@ -872,7 +861,6 @@ sub readline {
 			last
 		}
 	}
-	$self->blocking(0) if ! $was_blocking;
 	return substr($buf,0,$eod);
 }
 
@@ -2304,12 +2292,9 @@ See the 'example' directory.
 
 =head1 BUGS
 
-IO::Socket::SSL is not threadsafe.
-This is because IO::Socket::SSL is based on Net::SSLeay which
-uses a global object to access some of the API of openssl
-and is therefore not threadsafe.
-It might probably work if you don't use SSL_verify_callback and
-SSL_password_cb.
+IO::Socket::SSL depends on Net::SSLeay.  Up to version 1.43 of Net::SSLeay
+it was not thread safe, although it did probably work if you did not use 
+SSL_verify_callback and SSL_password_cb.
 
 IO::Socket::SSL does not work together with Storable::fd_retrieve/fd_store.
 See BUGS file for more information and how to work around the problem.
