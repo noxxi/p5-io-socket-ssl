@@ -4,7 +4,7 @@
 # $Id: Makefile.PL,v 1.1 2000/07/04 10:09:57 aspa Exp $.
 #
 
-use 5.00503; # prior versions have problems with self-ties.
+use 5.008; 
 use ExtUtils::MakeMaker;
 
 

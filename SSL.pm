@@ -75,7 +75,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.60';
+	$VERSION = '1.61';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1440,6 +1440,15 @@ sub new {
 
 	Net::SSLeay::CTX_set_options($ctx, Net::SSLeay::OP_ALL());
 
+	# if we don't set session_id_context if client certicate is expected
+	# client session caching will fail
+	# if user does not provide explicit id just use the stringification
+	# of the context
+	if ( my $id = $arg_hash->{SSL_session_id_context} 
+	    || ( $arg_hash->{SSL_verify_mode} & 0x02 ) && "$ctx" ) {
+	    Net::SSLeay::CTX_set_session_id_context($ctx,$id,length($id));
+	}
+
 	# SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER makes syswrite return if at least one
 	# buffer was written and not block for the rest
 	# SSL_MODE_ENABLE_PARTIAL_WRITE can be necessary for non-blocking because we
@@ -1932,6 +1941,9 @@ The session cache size refers to the number of unique host/port pairs that can b
 stored at one time; the oldest sessions in the cache will be removed if new ones are
 added.
 
+This option does not effect the session cache a server has for it's clients, e.g. it
+does not affect SSL objects with SSL_server set.
+
 =item SSL_session_cache
 
 Specifies session cache object which should be used instead of creating a new.
@@ -1943,6 +1955,12 @@ A session cache object can be created using
 C<< IO::Socket::SSL::Session_Cache->new( cachesize ) >>.
 
 Use set_default_session_cache() to set a global cache object.
+
+=item SSL_session_id_context
+
+This gives an id for the servers session cache. It's necessary if you want
+clients to connect with a client certificate. If not given but SSL_verify_mode
+specifies the need for client certificate a context unique id will be picked.
 
 =item SSL_error_trap
 
