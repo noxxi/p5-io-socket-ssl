@@ -75,7 +75,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.61';
+	$VERSION = '1.62';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1445,7 +1445,7 @@ sub new {
 	# if user does not provide explicit id just use the stringification
 	# of the context
 	if ( my $id = $arg_hash->{SSL_session_id_context} 
-	    || ( $arg_hash->{SSL_verify_mode} & 0x02 ) && "$ctx" ) {
+	    || ( $arg_hash->{SSL_verify_mode} & 0x01 ) && "$ctx" ) {
 	    Net::SSLeay::CTX_set_session_id_context($ctx,$id,length($id));
 	}
 

@@ -1,3 +1,5 @@
+v1.62 2012.03.28
+- small fix to last version
 v1.61 2012.03.27
 - call CTX_set_session_id_context so that servers session caching works with
   client certificates too. 
