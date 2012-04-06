@@ -75,7 +75,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.63';
+	$VERSION = '1.64';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1156,6 +1156,8 @@ sub dump_peer_certificate {
 			$scheme = $scheme{$scheme} or croak "scheme $scheme not defined";
 		}
 
+		return 1 if ! %$scheme; # 'none'
+
 		# get data from certificate
 		my $commonName = $dispatcher{cn}->($cert);
 		my @altNames = $dispatcher{subjectAltNames}->($cert);
@@ -1876,13 +1878,17 @@ See the OpenSSL documentation for SSL_CTX_set_verify for more information.
 
 Set the scheme used to automatically verify the hostname of the peer.
 See the information about the verification schemes in B<verify_hostname>.
+
 The default is undef, e.g. to not automatically verify the hostname.
+If no verification is done the other B<SSL_verifycn_*> options have
+no effect, but you might still do manual verification by calling
+B<verify_hostname>.
 
 =item SSL_verifycn_name
 
 Set the name which is used in verification of hostname. If SSL_verifycn_scheme
 is set and no SSL_verifycn_name is given it will try to use the PeerHost and
-PeerAddr settings and fail if no name caan be determined.
+PeerAddr settings and fail if no name can be determined.
 
 Using PeerHost or PeerAddr works only if you create the connection directly
 with C<< IO::Socket::SSL->new >>, if an IO::Socket::INET object is upgraded
@@ -2094,11 +2100,15 @@ name will be only checked if no names are given in subjectAltNames.
 This RFC doesn't say much useful about the verification so it just assumes
 that subjectAltNames are possible, but no wildcards are possible anywhere.
 
+=item none
+
+No verification will be done.
+Actually is does not make any sense to call verify_hostname in this case.
+
 =back
 
 The scheme can be given either by specifying the name for one of the above predefined
-schemes, by using a callback (see below) or by using a hash which can have the
-following keys and values:
+schemes, or by using a hash which can have the following keys and values:
 
 =over 8
 
@@ -2120,12 +2130,16 @@ or even '*' will not be allowed.
 Similar to wildcards_in_alt, but checks the common name. There is no predefined
 scheme which allows wildcards in common names.
 
-=back
+=item callback: \&coderef
 
 If you give a subroutine for verification it will be called with the arguments
 ($hostname,$commonName,@subjectAltNames), where hostname is the name given for
 verification, commonName is the result from peer_certificate('cn') and
 subjectAltNames is the result from peer_certificate('subjectAltNames').
+
+All other arguments for the verification scheme will be ignored in this case.
+
+=back
 
 =item B<errstr()>
 
