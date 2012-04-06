@@ -1,3 +1,6 @@
+v1.63 2012.04.06
+- applied patch of DOUGDUDE to ignore die from within eval to make tests 
+  more stable on Win32, https://rt.cpan.org/Ticket/Display.html?id=76147
 v1.62 2012.03.28
 - small fix to last version
 v1.61 2012.03.27

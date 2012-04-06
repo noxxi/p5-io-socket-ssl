@@ -31,6 +31,7 @@ if ( ! defined &ok ) {
 }
 
 $SIG{ __DIE__ } = sub {
+	return if $^S; # Ignore from within evals
 	ok( 0,"@_" );
 	killall();
 	exit(1);
