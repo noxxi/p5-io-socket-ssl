@@ -75,7 +75,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.65';
+	$VERSION = '1.66';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -165,6 +165,9 @@ sub import {
 	@_ = ( $class,@export );
 	goto &Exporter::import;
 }
+
+my %CREATED_IN_THIS_THREAD;
+sub CLONE { %CREATED_IN_THIS_THREAD = (); }
 
 # You might be expecting to find a new() subroutine here, but that is
 # not how IO::Socket::INET works.  All configuration gets performed in
@@ -359,6 +362,7 @@ sub connect_SSL {
 		$ctx = ${*$self}{'_SSL_ctx'};  # Reference to real context
 		$ssl = ${*$self}{'_SSL_object'} = Net::SSLeay::new($ctx->{context})
 			|| return $self->error("SSL structure creation failed");
+		$CREATED_IN_THIS_THREAD{$ssl} = 1;
 
 		Net::SSLeay::set_fd($ssl, $fileno)
 			|| return $self->error("SSL filehandle association failed");
@@ -535,6 +539,7 @@ sub accept_SSL {
 
 		$ssl = ${*$socket}{'_SSL_object'} = Net::SSLeay::new($ctx->{context})
 			|| return $socket->error("SSL structure creation failed");
+		$CREATED_IN_THIS_THREAD{$ssl} = 1;
 
 		Net::SSLeay::set_fd($ssl, $fileno)
 			|| return $socket->error("SSL filehandle association failed");
@@ -1291,10 +1296,13 @@ sub error {
 
 
 sub DESTROY {
-	my $self = shift || return;
-	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
-		if ${*$self}{'_SSL_opened'};
-	delete(${*$self}{'_SSL_ctx'});
+	my $self = shift or return;
+	my $ssl = ${*$self}{_SSL_object} or return;
+	if ($CREATED_IN_THIS_THREAD{$ssl}) {
+		$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
+			if ${*$self}{'_SSL_opened'};
+		delete(${*$self}{'_SSL_ctx'});
+	}
 }
 
 
@@ -2360,6 +2368,9 @@ See the 'example' directory.
 IO::Socket::SSL depends on Net::SSLeay.  Up to version 1.43 of Net::SSLeay
 it was not thread safe, although it did probably work if you did not use 
 SSL_verify_callback and SSL_password_cb.
+
+Creating an IO::Socket::SSL object in one thread and closing it in another
+thread will not work.
 
 IO::Socket::SSL does not work together with Storable::fd_retrieve/fd_store.
 See BUGS file for more information and how to work around the problem.

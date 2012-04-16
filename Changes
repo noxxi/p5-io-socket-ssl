@@ -1,3 +1,6 @@
+v1.66 2012.04.16
+- make it thread safer, thanks to bug report from vega[DOT]james[AT]gmail
+  [DOT]com, https://rt.cpan.org/Ticket/Display.html?id=76538
 v1.65 2012.04.16
 - added NPN (Next Protocol Negotiation) support based on patch from kmx
   https://rt.cpan.org/Ticket/Display.html?id=76223
