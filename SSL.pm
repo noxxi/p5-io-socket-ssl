@@ -75,7 +75,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.64';
+	$VERSION = '1.65';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -228,6 +228,7 @@ sub configure_SSL {
 		SSL_verify_callback => undef,
 		SSL_verifycn_scheme => undef,  # don't verify cn
 		SSL_verifycn_name => undef,    # use from PeerAddr/PeerHost
+		SSL_npn_protocols => undef,    # meaning depends whether on server or client side
 	);
 
 	# common problem forgetting SSL_use_cert
@@ -1326,6 +1327,13 @@ sub set_ctx_defaults {
 	}
 }
 
+sub next_proto_negotiated {
+	my $self = shift;
+	return $self->error("NPN not supported in Net::SSLeay")
+	    if ! exists &Net::SSLeay::P_next_proto_negotiated;
+	my $ssl = $self->_get_ssl_object || return;
+	return Net::SSLeay::P_next_proto_negotiated($ssl);
+}
 
 sub opened {
 	my $self = shift;
@@ -1458,6 +1466,18 @@ sub new {
 	Net::SSLeay::CTX_set_mode( $ctx,
 		SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER|SSL_MODE_ENABLE_PARTIAL_WRITE);
 
+	if ( my $proto_list = $arg_hash->{SSL_npn_protocols} ) {
+		return IO::Socket::SSL->error("NPN not supported in Net::SSLeay")
+		    if ! exists &Net::SSLeay::P_next_proto_negotiated;
+		if($arg_hash->{SSL_server}) {
+			# on server side SSL_npn_protocols means a list of advertised protocols
+			Net::SSLeay::CTX_set_next_protos_advertised_cb($ctx, $proto_list);
+		} else {
+			# on client side SSL_npn_protocols means a list of prefered protocols
+			# negotiation algorithm used is "as-openssl-implements-it"
+			Net::SSLeay::CTX_set_next_proto_select_cb($ctx, $proto_list);
+		}
+	}
 
 	my $verify_mode = $arg_hash->{SSL_verify_mode};
 	if ( $verify_mode != Net::SSLeay::VERIFY_NONE() and
@@ -1978,6 +1998,16 @@ be closed forcibly.	 The subroutine, if called, will be passed two parameters:
 a reference to the socket on which the SSL negotiation failed and and the full
 text of the error message.
 
+=item SSL_npn_protocols
+
+If used on the server side it specifies list of protocols advertised by SSL
+server as an array ref, e.g. ['spdy/2','http1.1']. 
+On the client side it specifies the protocols offered by the client for NPN
+as an array ref.
+See also method L<next_proto_negotiated>.
+
+Next Protocol Negotioation (NPN) is available with Net::SSLeay 1.46+ and openssl-1.0.1+.
+
 =back
 
 =item B<close(...)>
@@ -2140,6 +2170,13 @@ subjectAltNames is the result from peer_certificate('subjectAltNames').
 All other arguments for the verification scheme will be ignored in this case.
 
 =back
+
+=item B<next_proto_negotiated()>
+
+This method returns the name of negotiated protocol - e.g. 'http/1.1'. It works
+for both client and server side of SSL connection.
+
+NPN support is available with Net::SSLeay 1.46+ and openssl-1.0.1+.
 
 =item B<errstr()>
 

@@ -1,3 +1,6 @@
+v1.65 2012.04.16
+- added NPN (Next Protocol Negotiation) support based on patch from kmx
+  https://rt.cpan.org/Ticket/Display.html?id=76223
 v1.64 2012.04.06
 - clarify some behavior regarding hostname verfication.
   Thanks to DOHERTY for reporting.
