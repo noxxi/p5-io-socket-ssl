@@ -1,3 +1,10 @@
+v1.67 2012.05.07
+- https://rt.cpan.org/Ticket/Display.html?id=76929
+  thanks to d[DOT]thomas[AT]its[DOT]uq[DOT]edu[DOT]au for reporting
+  - if no explicit cipher list is given it will now default to ALL:!LOW instead 
+    of the openssl default, which usually includes weak ciphers like DES.
+  - new config key SSL_honor_cipher_order and documented how to use it to fight
+    BEAST attack. 
 v1.66 2012.04.16
 - make it thread safer, thanks to bug report from vega[DOT]james[AT]gmail
   [DOT]com, https://rt.cpan.org/Ticket/Display.html?id=76538

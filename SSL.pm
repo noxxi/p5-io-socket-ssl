@@ -30,6 +30,8 @@ use constant SSL_VERIFY_CLIENT_ONCE => Net::SSLeay::VERIFY_CLIENT_ONCE();
 use constant SSL_SENT_SHUTDOWN => 1;
 use constant SSL_RECEIVED_SHUTDOWN => 2;
 
+use constant DEFAULT_CIPHER_LIST => 'HIGH:!LOW';
+
 # non-XS Versions of Scalar::Util will fail
 BEGIN{
 	eval { use Scalar::Util 'dualvar'; dualvar(0,'') };
@@ -75,7 +77,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.66';
+	$VERSION = '1.67';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -232,6 +234,7 @@ sub configure_SSL {
 		SSL_verifycn_scheme => undef,  # don't verify cn
 		SSL_verifycn_name => undef,    # use from PeerAddr/PeerHost
 		SSL_npn_protocols => undef,    # meaning depends whether on server or client side
+		SSL_honor_cipher_order => 0,   # client order gets preference
 	);
 
 	# common problem forgetting SSL_use_cert
@@ -367,7 +370,7 @@ sub connect_SSL {
 		Net::SSLeay::set_fd($ssl, $fileno)
 			|| return $self->error("SSL filehandle association failed");
 
-		if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
+		if ( my $cl = $arg_hash->{SSL_cipher_list} || DEFAULT_CIPHER_LIST ) {
 			Net::SSLeay::set_cipher_list($ssl, $cl )
 				|| return $self->error("Failed to set SSL cipher list");
 		}
@@ -544,7 +547,7 @@ sub accept_SSL {
 		Net::SSLeay::set_fd($ssl, $fileno)
 			|| return $socket->error("SSL filehandle association failed");
 
-		if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
+		if ( my $cl = $arg_hash->{SSL_cipher_list} || DEFAULT_CIPHER_LIST) {
 			Net::SSLeay::set_cipher_list($ssl, $cl )
 				|| return $socket->error("Failed to set SSL cipher list");
 		}
@@ -1457,6 +1460,9 @@ sub new {
 	    "SSL Context init failed");
 
 	Net::SSLeay::CTX_set_options($ctx, Net::SSLeay::OP_ALL());
+	if ( $arg_hash->{SSL_honor_cipher_order} ) {
+	    Net::SSLeay::CTX_set_options($ctx, 0x00400000);
+	}
 
 	# if we don't set session_id_context if client certicate is expected
 	# client session caching will fail
@@ -1779,8 +1785,18 @@ If this option is set the cipher list for the connection will be set to the
 given value, e.g. something like 'ALL:!LOW:!EXP:!ADH'. Look into the OpenSSL
 documentation (L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>)
 for more details.
-If this option is not used the openssl builtin default is used which is suitable
-for most cases.
+
+If this option is not set 'ALL:!LOW' will be used.
+To use OpenSSL builtin default (whatever this is) set it to ''.
+
+=item SSL_honor_cipher_order
+
+If this option is true the cipher order the server specified is used instead
+of the order proposed by the client. To mitigate BEAST attack you might use
+something like
+
+  SSL_honor_cipher_order => 1,
+  SSL_cipher_list => 'RC4-SHA:ALL:!ADH:!LOW',
 
 =item SSL_use_cert
 
