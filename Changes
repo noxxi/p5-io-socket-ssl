@@ -1,3 +1,6 @@
+v1.68 2012.05.07
+- remove SSLv2 from default cipher list, which makes failed tests after last
+  change work again, fix behvior for empty cipher list (use default)
 v1.67 2012.05.07
 - https://rt.cpan.org/Ticket/Display.html?id=76929
   thanks to d[DOT]thomas[AT]its[DOT]uq[DOT]edu[DOT]au for reporting

@@ -30,7 +30,7 @@ use constant SSL_VERIFY_CLIENT_ONCE => Net::SSLeay::VERIFY_CLIENT_ONCE();
 use constant SSL_SENT_SHUTDOWN => 1;
 use constant SSL_RECEIVED_SHUTDOWN => 2;
 
-use constant DEFAULT_CIPHER_LIST => 'HIGH:!LOW';
+use constant DEFAULT_CIPHER_LIST => 'HIGH:!LOW:!SSLv2';
 
 # non-XS Versions of Scalar::Util will fail
 BEGIN{
@@ -77,7 +77,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.67';
+	$VERSION = '1.68';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -370,7 +370,9 @@ sub connect_SSL {
 		Net::SSLeay::set_fd($ssl, $fileno)
 			|| return $self->error("SSL filehandle association failed");
 
-		if ( my $cl = $arg_hash->{SSL_cipher_list} || DEFAULT_CIPHER_LIST ) {
+		if ( my $cl = exists $arg_hash->{SSL_cipher_list} 
+		    ? $arg_hash->{SSL_cipher_list} 
+		    :  DEFAULT_CIPHER_LIST ) {
 			Net::SSLeay::set_cipher_list($ssl, $cl )
 				|| return $self->error("Failed to set SSL cipher list");
 		}
@@ -547,7 +549,9 @@ sub accept_SSL {
 		Net::SSLeay::set_fd($ssl, $fileno)
 			|| return $socket->error("SSL filehandle association failed");
 
-		if ( my $cl = $arg_hash->{SSL_cipher_list} || DEFAULT_CIPHER_LIST) {
+		if ( my $cl = exists $arg_hash->{SSL_cipher_list} 
+		    ? $arg_hash->{SSL_cipher_list}
+		    : DEFAULT_CIPHER_LIST) {
 			Net::SSLeay::set_cipher_list($ssl, $cl )
 				|| return $socket->error("Failed to set SSL cipher list");
 		}
