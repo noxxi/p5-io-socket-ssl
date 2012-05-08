@@ -31,6 +31,7 @@ use constant SSL_SENT_SHUTDOWN => 1;
 use constant SSL_RECEIVED_SHUTDOWN => 2;
 
 use constant DEFAULT_CIPHER_LIST => 'HIGH:!LOW:!SSLv2';
+use constant DEFAULT_VERSION     => 'SSLv23:!SSLv2';
 
 # non-XS Versions of Scalar::Util will fail
 BEGIN{
@@ -77,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.69';
+	$VERSION = '1.70';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -228,7 +229,7 @@ sub configure_SSL {
 		SSL_server => $is_server,
 		SSL_use_cert => $is_server,
 		SSL_check_crl => 0,
-		SSL_version	=> 'sslv23',
+		SSL_version	=> DEFAULT_VERSION,
 		SSL_verify_mode => SSL_VERIFY_NONE,
 		SSL_verify_callback => undef,
 		SSL_verifycn_scheme => undef,  # don't verify cn
@@ -1454,16 +1455,36 @@ sub new {
 		return $ctx_object if ($ctx_object = ${*$ctx_object}{'_SSL_ctx'});
 	}
 
-	my $sub = UNIVERSAL::can('Net::SSLeay',
-	    $arg_hash->{SSL_version} =~m{^(?:ssl(v2)|ssl(v3)|(tlsv1))$}i ? 
-		"CTX_".lc($1||$2||$3)."_new" : "CTX_new" );
-	return IO::Socket::SSL->error(
-	    "SSL Version $arg_hash->{SSL_version} not supported")
-	    if ! $sub;
-	my $ctx = $sub->() or return IO::Socket::SSL->error(
-	    "SSL Context init failed");
+	my $ver;
+	my $disable_ver = 0;
+	for (split(/\s*:\s*/,$arg_hash->{SSL_version})) {
+	    m{^(!?)(?:(SSL(?:v2|v3|v23))|(TLSv1))$}i 
+		or croak("invalid SSL_version specified");
+	    my $not = $1;
+	    ( my $v = lc($2||$3) ) =~s{^(...)}{\U$1};
+	    if ( $not ) {
+		$disable_ver |= 
+		    $v eq 'SSLv2' ? 0x01000000 : # SSL_OP_NO_SSLv2 
+		    $v eq 'SSLv3' ? 0x02000000 : # SSL_OP_NO_SSLv3 
+		    $v eq 'TLSv1' ? 0x04000000 : # SSL_OP_NO_TLSv1
+		    croak("cannot disable version $_");
+	    } else {
+		croak("cannot set multiple SSL protocols in SSL_version")
+		    if $ver && $v ne $ver;
+		$ver = $v;
+	    }
+	}
 
-	Net::SSLeay::CTX_set_options($ctx, Net::SSLeay::OP_ALL());
+	my $sub =  UNIVERSAL::can( 'Net::SSLeay',
+	    $ver eq 'SSLv2' ? 'CTX_v2_new' :
+	    $ver eq 'SSLv3' ? 'CTX_v3_new' :
+	    $ver eq 'TLSv1' ? 'CTX_tlsv1_new' :
+	    'CTX_new'
+	) or return IO::Socket::SSL->error("SSL Version $ver not supported");
+	my $ctx = $sub->() or return 
+	    IO::Socket::SSL->error("SSL Context init failed");
+
+	Net::SSLeay::CTX_set_options($ctx, Net::SSLeay::OP_ALL() & ! $disable_ver );
 	if ( $arg_hash->{SSL_honor_cipher_order} ) {
 	    Net::SSLeay::CTX_set_options($ctx, 0x00400000);
 	}
@@ -1782,6 +1803,14 @@ side.
 Sets the version of the SSL protocol used to transmit data. The default is 'SSLv23',
 which auto-negotiates between SSLv2 and SSLv3.	You may specify 'SSLv2', 'SSLv3', or
 'TLSv1' (case-insensitive) if you do not want this behavior.
+
+You can limit to set of supported protocols by adding !version separated by ':'.
+The default is 'SSLv23:!SSLv2' which means, that SSLv2, SSLv3 and TLSv1 are supported
+for initial protocol handshakes, but SSLv2 will not be accepted, leaving only
+SSLv3 and TLSv1.  
+
+Setting the version instead to 'TLSv1' will probably break interaction with lots of
+clients which start with SSLv2 and then upgrade to TLSv1.
 
 =item SSL_cipher_list
 
