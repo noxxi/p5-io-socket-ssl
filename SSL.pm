@@ -77,7 +77,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.68';
+	$VERSION = '1.69';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1779,7 +1779,7 @@ side.
 
 =item SSL_version
 
-Sets the version of the SSL protocol used to transmit data.	 The default is SSLv2/3,
+Sets the version of the SSL protocol used to transmit data. The default is 'SSLv23',
 which auto-negotiates between SSLv2 and SSLv3.	You may specify 'SSLv2', 'SSLv3', or
 'TLSv1' (case-insensitive) if you do not want this behavior.
 
@@ -1790,7 +1790,7 @@ given value, e.g. something like 'ALL:!LOW:!EXP:!ADH'. Look into the OpenSSL
 documentation (L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>)
 for more details.
 
-If this option is not set 'ALL:!LOW' will be used.
+If this option is not set 'ALL:!LOW:!SSLv2' will be used.
 To use OpenSSL builtin default (whatever this is) set it to ''.
 
 =item SSL_honor_cipher_order
