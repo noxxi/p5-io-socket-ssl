@@ -1,3 +1,6 @@
+v1.71 2012.05.09
+- 1.70 done right. Also don't disable SSLv2 ciphers, SSLv2 support is better
+  disabled by the default SSL_version of 'SSLv23:!SSLv2'
 v1.70 2012.05.08
 - make it possible to disable protols using SSL_version, make SSL_version
   default to 'SSLv23:!SSLv2'

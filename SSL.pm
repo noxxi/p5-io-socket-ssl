@@ -30,7 +30,7 @@ use constant SSL_VERIFY_CLIENT_ONCE => Net::SSLeay::VERIFY_CLIENT_ONCE();
 use constant SSL_SENT_SHUTDOWN => 1;
 use constant SSL_RECEIVED_SHUTDOWN => 2;
 
-use constant DEFAULT_CIPHER_LIST => 'HIGH:!LOW:!SSLv2';
+use constant DEFAULT_CIPHER_LIST => 'HIGH:!LOW';
 use constant DEFAULT_VERSION     => 'SSLv23:!SSLv2';
 
 # non-XS Versions of Scalar::Util will fail
@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.70';
+	$VERSION = '1.71';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1484,7 +1484,7 @@ sub new {
 	my $ctx = $sub->() or return 
 	    IO::Socket::SSL->error("SSL Context init failed");
 
-	Net::SSLeay::CTX_set_options($ctx, Net::SSLeay::OP_ALL() & ! $disable_ver );
+	Net::SSLeay::CTX_set_options($ctx, Net::SSLeay::OP_ALL() | $disable_ver );
 	if ( $arg_hash->{SSL_honor_cipher_order} ) {
 	    Net::SSLeay::CTX_set_options($ctx, 0x00400000);
 	}
@@ -1819,7 +1819,7 @@ given value, e.g. something like 'ALL:!LOW:!EXP:!ADH'. Look into the OpenSSL
 documentation (L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>)
 for more details.
 
-If this option is not set 'ALL:!LOW:!SSLv2' will be used.
+If this option is not set 'ALL:!LOW' will be used.
 To use OpenSSL builtin default (whatever this is) set it to ''.
 
 =item SSL_honor_cipher_order
