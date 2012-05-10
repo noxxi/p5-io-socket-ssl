@@ -30,7 +30,7 @@ use constant SSL_VERIFY_CLIENT_ONCE => Net::SSLeay::VERIFY_CLIENT_ONCE();
 use constant SSL_SENT_SHUTDOWN => 1;
 use constant SSL_RECEIVED_SHUTDOWN => 2;
 
-use constant DEFAULT_CIPHER_LIST => 'HIGH:!LOW';
+use constant DEFAULT_CIPHER_LIST => 'ALL:!LOW';
 use constant DEFAULT_VERSION     => 'SSLv23:!SSLv2';
 
 # non-XS Versions of Scalar::Util will fail
@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.71';
+	$VERSION = '1.72';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
