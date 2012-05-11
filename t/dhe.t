@@ -32,11 +32,10 @@ my $server = IO::Socket::SSL->new(
     SSL_cert_file => "certs/server-rsa384-dh.pem",
     SSL_key_file  => "certs/server-rsa384-dh.pem",
     SSL_dh_file   => "certs/server-rsa384-dh.pem",
-    # openssl 1.0.1(beta2) complains about the rsa key too small, unless
-    # we explicitly set version to tlsv1 or sslv3
-    # unfortunatly the workaround fails for older openssl versions :(
-    (Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x10001000)
-        ? ( SSL_version   => 'tlsv1' ):()
+    # at least 0.9.8[ab] have problems if we don't explicitly disable
+    # RSA or EXPORT56, and 1.0.1 complains if we have RSA authentication
+    # enabled 
+    SSL_cipher_list => 'ALL:RSA:!aRSA',
 ) || do {
     notok($!);
     exit

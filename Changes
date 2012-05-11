@@ -1,3 +1,7 @@
+v1.72 2012.05.11
+- make test t/dhe.t hopefully work for more version of openssl
+  Thanks to paul[AT]city-fan[DOT]org for providing bug reports and
+  testing environment
 v1.72 2012.05.10
 - set DEFAULT_CIPHER_LIST to ALL:!LOW instead of HIGH:!LOW
   Thanks to dcostas[AT]gmail[DOT]com for problem report
