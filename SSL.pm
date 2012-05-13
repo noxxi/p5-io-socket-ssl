@@ -78,7 +78,7 @@ BEGIN {
 	}) {
 		@ISA = qw(IO::Socket::INET);
 	}
-	$VERSION = '1.73';
+	$VERSION = '1.74';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1458,10 +1458,11 @@ sub new {
 	my $ver;
 	my $disable_ver = 0;
 	for (split(/\s*:\s*/,$arg_hash->{SSL_version})) {
-	    m{^(!?)(?:(SSL(?:v2|v3|v23))|(TLSv1))$}i 
+	    m{^(!?)(?:(SSL(?:v2|v3|v23|v2/3))|(TLSv1))$}i 
 		or croak("invalid SSL_version specified");
 	    my $not = $1;
 	    ( my $v = lc($2||$3) ) =~s{^(...)}{\U$1};
+	    $v =~s{/}{}; # interpret SSLv2/3 as SSLv23
 	    if ( $not ) {
 		$disable_ver |= 
 		    $v eq 'SSLv2' ? 0x01000000 : # SSL_OP_NO_SSLv2 
