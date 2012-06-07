@@ -13,9 +13,16 @@ if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
     exit
 }
 
+# check first if we have loaded IO::Socket::IP, as if so we won't need or use
+# IO::Socket::INET6
+if( IO::Socket::SSL->CAN_IPV6 eq "IO::Socket::IP" ) {
+	print "1..0 # Skipped: using IO::Socket::IP instead\n";
+	exit;
+}
+
 # check if we have loaded INET6, IO::Socket::SSL should do it by itself
 # if it is available
-if ( ! $INC{ 'IO/Socket/INET6.pm' } ) {
+unless( IO::Socket::SSL->CAN_IPV6 eq "IO::Socket::INET6" ) {
 	# not available or IO::Socket::SSL forgot to load it
 	if ( ! eval { require IO::Socket::INET6 } ) {
 		print "1..0 # Skipped: no IO::Socket::INET6 available\n";

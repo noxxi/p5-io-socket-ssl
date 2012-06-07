@@ -18,6 +18,7 @@ use IO::Socket;
 use Net::SSLeay 1.21;
 use Exporter ();
 use Errno qw( EAGAIN ETIMEDOUT );
+use Socket 1.95 qw( inet_pton );
 use Carp;
 use strict;
 
@@ -61,24 +62,29 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 }
 
 my @caller_force_inet4; # in case inet4 gets forced we store here who forced it
-my $can_ipv6;           # true if we successfully enabled ipv6 while loading
 
 BEGIN {
 	# Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
 
+	# if we have IO::Socket::IP >= 0.11 we will use this in preference
+	# because it can handle both IPv4 and IPv6
+	if ( eval { require IO::Socket::IP; IO::Socket::IP->VERSION(0.11); } ) {
+		@ISA = qw(IO::Socket::IP);
+		constant->import( CAN_IPV6 => "IO::Socket::IP" );
+	}
 	# if we have IO::Socket::INET6 we will use this not IO::Socket::INET, because
 	# it can handle both IPv4 and IPv6. If we don't have INET6 available fall back
 	# to INET
-	if ( ! eval {
-		require Socket6;
-		Socket6->import( 'inet_pton' );
-		require IO::Socket::INET6;
+	elsif( eval { require IO::Socket::INET6; } ) {
 		@ISA = qw(IO::Socket::INET6);
-		$can_ipv6 = 1;
-	}) {
-		@ISA = qw(IO::Socket::INET);
+		constant->import( CAN_IPV6 => "IO::Socket::INET6" );
 	}
-	$VERSION = '1.74';
+	else {
+		@ISA = qw(IO::Socket::INET);
+		constant->import( CAN_IPV6 => '' );
+	}
+
+	$VERSION = '1.74_1';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -151,11 +157,11 @@ sub import {
 				# either we don't support it or we disabled it by explicitly
 				# loading it with 'inet4'. In this case re-enable but warn
 				# because this is probably an error
-				if ( $can_ipv6 ) {
-					@ISA = 'IO::Socket::INET6';
+				if ( CAN_IPV6 ) {
+					@ISA = ( CAN_IPV6 );
 					warn "IPv6 support re-enabled in __PACKAGE__, got disabled in file $caller_force_inet4[1] line $caller_force_inet4[2]";
 				} else {
-					die "INET6 is not supported, missing Socket6 or IO::Socket::INET6";
+					die "INET6 is not supported, install IO::Socket::INET6";
 				}
 			}
 		} elsif ( /^:?debug(\d+)/ ) {
@@ -185,7 +191,7 @@ sub configure {
 	# work around Bug in IO::Socket::INET6 where it doesn't use the
 	# right family for the socket on BSD systems:
 	# http://rt.cpan.org/Ticket/Display.html?id=39550
-	if ( $can_ipv6 && ! $arg_hash->{Domain} &&
+	if ( CAN_IPV6 eq "IO::Socket::INET6" && ! $arg_hash->{Domain} &&
 		! ( $arg_hash->{LocalAddr} || $arg_hash->{LocalHost} ) &&
 		(my $peer = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost})) {
 		# set Domain to AF_INET/AF_INET6 if there is only one choice
@@ -1187,9 +1193,6 @@ sub dump_peer_certificate {
 		my $ipn;
 		if ( $identity =~m{:} ) {
 			# no IPv4 or hostname have ':'	in it, try IPv6.
-			#  make sure that Socket6 was loaded properly
-			UNIVERSAL::can( __PACKAGE__, 'inet_pton' ) or croak
-				q[Looks like IPv6 address, make sure that Socket6 is loaded or make "use IO::Socket::SSL 'inet6'];
 			$ipn = inet_pton(AF_INET6,$identity) 
 				or croak "'$identity' is not IPv6, but neither IPv4 nor hostname";
 		} elsif ( $identity =~m{^\d+\.\d+\.\d+\.\d+$} ) {

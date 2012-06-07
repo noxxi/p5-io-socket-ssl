@@ -30,7 +30,8 @@ t/compatibility.t
 t/connectSSL-timeout.t
 t/core.t
 t/dhe.t
-t/inet6.t
+t/io-socket-inet6.t
+t/io-socket-ip.t
 t/memleak_bad_handshake.t
 t/nonblock.t
 t/npn.t
