@@ -84,7 +84,7 @@ BEGIN {
 		constant->import( CAN_IPV6 => '' );
 	}
 
-	$VERSION = '1.74_1';
+	$VERSION = '1.74_2';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1804,15 +1804,15 @@ side.
 
 =item SSL_version
 
-Sets the version of the SSL protocol used to transmit data. The default is 'SSLv23',
-which auto-negotiates between SSLv2 and SSLv3.	You may specify 'SSLv2', 'SSLv3', or
-'TLSv1' (case-insensitive) if you do not want this behavior.
+Sets the version of the SSL protocol used to transmit data. 'SSLv23' auto-negotiates 
+between SSLv2 and SSLv3, while 'SSLv2', 'SSLv3' or 'TLSv1' restrict the protocol
+to the specified version. All values are case-insensitive.
 
 You can limit to set of supported protocols by adding !version separated by ':'.
-The default is 'SSLv23:!SSLv2' which means, that SSLv2, SSLv3 and TLSv1 are supported
-for initial protocol handshakes, but SSLv2 will not be accepted, leaving only
-SSLv3 and TLSv1.  
 
+The default SSL_version is 'SSLv23:!SSLv2' which means, that SSLv2, SSLv3 and TLSv1 
+are supported for initial protocol handshakes, but SSLv2 will not be accepted, leaving 
+only SSLv3 and TLSv1.  
 Setting the version instead to 'TLSv1' will probably break interaction with lots of
 clients which start with SSLv2 and then upgrade to TLSv1.
 

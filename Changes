@@ -1,6 +1,9 @@
+v1.74_2 2012.06.07
+- fixed documentation errors, reported by MARSCHAP
+  https://rt.cpan.org/Ticket/Display.html?id=77690
 v1.74_1 2012.06.07
 - add support to IO::Socket::IP which support inet6 and inet4 by
-  integrating patch from leonerd-cpan[AT]leonerd[DOT]org[DOT]uk 
+  integrating patch from PEVANS
   for https://rt.cpan.org/Ticket/Display.html?id=75218
 v1.74 2012.05.13
 - accept a version of SSLv2/3 as SSLv23, because older documentation
