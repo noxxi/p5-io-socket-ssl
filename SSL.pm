@@ -84,7 +84,7 @@ BEGIN {
 		constant->import( CAN_IPV6 => '' );
 	}
 
-	$VERSION = '1.74_2';
+	$VERSION = '1.75';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1461,16 +1461,18 @@ sub new {
 	my $ver;
 	my $disable_ver = 0;
 	for (split(/\s*:\s*/,$arg_hash->{SSL_version})) {
-	    m{^(!?)(?:(SSL(?:v2|v3|v23|v2/3))|(TLSv1))$}i 
+	    m{^(!?)(?:(SSL(?:v2|v3|v23|v2/3))|(TLSv1[12]?))$}i 
 		or croak("invalid SSL_version specified");
 	    my $not = $1;
 	    ( my $v = lc($2||$3) ) =~s{^(...)}{\U$1};
 	    $v =~s{/}{}; # interpret SSLv2/3 as SSLv23
 	    if ( $not ) {
 		$disable_ver |= 
-		    $v eq 'SSLv2' ? 0x01000000 : # SSL_OP_NO_SSLv2 
-		    $v eq 'SSLv3' ? 0x02000000 : # SSL_OP_NO_SSLv3 
-		    $v eq 'TLSv1' ? 0x04000000 : # SSL_OP_NO_TLSv1
+		    $v eq 'SSLv2'  ? 0x01000000 : # SSL_OP_NO_SSLv2 
+		    $v eq 'SSLv3'  ? 0x02000000 : # SSL_OP_NO_SSLv3 
+		    $v eq 'TLSv1'  ? 0x04000000 : # SSL_OP_NO_TLSv1
+		    $v eq 'TLSv11' ? 0x00000400 : # SSL_OP_NO_TLSv1_1
+		    $v eq 'TLSv12' ? 0x08000000 : # SSL_OP_NO_TLSv1_2
 		    croak("cannot disable version $_");
 	    } else {
 		croak("cannot set multiple SSL protocols in SSL_version")
@@ -1812,9 +1814,13 @@ You can limit to set of supported protocols by adding !version separated by ':'.
 
 The default SSL_version is 'SSLv23:!SSLv2' which means, that SSLv2, SSLv3 and TLSv1 
 are supported for initial protocol handshakes, but SSLv2 will not be accepted, leaving 
-only SSLv3 and TLSv1.  
+only SSLv3 and TLSv1. You can also use !TLSv11 and !TLSv12 to disable TLS versions
+1.1 and 1.2 while allowing TLS version 1.0.
+
 Setting the version instead to 'TLSv1' will probably break interaction with lots of
-clients which start with SSLv2 and then upgrade to TLSv1.
+clients which start with SSLv2 and then upgrade to TLSv1. On the other side some
+clients just close the connection when they receive a TLS version 1.1 request. In this 
+case setting the version to 'SSLv23:!SSLv2:!TLSv11:!TLSv12' might help.
 
 =item SSL_cipher_list
 

@@ -1,3 +1,5 @@
+v1.75 2012.06.15
+- made it possible to explicitly disable TLSv11 and TLSv12 in SSL_version
 v1.74_2 2012.06.07
 - fixed documentation errors, reported by MARSCHAP
   https://rt.cpan.org/Ticket/Display.html?id=77690
