@@ -18,7 +18,6 @@ use IO::Socket;
 use Net::SSLeay 1.21;
 use Exporter ();
 use Errno qw( EAGAIN ETIMEDOUT );
-use Socket 1.95 qw( inet_pton );
 use Carp;
 use strict;
 
@@ -66,25 +65,44 @@ my @caller_force_inet4; # in case inet4 gets forced we store here who forced it
 BEGIN {
 	# Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
 
-	# if we have IO::Socket::IP >= 0.11 we will use this in preference
-	# because it can handle both IPv4 and IPv6
-	if ( eval { require IO::Socket::IP; IO::Socket::IP->VERSION(0.11); } ) {
-		@ISA = qw(IO::Socket::IP);
-		constant->import( CAN_IPV6 => "IO::Socket::IP" );
+	# try to load inet_pton from Socket or Socket6
+	my $ip6 = eval {
+	    require Socket;
+	    Socket->VERSION(1.95);
+	    Socket->import( 'inet_pton' );
+	    1;
+	} || eval {
+	    require Socket6;
+	    Socket6->import( 'inet_pton' );
+	    1;
+	};
+
+	# try IO::Socket::IP or IO::Socket::INET6 for IPv6 support
+	if ( $ip6 ) {
+
+	    # if we have IO::Socket::IP >= 0.11 we will use this in preference
+	    # because it can handle both IPv4 and IPv6
+	    if ( eval { require IO::Socket::IP; IO::Socket::IP->VERSION(0.11); } ) {
+		    @ISA = qw(IO::Socket::IP);
+		    constant->import( CAN_IPV6 => "IO::Socket::IP" );
+
+	    # if we have IO::Socket::INET6 we will use this not IO::Socket::INET
+	    # because it can handle both IPv4 and IPv6
+	    } elsif( eval { require IO::Socket::INET6; } ) {
+		    @ISA = qw(IO::Socket::INET6);
+		    constant->import( CAN_IPV6 => "IO::Socket::INET6" );
+	    } else {
+		    $ip6 = 0;
+	    }
 	}
-	# if we have IO::Socket::INET6 we will use this not IO::Socket::INET, because
-	# it can handle both IPv4 and IPv6. If we don't have INET6 available fall back
-	# to INET
-	elsif( eval { require IO::Socket::INET6; } ) {
-		@ISA = qw(IO::Socket::INET6);
-		constant->import( CAN_IPV6 => "IO::Socket::INET6" );
-	}
-	else {
+
+	# fall back to IO::Socket::INET for IPv4 only
+	if ( ! $ip6 ) {
 		@ISA = qw(IO::Socket::INET);
 		constant->import( CAN_IPV6 => '' );
 	}
 
-	$VERSION = '1.75';
+	$VERSION = '1.76';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -1191,7 +1209,7 @@ sub dump_peer_certificate {
 		# is the given hostname an IP address? Then we have to convert to network byte order [RFC791][RFC2460]
 
 		my $ipn;
-		if ( $identity =~m{:} ) {
+		if ( CAN_IPV6 and $identity =~m{:} ) {
 			# no IPv4 or hostname have ':'	in it, try IPv6.
 			$ipn = inet_pton(AF_INET6,$identity) 
 				or croak "'$identity' is not IPv6, but neither IPv4 nor hostname";

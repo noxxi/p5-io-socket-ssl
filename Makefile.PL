@@ -93,7 +93,6 @@ WriteMakefile(
 	'PREREQ_PM' => {
 		'Net::SSLeay' => 1.21,
 		'Scalar::Util' => 0,
-		'Socket' => 1.95,
 	},
 	'dist' => { COMPRESS => 'gzip', SUFFIX => 'gz', },
 );
