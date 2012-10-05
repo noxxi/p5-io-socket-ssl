@@ -69,11 +69,11 @@ BEGIN {
 	my $ip6 = eval {
 	    require Socket;
 	    Socket->VERSION(1.95);
-	    Socket->import( 'inet_pton' );
+	    Socket->import( qw/inet_pton inet_ntop/ );
 	    1;
 	} || eval {
 	    require Socket6;
-	    Socket6->import( 'inet_pton' );
+	    Socket6->import( qw/inet_pton inet_ntop/ );
 	    1;
 	};
 
@@ -102,7 +102,7 @@ BEGIN {
 		constant->import( CAN_IPV6 => '' );
 	}
 
-	$VERSION = '1.76';
+	$VERSION = '1.77';
 	$GLOBAL_CONTEXT_ARGS = {};
 
 	#Make $DEBUG another name for $Net::SSLeay::trace
@@ -525,9 +525,17 @@ sub _update_peer {
 	my $self = shift;
 	my $arg_hash = ${*$self}{'_SSL_arguments'};
 	eval {
-		my ($port,$addr) = sockaddr_in( getpeername( $self ));
-		$arg_hash->{PeerAddr} = inet_ntoa( $addr );
-		$arg_hash->{PeerPort} = $port;
+                my $sockaddr = getpeername( $self );
+                my $af = sockaddr_family($sockaddr);
+                if( $af == AF_INET6 ) {
+                    my ($port, $addr, $scope, $flow ) = unpack_sockaddr_in6( $sockaddr );
+                    $arg_hash->{PeerAddr} = inet_ntop( $af, $addr );
+                    $arg_hash->{PeerPort} = $port;
+                } else {
+                    my ($port,$addr) = sockaddr_in( $sockaddr);
+                    $arg_hash->{PeerAddr} = inet_ntoa( $addr );
+                    $arg_hash->{PeerPort} = $port;
+                }
 	}
 }
 

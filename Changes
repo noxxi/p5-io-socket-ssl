@@ -1,3 +1,7 @@
+v1.77 2012.10.05
+- update_peer for IPv6 also, applied fix to 
+  https://rt.cpan.org/Ticket/Display.html?id=79916 by
+  tlhackque[AT]yahoo[DOT]com
 v1.76 2012.06.18
 - no longer depend on Socket.pm 1.95 for inet_pton, but use Socket6.pm if 
   no current Socket.pm is available. Thanks to paul[AT]city-fan[DOT]org

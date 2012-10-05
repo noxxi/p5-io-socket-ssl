@@ -90,6 +90,7 @@ WriteMakefile(
 	'ABSTRACT' => 'Nearly transparent SSL encapsulation for IO::Socket::INET.',
 	'VERSION_FROM' => 'SSL.pm',
 	'DISTNAME' => 'IO-Socket-SSL',
+	'LICENSE' => 'perl',
 	'PREREQ_PM' => {
 		'Net::SSLeay' => 1.21,
 		'Scalar::Util' => 0,
