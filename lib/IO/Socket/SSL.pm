@@ -69,11 +69,11 @@ BEGIN {
     my $ip6 = eval {
 	require Socket;
 	Socket->VERSION(1.95);
-	Socket->import( qw/inet_pton inet_ntop/ );
+	Socket->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
 	AF_INET6(); # >0 if defined in IO::Socket
     } || eval {
 	require Socket6;
-	Socket6->import( qw/inet_pton inet_ntop/ );
+	Socket6->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
 	AF_INET6(); # >0 if defined in IO::Socket
     };
 
@@ -102,7 +102,7 @@ BEGIN {
 	constant->import( CAN_IPV6 => '' );
     }
 
-    $VERSION = '1.77';
+    $VERSION = '1.78';
     $GLOBAL_CONTEXT_ARGS = {};
 
     #Make $DEBUG another name for $Net::SSLeay::trace
@@ -528,8 +528,9 @@ sub _update_peer {
 	my $sockaddr = getpeername( $self );
 	my $af = sockaddr_family($sockaddr);
 	if( CAN_IPV6 && $af == AF_INET6 ) {
-	    my ($port, $addr, $scope, $flow ) = unpack_sockaddr_in6( $sockaddr );
-	    $arg_hash->{PeerAddr} = inet_ntop( $af, $addr );
+	    my ($host, $port) = getnameinfo($sockaddr,
+		NI_NUMERICHOST | NI_NUMERICSERV);
+	    $arg_hash->{PeerAddr} = $host;
 	    $arg_hash->{PeerPort} = $port;
 	} else {
 	    my ($port,$addr) = sockaddr_in( $sockaddr);

@@ -1,3 +1,6 @@
+- use getnameinfo instead of unpack_sockaddr_in6 to get PeerAddr and 
+  PeerPort from sockaddr in _update_peer, because this provides scope
+  too. Thanks to bluhm[AT]genua[DOT]de.
 - work around systems which don't defined AF_INET6
   https://rt.cpan.org/Ticket/Display.html?id=81216
   Thanks to GAAS for reporting
