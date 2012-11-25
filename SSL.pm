@@ -70,11 +70,11 @@ BEGIN {
 	    require Socket;
 	    Socket->VERSION(1.95);
 	    Socket->import( qw/inet_pton inet_ntop/ );
-	    1;
+	    AF_INET6(); # >0 if defined in IO::Socket
 	} || eval {
 	    require Socket6;
 	    Socket6->import( qw/inet_pton inet_ntop/ );
-	    1;
+	    AF_INET6(); # >0 if defined in IO::Socket
 	};
 
 	# try IO::Socket::IP or IO::Socket::INET6 for IPv6 support
@@ -527,7 +527,7 @@ sub _update_peer {
 	eval {
                 my $sockaddr = getpeername( $self );
                 my $af = sockaddr_family($sockaddr);
-                if( $af == AF_INET6 ) {
+                if( CAN_IPV6 && $af == AF_INET6 ) {
                     my ($port, $addr, $scope, $flow ) = unpack_sockaddr_in6( $sockaddr );
                     $arg_hash->{PeerAddr} = inet_ntop( $af, $addr );
                     $arg_hash->{PeerPort} = $port;
