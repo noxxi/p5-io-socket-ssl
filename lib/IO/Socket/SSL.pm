@@ -1,3 +1,5 @@
+# vim: set sts=4 sw=4 ts=8 ai:
+#
 # IO::Socket::SSL:
 # a drop-in replacement for IO::Socket::INET that encapsulates
 # data passed over a network with SSL.

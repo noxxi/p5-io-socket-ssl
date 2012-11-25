@@ -1,3 +1,4 @@
+# vim: set sts=4 sw=4 ts=8 ai:
 #
 # a MakeMaker script for IO::Socket::SSL (aspa@hip.fi).
 #
@@ -88,7 +89,7 @@ WriteMakefile(
     'NAME' => 'IO::Socket::SSL',
     'AUTHOR' => 'Steffen Ullrich & Peter Behroozi & Marko Asplund',
     'ABSTRACT' => 'Nearly transparent SSL encapsulation for IO::Socket::INET.',
-    'VERSION_FROM' => 'SSL.pm',
+    'VERSION_FROM' => 'lib/IO/Socket/SSL.pm',
     'DISTNAME' => 'IO-Socket-SSL',
     'LICENSE' => 'perl',
     'PREREQ_PM' => {

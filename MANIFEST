@@ -20,7 +20,7 @@ MANIFEST
 patches/Net_SSLeay.patch
 README
 README.Win32
-SSL.pm
+lib/IO/Socket/SSL.pm
 t/01loadmodule.t
 t/02settings.t
 t/acceptSSL-timeout.t
