@@ -62,6 +62,7 @@ if ( $pid == 0 ) {
     unless ( IO::Socket::SSL->start_SSL( $client,
 	SSL_version => 'TLSv1',
 	SSL_cipher_list => 'HIGH',
+	SSL_verify_mode => 0,
 	%extra_options
     )) {
 	#DEBUG( $SSL_ERROR );

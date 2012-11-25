@@ -46,7 +46,7 @@ unless (fork) {
     package MyClass;
     use IO::Socket::SSL;
     @ISA = "IO::Socket::SSL";
-    MyClass->start_SSL($client) || print "not ";
+    MyClass->start_SSL($client, SSL_verify_mode => 0) || print "not ";
     print "ok\n";
     (ref($client) eq "MyClass") || print "not ";
     print "ok\n";

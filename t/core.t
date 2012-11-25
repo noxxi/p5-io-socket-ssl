@@ -190,6 +190,7 @@ unless (fork) {
 	&ok("Second Client Initialization");
 
 	$client_2 = IO::Socket::SSL->new_from_fd($client_2->fileno, '+<>',
+											 SSL_verify_mode => 0,
 											 SSL_reuse_ctx => $client,
 											 SSL_cipher_list => 'HIGH');
 	print "not " if (!$client_2);
@@ -221,6 +222,7 @@ unless (fork) {
 										   PeerPort => $SSL_SERVER_PORT,
 										   SSL_reuse_ctx => $client_3,
 										   Blocking => 0,
+										   SSL_verify_mode => 0,
 										   SSL_cipher_list => 'HIGH');
 		print "not " if (!$client_4);
 		&ok("Client Nonblocking Check 2");

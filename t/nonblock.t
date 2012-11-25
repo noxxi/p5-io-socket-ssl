@@ -151,6 +151,7 @@ if ( $pid == 0 ) {
 	# upgrade to SSL socket w/o connection yet
 	if ( ! IO::Socket::SSL->start_SSL( $to_server,
 	    SSL_startHandshake => 0,
+	    SSL_verify_mode => 0,
 	    %extra_options,
 	    %tls_options,
 	)) {

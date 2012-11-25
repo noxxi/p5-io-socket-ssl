@@ -1,3 +1,11 @@
+v1.79 2012.11.25
+- prepare transition to a more secure default for SSL_verify_mode.
+  The use of the current default SSL_VERIFY_NONE will cause a big warning
+  for clients, unless SSL_verify_mode was explicitly set inside the 
+  application to this insecure value.
+  In the near future the default will be SSL_VERIFY_PEER, and thus 
+  causing verification failures in unchanged applications.
+v1.78 2012.11.25
 - use getnameinfo instead of unpack_sockaddr_in6 to get PeerAddr and 
   PeerPort from sockaddr in _update_peer, because this provides scope
   too. Thanks to bluhm[AT]genua[DOT]de.

@@ -102,7 +102,7 @@ BEGIN {
 	constant->import( CAN_IPV6 => '' );
     }
 
-    $VERSION = '1.78';
+    $VERSION = '1.79';
     $GLOBAL_CONTEXT_ARGS = {};
 
     #Make $DEBUG another name for $Net::SSLeay::trace
@@ -254,13 +254,38 @@ sub configure_SSL {
 	SSL_use_cert => $is_server,
 	SSL_check_crl => 0,
 	SSL_version => DEFAULT_VERSION,
-	SSL_verify_mode => SSL_VERIFY_NONE,
 	SSL_verify_callback => undef,
 	SSL_verifycn_scheme => undef,  # don't verify cn
 	SSL_verifycn_name => undef,    # use from PeerAddr/PeerHost
 	SSL_npn_protocols => undef,    # meaning depends whether on server or client side
 	SSL_honor_cipher_order => 0,   # client order gets preference
+
+	# default for SSL_verify_mode should be SSL_VERIFY_PEER for client
+	# for now we keep the default of SSL_VERIFY_NONE but complain, if 
+	# somebody uses this implicit default
+	# SSL_verify_mode => $is_server ? SSL_VERIFY_NONE : SSL_VERIFY_PEER;
+	SSL_verify_mode => SSL_VERIFY_NONE,
     );
+
+    # complain if SSL_verify_mode is SSL_VERIFY_NONE for client unless it 
+    # was explicitly set this way. In the future the default will change 
+    # to verify the server certificate and apps, which don't provide 
+    # the necessary credentials should fail
+    if ( ! $is_server 
+	and ! exists $arg_hash->{SSL_verify_mode} 
+	and $default_args{SSL_verify_mode} == SSL_VERIFY_NONE ) {
+	carp(
+	    "*******************************************************************\n".
+	    " Using the default of SSL_verify_mode of SSL_VERIFY_NONE for client\n".
+	    " is depreciated! Please set SSL_verify_mode to SSL_VERIFY_PEER\n".
+	    " together with SSL_ca_file|SSL_ca_path for verification.\n".
+	    " If you really don't want to verify the certificate and keep the\n".
+	    " connection open to Man-In-The-Middle attacks please set\n".
+	    " SSL_verify_mode explicitly to SSL_VERIFY_NONE in your application.\n".
+	    "*******************************************************************\n".
+	    " "
+	);
+    }
 
     # common problem forgetting SSL_use_cert
     # if client cert is given but SSL_use_cert undef assume that it
@@ -1949,12 +1974,18 @@ If you definitly want no SSL_ca_path used you should set it to undef.
 
 =item SSL_verify_mode
 
-This option sets the verification mode for the peer certificate.  The default
-(0x00) does no authentication.	You may combine 0x01 (verify peer), 0x02 (fail
-verification if no peer certificate exists; ignored for clients), and 0x04
-(verify client once) to change the default.
-
+This option sets the verification mode for the peer certificate.  
+You may combine SSL_VERIFY_PEER (verify_peer), SSL_VERIFY_FAIL_IF_NO_PEER_CERT
+(fail verification if no peer certificate exists; ignored for clients),
+SSL_VERIFY_CLIENT_ONCE (verify client once; ignored for clients).
 See OpenSSL man page for SSL_CTX_set_verify for more information.
+
+The default is SSL_VERIFY_NONE for server  (e.g. no check for client
+certificate).
+For historical reasons the default for client is currently also SSL_VERIFY_NONE,
+but this will change to SSL_VERIFY_PEER in the near future. To aid transition a
+warning is issued if the client is used with the default SSL_VERIFY_NONE, unless
+SSL_verify_mode was explicitly set by the application.
 
 =item SSL_verify_callback
 
@@ -2468,6 +2499,10 @@ non-blocking on this platform.
 If you have a server and it looks like you have a memory leak you might 
 check the size of your session cache. Default for Net::SSLeay seems to be 
 20480, see the example for SSL_create_ctx_callback for how to limit it.
+
+The default for SSL_verify_mode on the client is currently SSL_VERIFY_NONE,
+which is a very bad idea, thus the default will change in the near future.
+See documentation for SSL_verify_mode for more information.
 
 =head1 LIMITATIONS
 

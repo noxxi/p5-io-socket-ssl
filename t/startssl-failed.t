@@ -48,7 +48,7 @@ sub client {
 	or return fail("client tcp connect");
     ok("client tcp connect");
 
-    IO::Socket::SSL->start_SSL($client) and
+    IO::Socket::SSL->start_SSL(PeerAddr => $client, SSL_verify_mode => 0) and
 	return fail('start ssl should fail');
     ok("startssl client failed: $SSL_ERROR");
 

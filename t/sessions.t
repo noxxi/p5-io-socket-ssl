@@ -122,9 +122,15 @@ unless (fork) {
 	PeerPort => $SSL_SERVER_PORT3
     );
     my @clients = (
-	IO::Socket::SSL->new("$SSL_SERVER_ADDR:$SSL_SERVER_PORT"),
-        IO::Socket::SSL->new("$SSL_SERVER_ADDR:$SSL_SERVER_PORT2"),
-        IO::Socket::SSL->start_SSL( $sock3 ),
+	IO::Socket::SSL->new(	
+	    PeerAddr => "$SSL_SERVER_ADDR:$SSL_SERVER_PORT",
+	    SSL_verify_mode => 0
+	),
+        IO::Socket::SSL->new(
+	    PeerAddr => "$SSL_SERVER_ADDR:$SSL_SERVER_PORT2",
+	    SSL_verify_mode => 0
+	),
+        IO::Socket::SSL->start_SSL( $sock3 , SSL_verify_mode => 0),
     );
     
     if (!$clients[0] or !$clients[1] or !$clients[2]) {
@@ -164,11 +170,13 @@ unless (fork) {
 	close $clients[$_];
     }
 
-    @clients = (
-    	IO::Socket::SSL->new("$SSL_SERVER_ADDR:$SSL_SERVER_PORT"),
-	IO::Socket::SSL->new("$SSL_SERVER_ADDR:$SSL_SERVER_PORT2"),
-	IO::Socket::SSL->new("$SSL_SERVER_ADDR:$SSL_SERVER_PORT3")
-    );
+    @clients = map {
+	IO::Socket::SSL->new(
+	    PeerAddr => $SSL_SERVER_ADDR,
+	    PeerPort => $_,
+	    SSL_verify_mode => 0,
+	)
+    } ( $SSL_SERVER_PORT, $SSL_SERVER_PORT2, $SSL_SERVER_PORT3 );
 
     if (keys(%$cache) != 6) {
 	print "not ";

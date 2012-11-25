@@ -44,7 +44,7 @@ sub client {
 	    sleep(1); # avoid race condition, if client calls start but server is not yet available
 
 	    #print STDERR ">>$$(client) start\n";
-	    IO::Socket::SSL->start_SSL( $client )
+	    IO::Socket::SSL->start_SSL($client, SSL_verify_mode => 0 )
 	    	|| die "not ok #client::start_SSL: $SSL_ERROR\n";
 	    #print STDERR "<<$$(client) start\n";
 	    print "ok # client::start_SSL\n";

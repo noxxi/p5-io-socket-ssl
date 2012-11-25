@@ -40,8 +40,11 @@ if ( $pid == 0 ) {
 	$SIG{HUP} = sub { ok("got hup") };
 
 	close($server);
-	my $client = IO::Socket::SSL->new( "$SSL_SERVER_ADDR:$SSL_SERVER_PORT" )
-		|| print "not ";
+	my $client = IO::Socket::SSL->new( 
+	    PeerAddr => $SSL_SERVER_ADDR,
+	    PeerPort => $SSL_SERVER_PORT,
+	    SSL_verify_mode => 0
+	) || print "not ";
 	ok( "client ssl connect" );
 
 	my $line = <$client>;
