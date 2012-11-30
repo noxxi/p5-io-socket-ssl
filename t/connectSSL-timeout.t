@@ -57,7 +57,7 @@ sub client {
 	my $saddr = shift;
 	my $c = IO::Socket::INET->new( $saddr ) || die "connect failed: $!";
 	print "Connected\n";
-	if ( IO::Socket::SSL->start_SSL( $c, Timeout => 5 )) {
+	if ( IO::Socket::SSL->start_SSL( $c, Timeout => 5, SSL_verify_mode => 0 )) {
 		 print "SSL Handshake OK\n";
 		 print <$c>
 	} else {

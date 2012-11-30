@@ -59,7 +59,8 @@ sub client_no_ssl {
 
 sub client_ssl {
 	my $saddr = shift;
-	my $c = IO::Socket::SSL->new( $saddr ) || die "connect failed: $!|$SSL_ERROR";
+	my $c = IO::Socket::SSL->new( PeerAddr => $saddr, SSL_verify_mode => 0 ) 
+	    || die "connect failed: $!|$SSL_ERROR";
 	print "Connected\n";
 	while ( sysread( $c,my $buf,8000 )) { print $buf }
 }

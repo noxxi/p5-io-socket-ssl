@@ -1,3 +1,7 @@
+v1.80 2012.11.30
+- removed some warnings in test (missing SSL_verify_mode => 0) which
+  caused tests to hang on Windows.
+  https://rt.cpan.org/Ticket/Display.html?id=81493
 v1.79 2012.11.25
 - prepare transition to a more secure default for SSL_verify_mode.
   The use of the current default SSL_VERIFY_NONE will cause a big warning

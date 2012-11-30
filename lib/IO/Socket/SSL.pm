@@ -102,7 +102,7 @@ BEGIN {
 	constant->import( CAN_IPV6 => '' );
     }
 
-    $VERSION = '1.79';
+    $VERSION = '1.80';
     $GLOBAL_CONTEXT_ARGS = {};
 
     #Make $DEBUG another name for $Net::SSLeay::trace
