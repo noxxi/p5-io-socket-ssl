@@ -21,6 +21,8 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
+our $VERSION = 1.81;
+
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
 use constant SSL_VERIFY_FAIL_IF_NO_PEER_CERT => Net::SSLeay::VERIFY_FAIL_IF_NO_PEER_CERT();
@@ -30,8 +32,27 @@ use constant SSL_VERIFY_CLIENT_ONCE => Net::SSLeay::VERIFY_CLIENT_ONCE();
 use constant SSL_SENT_SHUTDOWN => 1;
 use constant SSL_RECEIVED_SHUTDOWN => 2;
 
-use constant DEFAULT_CIPHER_LIST => 'ALL:!LOW';
-use constant DEFAULT_VERSION     => 'SSLv23:!SSLv2';
+# global defaults
+my %DEFAULT_SSL_ARGS = (
+    SSL_check_crl => 0,
+    SSL_version => 'SSLv23:!SSLv2',
+    SSL_verify_callback => undef,
+    SSL_verifycn_scheme => undef,  # don't verify cn
+    SSL_verifycn_name => undef,    # use from PeerAddr/PeerHost
+    SSL_npn_protocols => undef,    # meaning depends whether on server or client side
+    SSL_honor_cipher_order => 0,   # client order gets preference
+    SSL_cipher_list => 'ALL:!LOW',
+
+    # default for SSL_verify_mode should be SSL_VERIFY_PEER for client
+    # for now we keep the default of SSL_VERIFY_NONE but complain, if 
+    # somebody uses this implicit default
+    # SSL_verify_mode => undef,  # set to undef to enable secure default
+    SSL_verify_mode => SSL_VERIFY_NONE,
+);
+
+# global defaults which can be changed using set_defaults
+# either key/value can be set or it can just be set to an external hash
+my $GLOBAL_SSL_ARGS = {};
 
 # non-XS Versions of Scalar::Util will fail
 BEGIN{
@@ -40,7 +61,7 @@ BEGIN{
 	if $@;
 }
 
-use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
+use vars qw(@ISA $DEBUG $SSL_ERROR @EXPORT );
 
 {
     # These constants will be used in $! at return from SSL_connect,
@@ -63,7 +84,7 @@ use vars qw(@ISA $VERSION $DEBUG $SSL_ERROR $GLOBAL_CONTEXT_ARGS @EXPORT );
 my @caller_force_inet4; # in case inet4 gets forced we store here who forced it
 
 BEGIN {
-    # Declare @ISA, $VERSION, $GLOBAL_CONTEXT_ARGS
+    # declare @ISA depeding of the installed socket class
 
     # try to load inet_pton from Socket or Socket6
     my $ip6 = eval {
@@ -101,9 +122,6 @@ BEGIN {
 	@ISA = qw(IO::Socket::INET);
 	constant->import( CAN_IPV6 => '' );
     }
-
-    $VERSION = '1.80';
-    $GLOBAL_CONTEXT_ARGS = {};
 
     #Make $DEBUG another name for $Net::SSLeay::trace
     *DEBUG = \$Net::SSLeay::trace;
@@ -248,24 +266,32 @@ sub configure_SSL {
 
     my $is_server = $arg_hash->{'SSL_server'} || $arg_hash->{'Listen'} || 0;
 
+    # add user defined defaults
+    %$arg_hash = ( 
+	%$GLOBAL_SSL_ARGS, 
+	%$arg_hash 
+    ) if %$GLOBAL_SSL_ARGS;
+
+    # common problem forgetting to set SSL_use_cert
+    # if client cert is given by user but SSL_use_cert is undef, assume that it
+    # should be set
+    if ( ! $is_server && ! defined $arg_hash->{SSL_use_cert}
+	&& ( grep { $arg_hash->{$_} } qw(SSL_cert SSL_cert_file))
+	&& ( grep { $arg_hash->{$_} } qw(SSL_key SSL_key_file)) ) {
+	$arg_hash->{SSL_use_cert} = 1
+    }
+
+    # library defaults
     my %default_args = (
 	Proto => 'tcp',
 	SSL_server => $is_server,
 	SSL_use_cert => $is_server,
-	SSL_check_crl => 0,
-	SSL_version => DEFAULT_VERSION,
-	SSL_verify_callback => undef,
-	SSL_verifycn_scheme => undef,  # don't verify cn
-	SSL_verifycn_name => undef,    # use from PeerAddr/PeerHost
-	SSL_npn_protocols => undef,    # meaning depends whether on server or client side
-	SSL_honor_cipher_order => 0,   # client order gets preference
-
-	# default for SSL_verify_mode should be SSL_VERIFY_PEER for client
-	# for now we keep the default of SSL_VERIFY_NONE but complain, if 
-	# somebody uses this implicit default
-	# SSL_verify_mode => $is_server ? SSL_VERIFY_NONE : SSL_VERIFY_PEER;
-	SSL_verify_mode => SSL_VERIFY_NONE,
+	%DEFAULT_SSL_ARGS,
     );
+
+    # make default secure, unless it was set different before
+    $default_args{SSL_verify_mode} = $is_server ? SSL_VERIFY_NONE : SSL_VERIFY_PEER
+	if ! defined $default_args{SSL_verify_mode};
 
     # complain if SSL_verify_mode is SSL_VERIFY_NONE for client unless it 
     # was explicitly set this way. In the future the default will change 
@@ -287,37 +313,34 @@ sub configure_SSL {
 	);
     }
 
-    # common problem forgetting SSL_use_cert
-    # if client cert is given but SSL_use_cert undef assume that it
-    # should be set
-    if ( ! $is_server && ! defined $arg_hash->{SSL_use_cert}
-	&& ( grep { $arg_hash->{$_} } qw(SSL_cert SSL_cert_file))
-	&& ( grep { $arg_hash->{$_} } qw(SSL_key SSL_key_file)) ) {
-	$arg_hash->{SSL_use_cert} = 1
-    }
+    # add defaults to arg_hash
+    %$arg_hash = ( %default_args, %$arg_hash );
 
-    # SSL_key_file and SSL_cert_file will only be set in defaults if
-    # SSL_key|SSL_key_file resp SSL_cert|SSL_cert_file are not set in
-    # $args_hash
-    foreach my $k (qw( key cert )) {
-	next if exists $arg_hash->{ "SSL_${k}" };
-	next if exists $arg_hash->{ "SSL_${k}_file" };
-	$default_args{ "SSL_${k}_file" } = $is_server
-	    ?  "certs/server-${k}.pem"
-	    :  "certs/client-${k}.pem";
-    }
-
-    # add only SSL_ca_* if not in args
-    if ( ! exists $arg_hash->{SSL_ca_file} && ! exists $arg_hash->{SSL_ca_path} ) {
-	if ( -f 'certs/my-ca.pem' ) {
-	    $default_args{SSL_ca_file} = 'certs/my-ca.pem'
-	} elsif ( -d 'ca/' ) {
-	    $default_args{SSL_ca_path} = 'ca/'
+    # use default path to certs and ca unless another one was given
+    # don't mix default path with user specified path, either we use all
+    # or no defaults
+    {
+	my $use_default = 1;
+	for (qw( SSL_cert SSL_cert_file SSL_key SSL_key_file SSL_ca_file SSL_ca_path )) {
+	    next if ! exists $arg_hash->{$_};
+	    $use_default = 0;
+	    last;
+	}
+	if ( $use_default ) {
+	    my %ca = 
+		-f 'certs/my-ca.pem' ? ( SSL_ca_file => 'certs/my-ca.pem' ) :
+		-d 'ca/' ? ( SSL_ca_path => 'ca/' ) :
+		();
+	    my %certs = $is_server ? (
+		SSL_key_file => 'certs/server-key.pem',
+		SSL_cert_file => 'certs/server-cert.pem',
+	    ) : (
+		SSL_key_file => 'certs/client-key.pem',
+		SSL_cert_file => 'certs/client-cert.pem',
+	    );
+	    %$arg_hash = ( %$arg_hash, %ca, %certs );
 	}
     }
-
-    #Replace nonexistent entries with defaults
-    %$arg_hash = ( %default_args, %$GLOBAL_CONTEXT_ARGS, %$arg_hash );
 
     #Avoid passing undef arguments to Net::SSLeay
     defined($arg_hash->{$_}) or delete($arg_hash->{$_}) foreach (keys %$arg_hash);
@@ -420,9 +443,7 @@ sub connect_SSL {
 	Net::SSLeay::set_fd($ssl, $fileno)
 	    || return $self->error("SSL filehandle association failed");
 
-	if ( my $cl = exists $arg_hash->{SSL_cipher_list} 
-	    ? $arg_hash->{SSL_cipher_list} 
-	    :  DEFAULT_CIPHER_LIST ) {
+	if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
 	    Net::SSLeay::set_cipher_list($ssl, $cl )
 		|| return $self->error("Failed to set SSL cipher list");
 	}
@@ -608,9 +629,7 @@ sub accept_SSL {
 	Net::SSLeay::set_fd($ssl, $fileno)
 	    || return $socket->error("SSL filehandle association failed");
 
-	if ( my $cl = exists $arg_hash->{SSL_cipher_list} 
-	    ? $arg_hash->{SSL_cipher_list}
-	    : DEFAULT_CIPHER_LIST) {
+	if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
 	    Net::SSLeay::set_cipher_list($ssl, $cl )
 		|| return $socket->error("Failed to set SSL cipher list");
 	}
@@ -1379,23 +1398,27 @@ sub subject_name { return(shift()->peer_certificate("subject")) }
 sub get_peer_certificate { return shift() }
 
 sub context_init {
-    return($GLOBAL_CONTEXT_ARGS = (ref($_[0]) eq 'HASH') ? $_[0] : {@_});
+    return($GLOBAL_SSL_ARGS = (ref($_[0]) eq 'HASH') ? $_[0] : {@_});
 }
 
 sub set_default_context {
-    $GLOBAL_CONTEXT_ARGS->{'SSL_reuse_ctx'} = shift;
+    $GLOBAL_SSL_ARGS->{'SSL_reuse_ctx'} = shift;
 }
 
 sub set_default_session_cache {
-    $GLOBAL_CONTEXT_ARGS->{SSL_session_cache} = shift;
+    $GLOBAL_SSL_ARGS->{SSL_session_cache} = shift;
 }
 
-sub set_ctx_defaults {
+sub set_defaults {
     my %args = @_;
     while ( my ($k,$v) = each %args ) {
 	$k =~s{^(SSL_)?}{SSL_};
-	$GLOBAL_CONTEXT_ARGS->{$k} = $v;
+	$GLOBAL_SSL_ARGS->{$k} = $v;
     }
+}
+{ # depreceated API
+    no warnings;
+    *set_ctx_defaults = \&set_defaults; 
 }
 
 sub next_proto_negotiated {
@@ -2375,7 +2398,7 @@ get_session and add_session like IO::Socket::SSL::Session_Cache does).
 See the SSL_session_cache option of new() for more details.	 Note that this sets the default
 cache globally, so use with caution.
 
-=item B<IO::Socket::SSL::set_ctx_defaults(%args)>
+=item B<IO::Socket::SSL::set_defaults(%args)>
 
 With this function one can set defaults for all SSL_* parameter used for creation of
 the context, like the SSL_verify* parameter.

@@ -1,3 +1,15 @@
+v1.81 2012.12.06
+- depreceated set_ctx_defaults, new name ist set_defaults (but old name
+  still available)
+- changed handling of default path for SSL_(ca|cert|key)* keys: either
+  if one of these keys is user defined don't add defaults for the
+  others, e.g.  don't mix user settings and defaults
+- cleaner handling of module defaults vs. global settings vs. socket
+  specific settings. Global and socket specific settings are both
+  provided by the user, while module defaults not.
+- make IO::Socket::INET6 and IO::Socket::IP specific tests run both,
+  even if both modules are installed by faking a failed load of the
+  other module.
 v1.80 2012.11.30
 - removed some warnings in test (missing SSL_verify_mode => 0) which
   caused tests to hang on Windows.
