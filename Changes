@@ -1,5 +1,6 @@
+- correct spelling, rt#8270. Thanks to ETHER
 v1.81 2012.12.06
-- depreceated set_ctx_defaults, new name ist set_defaults (but old name
+- deprecated set_ctx_defaults, new name ist set_defaults (but old name
   still available)
 - changed handling of default path for SSL_(ca|cert|key)* keys: either
   if one of these keys is user defined don't add defaults for the
@@ -216,7 +217,7 @@ v1.34 2010.11.01
 - if upgrading socket from inet to ssl fails due to handshake problems
   the socket gets downgraded, but is still open.
   See https://rt.cpan.org/Ticket/Display.html?id=61466
-- depreceate kill_socket, just use close()
+- deprecate kill_socket, just use close()
 v1.33 2010.03.17
 - attempt to make t/memleak_bad_handshake.t more stable, it fails 
   for unknown reason on various systems
@@ -441,7 +442,7 @@ v1.01
   see http://bugs.debian.org/cgi-bin/bugreport.cgi?bug=383106
 
 v1.0
-- fix depreciated and practically undocumented function 
+- fix deprecated and practically undocumented function 
   get_peer_certificate so that LWP Net::HTTPS works again
 - set arg 'Blocking' while calling SUPER::configure only
   if it was set by the caller to work around Problem in LWP

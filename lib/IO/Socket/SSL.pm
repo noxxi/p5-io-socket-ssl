@@ -303,7 +303,7 @@ sub configure_SSL {
 	carp(
 	    "*******************************************************************\n".
 	    " Using the default of SSL_verify_mode of SSL_VERIFY_NONE for client\n".
-	    " is depreciated! Please set SSL_verify_mode to SSL_VERIFY_PEER\n".
+	    " is deprecated! Please set SSL_verify_mode to SSL_VERIFY_PEER\n".
 	    " together with SSL_ca_file|SSL_ca_path for verification.\n".
 	    " If you really don't want to verify the certificate and keep the\n".
 	    " connection open to Man-In-The-Middle attacks please set\n".
@@ -1416,7 +1416,7 @@ sub set_defaults {
 	$GLOBAL_SSL_ARGS->{$k} = $v;
     }
 }
-{ # depreceated API
+{ # deprecated API
     no warnings;
     *set_ctx_defaults = \&set_defaults; 
 }
@@ -2562,7 +2562,7 @@ use close() instead
 
 use the peer_certificate() function instead.
 Used to return X509_Certificate with methods subject_name and issuer_name.
-Now simply returns $self which has these methods (although depreceated).
+Now simply returns $self which has these methods (although deprecated).
 
 =item issuer_name()
 
