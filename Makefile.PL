@@ -97,4 +97,9 @@ WriteMakefile(
 	'Scalar::Util' => 0,
     },
     'dist' => { COMPRESS => 'gzip', SUFFIX => 'gz', },
+    META_MERGE => {
+	resources => {
+	    repository => 'https://github.com/noxxi/p5-io-socket-ssl',
+	},
+   },
 );
