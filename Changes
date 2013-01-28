@@ -1,3 +1,8 @@
+v1.82 2013.01.28
+- sub error sets $SSL_ERROR etc only if there really is an error, 
+  otherwise it will keep the latest error. This causes 
+  IO::Socket::SSL->new.. to report the correct problem, even if
+  the problem is deeper in the code (like in connect)
 - correct spelling, rt#8270. Thanks to ETHER
 v1.81 2012.12.06
 - deprecated set_ctx_defaults, new name ist set_defaults (but old name
