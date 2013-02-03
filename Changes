@@ -2,6 +2,7 @@ v1.83 2013.02.03
 - Server Name Indication (SNI) support on the server side, inspired by
   patch provided by karel[DOT]miko[AT]gmail[DOT]com.
   https://rt.cpan.org/Ticket/Display.html?id=82761
+- reworked part of the documentation, like providing better examples.
 v1.82 2013.01.28
 - sub error sets $SSL_ERROR etc only if there really is an error, 
   otherwise it will keep the latest error. This causes 
