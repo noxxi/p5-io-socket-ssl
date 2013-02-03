@@ -1,8 +1,7 @@
 # vim: set sts=4 sw=4 ts=8 ai:
 #
 # IO::Socket::SSL:
-# a drop-in replacement for IO::Socket::INET that encapsulates
-# data passed over a network with SSL.
+# provide an interface to SSL connections similar to IO::Socket modules
 #
 # Current Code Shepherd: Steffen Ullrich <steffen at genua.de>
 # Code Shepherd before: Peter Behroozi, <behrooz at fas.harvard.edu>
@@ -1886,49 +1885,129 @@ sub DESTROY {
 
 =head1 NAME
 
-IO::Socket::SSL -- Nearly transparent SSL encapsulation for IO::Socket::INET.
+IO::Socket::SSL -- SSL sockets with IO::Socket interface
 
 =head1 SYNOPSIS
 
-	use strict;
-	use IO::Socket::SSL;
+    use strict;
+    use IO::Socket::SSL;
 
-	my $client = IO::Socket::SSL->new("www.example.com:https")
-		|| warn "I encountered a problem: ".IO::Socket::SSL::errstr();
-	$client->verify_hostname( 'www.example.com','http' )
-		|| die "hostname verification failed";
+    # simple HTTP client -----------------------------------------------
+    my $sock = IO::Socket::SSL->new(
+	# where to connect
+	PeerHost => "www.example.com",
+	PeerPort => "https",
 
-	print $client "GET / HTTP/1.0\r\n\r\n";
-	print <$client>;
+	# certificate verification
+	SSL_verify_mode => SSL_VERIFY_PEER,
+	SSL_ca_path => '/etc/ssl/certs', # typical CA path on Linux
+	# on OpenBSD instead: SSL_ca_file => '/etc/ssl/cert.pem'
+
+	# easy hostname verification 
+	SSL_verifycb_name => 'foo.bar', # defaults to PeerHost
+	SSL_verifycn_schema => 'http',
+
+	# SNI support
+	SSL_hostname => 'foo.bar', # defaults to PeerHost
+
+    ) or die "failed connect or ssl handshake: $!,$SSL_ERROR";
+
+    # send and receive over SSL connection
+    print $client "GET / HTTP/1.0\r\n\r\n";
+    print <$client>;
+
+    # simple server ----------------------------------------------------
+    my $server = IO::Socket::SSL->new(
+	# where to listen
+	LocalAddr => '127.0.0.1',
+	LocalPort => 8080,
+	Listen => 10,
+
+	# which certificate to offer
+	# with SNI support there can be different certificates per hostname
+	SSL_cert_file => 'cert.pem',
+	SSL_key_file => 'key.pem',
+    ) or die "failed to listen: $!";
+
+    # accept client
+    my $client = $server->accept or die 
+	"failed to accept or ssl handshake: $!,$SSL_ERROR";
+
+    # Upgrade existing socket to SSL ---------------------------------
+    my $sock = IO::Socket::INET->new('imap.example.com:imap');
+    # ... receive greeting, send STARTTLS, receive ok ...
+    IO::Socket::SSL->start_SSL($sock,
+	SSL_verify_mode => SSL_VERIFY_PEER,
+	SSL_ca_path => '/etc/ssl/certs',
+	...
+    ) or die "failed to upgrade to SSL: $SSL_ERROR";
+
+    # manual name verification, could also be done in start_SSL with
+    # SSL_verifycn_name etc
+    $client->verify_hostname( 'imap.example.com','imap' )
+	or die "hostname verification failed";
+
+    # all data are now SSL encrypted
+    print $sock .... 
+
+
 
 
 =head1 DESCRIPTION
 
-This module is a true drop-in replacement for IO::Socket::INET that uses
-SSL to encrypt data before it is transferred to a remote server or
-client.	 IO::Socket::SSL supports all the extra features that one needs
-to write a full-featured SSL client or server application: multiple SSL contexts,
-cipher selection, certificate verification, and SSL version selection.	As an
-extra bonus, it works perfectly with mod_perl.
+This module provides an interface to SSL sockets, similar to other IO::Socket
+modules. Because of that, it can be used to make existing programs using
+IO::Socket::INET or similar modules to provide SSL encryption without much
+effort.
+IO::Socket::SSL supports all the extra features that one needs to write a
+
+full-featured SSL client or server application: multiple SSL contexts, cipher
+selection, certificate verification, Server Name Identification (SNI), Next
+Protocol Negotiation (NPN), SSL version selection and more.
 
 If you have never used SSL before, you should read the appendix labelled 'Using SSL'
 before attempting to use this module.
-
-If you have used this module before, read on, as versions 0.93 and above
-have several changes from the previous IO::Socket::SSL versions (especially
-see the note about return values).
-
-If you are using non-blocking sockets read on, as version 0.98 added better
-support for non-blocking.
 
 If you are trying to use it with threads see the BUGS section.
 
 =head1 METHODS
 
-IO::Socket::SSL inherits its methods from IO::Socket::INET, overriding them
-as necessary.  If there is an SSL error, the method or operation will return an
-empty list (false in all contexts).	 The methods that have changed from the
-perspective of the user are re-documented here:
+IO::Socket::SSL inherits from another IO::Socket module.
+The choice of the super class depends on the installed modules:
+
+=over 4
+
+=item *
+
+If IO::Socket::IP is installed it will use this module as super class,
+transparently providing IPv6 and IPv4 support.
+
+=item *
+
+If IO::Socket::INET6 is installed it will use this module as super class,
+transparently providing IPv6 and IPv4 support.
+
+=item *
+
+Otherwise it will fall back to IO::Socket::INET, which is a perl core module.
+With IO::Socket::INET you only get IPv4 support.
+
+=back
+
+Please be aware, that with the IPv6 capable super classes, it will lookup first
+for the IPv6 address of a given hostname. If the resolver provides an IPv6
+address, but the host cannot be reached by IPv6, there will be no automatic 
+fallback to IPv4.
+To avoid these problems you can either force IPv4 by specifying and AF_INET
+as C<Domain> of the socket or globally enforce IPv4 by loading IO::Socket::SSL
+with the option 'inet4'.
+
+IO::Socket::SSL will provide all of the methods of its super class, but
+sometimes it will override them to match the behavior expected from SSL or to
+provide additional arguments.
+
+The new or changed methods are described below, but please read also the
+section about SSL specific error handling.
 
 =over 4
 
@@ -1990,7 +2069,7 @@ something like
 
 =item SSL_use_cert
 
-If this is set, it forces IO::Socket::SSL to use a certificate and key, even if
+If this is true, it forces IO::Socket::SSL to use a certificate and key, even if
 you are setting up an SSL client.  If this is set to 0 (the default), then you will
 only need a certificate and key if you are setting up a server.
 
@@ -2000,7 +2079,7 @@ For convinience it is also set if it was not given but a cert was given for use
 
 =item SSL_server
 
-Use this, if the socket should be used as a server.
+Set this option to a true value, if the socket should be used as a server.
 If this is not explicitly set it is assumed, if the Listen parameter is given
 when creating the socket.
 
@@ -2550,19 +2629,22 @@ and read/sysread families instead.
 
 =back
 
-=head1 IPv6
+=head1 ERROR HANDLING
 
-Support for IPv6 with IO::Socket::SSL is expected to work and basic testing is done.
-If IO::Socket::INET6 is available it will automatically use it instead of
-IO::Socket::INET4.
+if an SSL specific error occurs the global variable C<$SSL_ERROR> will be set.
+If the error occured on an existing SSL socket the method C<errstr> will
+give access to the latest socket specific error.
+Both C<$SSL_ERROR> and C<errstr> method give a dualvar similar to C<$!>, e.g.
+providing an error number in numeric context or an error description in string
+context.
 
-Please be aware of the associated problems: If you give a name as a host and the
-host resolves to both IPv6 and IPv4 it will try IPv6 first and if there is no IPv6
-connectivity it will fail.
-
-To avoid these problems you can either force IPv4 by specifying and AF_INET as the
-Domain (this is per socket) or load IO::Socket::SSL with the option 'inet4'
-(This is a global setting, e.g. affects all IO::Socket::SSL objects in the program).
+If you have a non-blocking socket, the expected behavior on read, write, accept
+or connect is to set C<$!> to EAGAIN if the operation can not be completed
+immediatly.
+With SSL there might be cases, like SSL handshakes, where the write operation
+can not be completed until it can read from the socket or vice versa. 
+In these cases C<$!> is set to EGAIN like expected, and additionally
+C<$SSL_ERROR> is set to either SSL_WANT_READ or SSL_WANT_WRITE.
 
 =head1 RETURN VALUES
 
