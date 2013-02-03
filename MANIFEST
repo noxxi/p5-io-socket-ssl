@@ -45,4 +45,5 @@ t/start-stopssl.t
 t/sysread_write.t
 t/testlib.pl
 t/verify_hostname.t
+t/sni.t
 util/export_certs.pl
