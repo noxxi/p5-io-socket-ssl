@@ -471,10 +471,17 @@ sub connect_SSL {
 	    }
 	    # define SSL_CTRL_SET_TLSEXT_HOSTNAME 55
 	    # define TLSEXT_NAMETYPE_host_name 0
-	    Net::SSLeay::ctrl($ssl,55,0,$host) if $host;
+	    if ($host) {
+		$DEBUG>=2 && DEBUG("using SNI with hostname $host");
+		Net::SSLeay::ctrl($ssl,55,0,$host);
+	    } else {
+		$DEBUG>=2 && DEBUG("not using SNI because hostname is unknown");
+	    }
 	} elsif ( $arg_hash->{SSL_hostname} ) {
 	    return $self->error(
 		"Client side SNI not supported for this openssl");
+	} else {
+	    $DEBUG>=2 && DEBUG("not using SNI because openssl is too old");
 	}
 
 	$arg_hash->{PeerAddr} || $self->_update_peer;
