@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = 1.83;
+our $VERSION = 1.83_1;
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -855,8 +855,9 @@ sub readline {
 	while (1) {
 	    my $rv = $self->sysread($buf,2**16,length($buf));
 	    if ( ! defined $rv ) {
-		next if $!{EINTR};
-		return;
+		next if $!{EINTR};                     # retry
+		last if $!{EAGAIN} || $!{EWOULDBLOCK}; # use everything so far
+		return;                                # return error
 	    } elsif ( ! $rv ) {
 		last
 	    }
@@ -884,8 +885,9 @@ sub readline {
 	while ( $size>length($buf)) {
 	    my $rv = $self->sysread($buf,$size-length($buf),length($buf));
 	    if ( ! defined $rv ) {
-		next if $!{EINTR};
-		return;
+		next if $!{EINTR};                     # retry
+		last if $!{EAGAIN} || $!{EWOULDBLOCK}; # use everything so far
+		return;                                # return error
 	    } elsif ( ! $rv ) {
 		last
 	    }
@@ -902,8 +904,9 @@ sub readline {
 	while (1) {
 	    my $rv = $self->sysread($buf,1,length($buf));
 	    if ( ! defined $rv ) {
-		next if $!{EINTR};
-		return;
+		next if $!{EINTR};                     # retry
+		last if $!{EAGAIN} || $!{EWOULDBLOCK}; # use everything so far
+		return;                                # return error
 	    } elsif ( ! $rv ) {
 		last
 	    }
@@ -919,7 +922,7 @@ sub readline {
     my $ssl = $self->_get_ssl_object or return;
     while (1) {
 
-	# block until we have more data or eof
+	# wait until we have more data or eof
 	my $poke = Net::SSLeay::peek($ssl,1);
 	if ( ! defined $poke or $poke eq '' ) {
 	    next if $!{EINTR};
@@ -2638,20 +2641,33 @@ and read/sysread families instead.
 
 =head1 ERROR HANDLING
 
-if an SSL specific error occurs the global variable C<$SSL_ERROR> will be set.
+If an SSL specific error occurs the global variable C<$SSL_ERROR> will be set.
 If the error occured on an existing SSL socket the method C<errstr> will
 give access to the latest socket specific error.
 Both C<$SSL_ERROR> and C<errstr> method give a dualvar similar to C<$!>, e.g.
 providing an error number in numeric context or an error description in string
 context.
 
+=head1 NON-BLOCKING I/O
+
 If you have a non-blocking socket, the expected behavior on read, write, accept
 or connect is to set C<$!> to EAGAIN if the operation can not be completed
 immediatly.
-With SSL there might be cases, like SSL handshakes, where the write operation
+
+With SSL there are cases, like with SSL handshakes, where the write operation
 can not be completed until it can read from the socket or vice versa. 
 In these cases C<$!> is set to EGAIN like expected, and additionally
 C<$SSL_ERROR> is set to either SSL_WANT_READ or SSL_WANT_WRITE.
+Thus if you get EAGAIN on a SSL socket you must check C<$SSL_ERROR> for
+SSL_WANT_* and adapt your event mask accordingly.
+
+Using readline on non-blocking sockets does not make much sense and I would
+advise against using it.
+And, while the behavior is not documented for other L<IO::Socket> classes, it
+will try to emulate the behavior seen there, e.g. to return the received data
+instead of blocking, even if the line is not complete. If an unrecoverable error
+occurs it will return nothing, even if it already received some data.
+
 
 =head1 RETURN VALUES
 

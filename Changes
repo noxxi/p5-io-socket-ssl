@@ -1,3 +1,9 @@
+v1.83_1 2013.02.14
+- seperated documention of non-blocking I/O from error handling
+- changed and documented behavior of readline to return the read
+  data on EAGAIN/EWOULDBLOCK in case of non-blocking socket.
+  See https://github.com/noxxi/p5-io-socket-ssl/issues/1, thanks to
+  mytram
 v1.83 2013.02.03
 - Server Name Indication (SNI) support on the server side, inspired by
   patch provided by karel[DOT]miko[AT]gmail[DOT]com.
