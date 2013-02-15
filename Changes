@@ -1,3 +1,7 @@
+v1.84 2013.02.15
+- disabled client side SNI for openssl version < 1.0.0 because of RT#83289
+- added functions can_client_sni, can_server_sni, can_npn to check avaibility
+  of SNI and NPN features. Added more documentation for SNI and NPN.
 v1.83_1 2013.02.14
 - seperated documention of non-blocking I/O from error handling
 - changed and documented behavior of readline to return the read

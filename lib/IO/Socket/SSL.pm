@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = 1.83_1;
+our $VERSION = 1.84;
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -177,11 +177,11 @@ BEGIN {
 
 my $can_client_sni;  # do we support SNI on the client side
 my $can_server_sni;  # do we support SNI on the server side
+my $can_npn;         # do we support NPN
 BEGIN {
-    if (Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x009080ef) {
-	$can_client_sni = 1;
-	$can_server_sni = 1 if $Net::SSLeay::VERSION >= 1.50;
-    }
+    $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x01000000;
+    $can_server_sni = defined &Net::SSLeay::get_servername;
+    $can_npn        = defined &Net::SSLeay::P_next_proto_negotiated;
 }
 
 # Export some stuff
@@ -1417,6 +1417,9 @@ sub error {
     return;
 }
 
+sub can_client_sni { return $can_client_sni }
+sub can_server_sni { return $can_server_sni }
+sub can_npn        { return $can_npn }
 
 sub DESTROY {
     my $self = shift or return;
@@ -1464,8 +1467,7 @@ sub set_defaults {
 
 sub next_proto_negotiated {
     my $self = shift;
-    return $self->error("NPN not supported in Net::SSLeay")
-	if ! exists &Net::SSLeay::P_next_proto_negotiated;
+    return $self->error("NPN not supported in Net::SSLeay") if ! $can_npn;
     my $ssl = $self->_get_ssl_object || return;
     return Net::SSLeay::P_next_proto_negotiated($ssl);
 }
@@ -1629,7 +1631,7 @@ sub new {
 
     if ( my $proto_list = $arg_hash->{SSL_npn_protocols} ) {
 	return IO::Socket::SSL->error("NPN not supported in Net::SSLeay")
-	    if ! exists &Net::SSLeay::P_next_proto_negotiated;
+	    if ! $can_npn;
 	if($arg_hash->{SSL_server}) {
 	    # on server side SSL_npn_protocols means a list of advertised protocols
 	    Net::SSLeay::CTX_set_next_protos_advertised_cb($ctx, $proto_list);
@@ -1972,7 +1974,7 @@ effort.
 IO::Socket::SSL supports all the extra features that one needs to write a
 
 full-featured SSL client or server application: multiple SSL contexts, cipher
-selection, certificate verification, Server Name Identification (SNI), Next
+selection, certificate verification, Server Name Indication (SNI), Next
 Protocol Negotiation (NPN), SSL version selection and more.
 
 If you have never used SSL before, you should read the appendix labelled 'Using SSL'
@@ -2039,6 +2041,8 @@ If you want to disable SNI set this argument to ''.
 
 Currently only supported for the client side and will be ignored for the server
 side.
+
+See section "SNI Support" for details of SNI the support.
 
 =item SSL_version
 
@@ -2344,6 +2348,9 @@ as an array ref.
 See also method L<next_proto_negotiated>.
 
 Next Protocol Negotioation (NPN) is available with Net::SSLeay 1.46+ and openssl-1.0.1+.
+To check support you might call C<IO::Socket::SSL->can_npn()>.
+If you use this option with an unsupported Net::SSLeay/OpenSSL it will 
+throw an error.
 
 =back
 
@@ -2439,7 +2446,7 @@ See Net::SSLeay::X509_get_subjectAltNames.
 
 =item B<get_servername>
 
-This gives the name requested by the client if Server Name Identification
+This gives the name requested by the client if Server Name Indication
 (SNI) was used.
 
 =item B<verify_hostname($hostname,$scheme)>
@@ -2519,6 +2526,7 @@ This method returns the name of negotiated protocol - e.g. 'http/1.1'. It works
 for both client and server side of SSL connection.
 
 NPN support is available with Net::SSLeay 1.46+ and openssl-1.0.1+.
+To check support you might call C<IO::Socket::SSL->can_npn()>.
 
 =item B<errstr()>
 
@@ -2668,6 +2676,28 @@ will try to emulate the behavior seen there, e.g. to return the received data
 instead of blocking, even if the line is not complete. If an unrecoverable error
 occurs it will return nothing, even if it already received some data.
 
+=head1 SNI Support
+
+Newer extensions to SSL can distinguish between multiple hostnames on the same
+IP address using Server Name Indication (SNI). 
+
+Support for SNI on the client side was added somewhere in the OpenSSL 0.9.8
+series, but only with 1.0 a bug was fixed when the server could not decide about
+its hostname. Therefore client side SNI is only supported with OpenSSL 1.0 or
+higher in L<IO::Socket::SSL>.
+With a supported version, SNI is used automatically on the client side, if it can
+determine the hostname from C<PeerAddr> or C<PeerHost>. On unsupported OpenSSL
+versions it will silently not use SNI.
+The hostname can also be given explicitly given with C<SSL_hostname>, but in
+this case it will throw in error, if SNI is not supported.
+To check for support you might call C<IO::Socket::SSL->can_client_sni()>.
+
+On the server side earlier versions of OpenSSL are supported, but only together
+with L<Net::SSLeay> version >= 1.50.
+To check for support you might call C<IO::Socket::SSL->can_server_sni()>.
+If server side SNI is supported, you might specify different certificates per
+host with C<SSL_cert*> and C<SSL_key*>, and check the requested name using
+C<get_servername>.
 
 =head1 RETURN VALUES
 
