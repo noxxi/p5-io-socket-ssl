@@ -2749,6 +2749,11 @@ IO::Socket::SSL depends on Net::SSLeay.  Up to version 1.43 of Net::SSLeay
 it was not thread safe, although it did probably work if you did not use 
 SSL_verify_callback and SSL_password_cb.
 
+If you use IO::Socket::SSL together with threads you should load it (e.g. use or
+require) inside the main thread before creating any other threads which use it.
+This way it is much faster because it will be initialized only once. Also there
+are reports that it might crash the other way.
+
 Creating an IO::Socket::SSL object in one thread and closing it in another
 thread will not work.
 
@@ -2811,20 +2816,6 @@ use peer_certificate( 'issuer' ) instead
 =item subject_name()
 
 use peer_certificate( 'subject' ) instead
-
-=back
-
-The following classes have been removed:
-
-=over 2
-
-=item SSL_SSL
-
-(not that you should have been directly accessing this anyway):
-
-=item X509_Certificate
-
-(but get_peer_certificate() will still Do The Right Thing)
 
 =back
 
