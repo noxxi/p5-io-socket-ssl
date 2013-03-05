@@ -2821,7 +2821,7 @@ use peer_certificate( 'subject' ) instead
 
 =head1 SEE ALSO
 
-IO::Socket::INET, IO::Socket::INET6, Net::SSLeay.
+IO::Socket::INET, IO::Socket::INET6, IO::Socket::IP, Net::SSLeay.
 
 =head1 AUTHORS
 
@@ -2835,11 +2835,11 @@ Patches incorporated from various people, see file Changes.
 
 =head1 COPYRIGHT
 
-Working support for non-blocking was added by Steffen Ullrich.
+The original versions of this module are Copyright (C) 1999-2002 Marko Asplund.
 
 The rewrite of this module is Copyright (C) 2002-2005 Peter Behroozi.
 
-The original versions of this module are Copyright (C) 1999-2002 Marko Asplund.
+Versions 0.98 and newer are Copyright (C) 2006-2013 Steffen Ullrich.
 
 This module is free software; you can redistribute it and/or
 modify it under the same terms as Perl itself.
