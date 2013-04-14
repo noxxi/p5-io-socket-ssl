@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = 1.84;
+our $VERSION = 1.85;
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -55,6 +55,7 @@ my $GLOBAL_SSL_ARGS = {};
 
 # non-XS Versions of Scalar::Util will fail
 BEGIN{
+    local $SIG{__DIE__}; local $SIG{__WARN__}; # be silent
     eval { use Scalar::Util 'dualvar'; dualvar(0,'') };
     die "You need the XS Version of Scalar::Util for dualvar() support"
 	if $@;
@@ -87,6 +88,7 @@ BEGIN {
     # declare @ISA depeding of the installed socket class
 
     # try to load inet_pton from Socket or Socket6
+    local $SIG{__DIE__}; local $SIG{__WARN__}; # be silent
     my $ip6 = eval {
 	require Socket;
 	Socket->VERSION(1.95);
@@ -198,7 +200,8 @@ sub import {
 	    @caller_force_inet4 = caller(); # save for warnings for 'inet6' case
 	} elsif ( /^inet6$/i ) {
 	    # check if we have already ipv6 as base
-	    if ( ! UNIVERSAL::isa( $class, 'IO::Socket::INET6' )) {
+	    if ( ! UNIVERSAL::isa( $class, 'IO::Socket::INET6')
+		and ! UNIVERSAL::isa( $class, 'IO::Socket::IP' )) {
 		# either we don't support it or we disabled it by explicitly
 		# loading it with 'inet4'. In this case re-enable but warn
 		# because this is probably an error
@@ -272,7 +275,6 @@ sub configure {
 
 sub configure_SSL {
     my ($self, $arg_hash) = @_;
-
     my $is_server = $arg_hash->{'SSL_server'} || $arg_hash->{'Listen'} || 0;
 
     # add user defined defaults

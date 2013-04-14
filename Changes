@@ -1,3 +1,8 @@
+v1.85 2013.04.14
+- probe for available modules with local __DIE__ and __WARN__handlers.
+  fixes RT#84574, thanks to FRAZER
+- fix warning, when IO::Socket::IP is installed and inet6 support gets explictly
+  requested. RT#84619, thanks to Prashant[DOT]Tekriwal[AT]netapp[DOT]com
 v1.84 2013.02.15
 - disabled client side SNI for openssl version < 1.0.0 because of RT#83289
 - added functions can_client_sni, can_server_sni, can_npn to check avaibility
