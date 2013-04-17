@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = 1.85;
+our $VERSION = 1.86;
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -309,6 +309,7 @@ sub configure_SSL {
     # to verify the server certificate and apps, which don't provide 
     # the necessary credentials should fail
     if ( ! $is_server 
+	and ! $arg_hash->{SSL_reuse_ctx} 
 	and ! exists $arg_hash->{SSL_verify_mode} 
 	and $default_args{SSL_verify_mode} == SSL_VERIFY_NONE ) {
 	carp(

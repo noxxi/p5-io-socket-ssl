@@ -1,3 +1,6 @@
+v1.86 2013.04.17
+- RT#84686 - don't complain about SSL_verify_mode is SSL_reuse_ctx,
+  thanks to CLEACH
 v1.85 2013.04.14
 - probe for available modules with local __DIE__ and __WARN__handlers.
   fixes RT#84574, thanks to FRAZER
