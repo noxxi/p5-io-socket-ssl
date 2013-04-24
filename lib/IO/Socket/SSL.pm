@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = 1.86;
+our $VERSION = 1.87;
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -351,6 +351,24 @@ sub configure_SSL {
 		SSL_cert_file => 'certs/client-cert.pem',
 	    );
 	    %$arg_hash = ( %$arg_hash, %ca, %certs );
+	} else {
+	    for(qw(SSL_cert_file SSL_key_file)) {
+		defined( my $file = $arg_hash->{$_} ) or next;
+		for my $f (ref($file) eq 'HASH' ? values(%$file):$file ) {
+		    die "$_ $f does not exist" if ! -f $f;
+		    die "$_ $f is not accessable" if ! -r _;
+		}
+	    }
+	    if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
+		die "SSL_ca_file $f does not exist" if ! -f $f;
+		die "SSL_ca_file $f is not accessable" if ! -r _;
+	    }
+	    if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
+		die "only SSL_ca_path or SSL_ca_file should be given" 
+		    if defined $arg_hash->{SSL_ca_file};
+		die "SSL_ca_path $d does not exist" if ! -d $d;
+		die "SSL_ca_path $d is not accessable" if ! -r _;
+	    }
 	}
     }
 
@@ -1683,7 +1701,7 @@ sub new {
 	my %sni;
 	for my $opt (qw(SSL_key SSL_key_file SSL_cert SSL_cert_file)) {
 	    my $val  = $arg_hash->{$opt} or next;
-	    if ( ref($val)) {
+	    if ( ref($val) eq 'HASH' ) {
 		# SNI
 		while ( my ($host,$v) = each %$val ) {
 		    $sni{lc($host)}{$opt} = $v;

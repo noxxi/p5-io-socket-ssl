@@ -1,3 +1,7 @@
+v1.87 2013.04.24
+- RT#84829 - complain if given SSL_(key|cert|ca)_(file|path) do not exist or
+  if they are not readable. Thanks to perl[AT]minty[DOT]org 
+- fix use of SSL_key|SSL_file objects instead of files, broken with 1.83
 v1.86 2013.04.17
 - RT#84686 - don't complain about SSL_verify_mode is SSL_reuse_ctx,
   thanks to CLEACH
