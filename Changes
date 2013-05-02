@@ -1,3 +1,7 @@
+v1.88 2013.05.02
+- consider a value of '' the same as undef for SSL_ca_(path|file), SSL_key*
+  and SSL_cert* - some apps like Net::LDAP use it that way.
+  Thanks to alexander[AT]kuehn[AT]nagilum[DOT]de for reporting the problem.
 v1.87 2013.04.24
 - RT#84829 - complain if given SSL_(key|cert|ca)_(file|path) do not exist or
   if they are not readable. Thanks to perl[AT]minty[DOT]org 

@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = 1.87;
+our $VERSION = 1.88;
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -334,9 +334,13 @@ sub configure_SSL {
     {
 	my $use_default = 1;
 	for (qw( SSL_cert SSL_cert_file SSL_key SSL_key_file SSL_ca_file SSL_ca_path )) {
-	    next if ! exists $arg_hash->{$_};
+	    next if ! defined $arg_hash->{$_};
+	    # some apps set keys '' to signal that it is not set, replace with undef
+	    if ( $arg_hash->{$_} eq '' ) {
+		$arg_hash->{$_} = undef;
+		next;
+	    }
 	    $use_default = 0;
-	    last;
 	}
 	if ( $use_default ) {
 	    my %ca = 
