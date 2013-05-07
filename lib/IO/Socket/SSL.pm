@@ -85,7 +85,7 @@ use vars qw(@ISA $SSL_ERROR @EXPORT );
 my @caller_force_inet4; # in case inet4 gets forced we store here who forced it
 
 BEGIN {
-    # declare @ISA depeding of the installed socket class
+    # declare @ISA depending of the installed socket class
 
     # try to load inet_pton from Socket or Socket6
     local $SIG{__DIE__}; local $SIG{__WARN__}; # be silent
@@ -187,8 +187,8 @@ BEGIN {
 }
 
 # Export some stuff
-# inet4|inet6|debug will be handeled by myself, everything
-# else will be handeld the Exporter way
+# inet4|inet6|debug will be handled by myself, everything
+# else will be handled the Exporter way
 sub import {
     my $class = shift;
 
@@ -253,7 +253,7 @@ sub configure {
 
     # force initial blocking
     # otherwise IO::Socket::SSL->new might return undef if the
-    # socket is nonblocking and it fails to connect immediatly
+    # socket is nonblocking and it fails to connect immediately
     # for real nonblocking behavior one should create a nonblocking
     # socket and later call connect explicitly
     my $blocking = delete $arg_hash->{Blocking};
@@ -941,7 +941,7 @@ sub readline {
     }
 
 
-    # find first occurence of $delim0 followed by as much as possible $delim1
+    # find first occurrence of $delim0 followed by as much as possible $delim1
     my $buf = '';
     my $eod = 0;  # pointer into $buf after $delim0 $delim1*
     my $ssl = $self->_get_ssl_object or return;
@@ -1314,7 +1314,7 @@ sub dump_peer_certificate {
 	    $ipn = inet_pton(AF_INET6,$identity) 
 		or croak "'$identity' is not IPv6, but neither IPv4 nor hostname";
 	} elsif ( $identity =~m{^\d+\.\d+\.\d+\.\d+$} ) {
-	     # definitly no hostname, try IPv4
+	     # definitely no hostname, try IPv4
 	    $ipn = inet_aton( $identity ) or croak "'$identity' is not IPv4, but neither IPv6 nor hostname";
 	} else {
 	    # assume hostname, check for umlauts etc
@@ -1350,7 +1350,7 @@ sub dump_peer_certificate {
 	while (@altNames) {
 	    my ($type, $name) = splice (@altNames, 0, 2);
 	    if ( $ipn and $type == GEN_IPADD ) {
-		# exakt match needed for IP
+		# exact match needed for IP
 		# $name is already packed format (inet_xton)
 		return 1 if $ipn eq $name;
 
@@ -1429,7 +1429,7 @@ sub error {
 	push @err, Net::SSLeay::ERR_error_string($err);
 	$DEBUG>=2 && DEBUG( $error."\n".$self->get_ssleay_error());
     }
-    # if no new error occured report last again
+    # if no new error occurred report last again
     if ( ! @err and my $err = 
 	ref($self) ? ${*$self}{'_SSL_last_err'} : $SSL_ERROR ) {
 	push @err,$err;
@@ -1638,7 +1638,7 @@ sub new {
 	Net::SSLeay::CTX_set_options($ctx, 0x00400000);
     }
 
-    # if we don't set session_id_context if client certicate is expected
+    # if we don't set session_id_context if client certificate is expected
     # client session caching will fail
     # if user does not provide explicit id just use the stringification
     # of the context
@@ -1661,7 +1661,7 @@ sub new {
 	    # on server side SSL_npn_protocols means a list of advertised protocols
 	    Net::SSLeay::CTX_set_next_protos_advertised_cb($ctx, $proto_list);
 	} else {
-	    # on client side SSL_npn_protocols means a list of prefered protocols
+	    # on client side SSL_npn_protocols means a list of preferred protocols
 	    # negotiation algorithm used is "as-openssl-implements-it"
 	    Net::SSLeay::CTX_set_next_proto_select_cb($ctx, $proto_list);
 	}
@@ -1749,7 +1749,7 @@ sub new {
 	}
 
 	if ( keys %sni > 1 or ! exists $sni{''} ) {
-	    # we definitly want SNI support
+	    # we definitely want SNI support
 	    $can_server_sni or return IO::Socket::SSL->error(
 		"Server side SNI not supported for this openssl/Net::SSLeay");
 	    $_ = $_->{ctx} for( values %sni);
@@ -2057,7 +2057,7 @@ that came bundled with IO::Socket::INET, plus (optionally) the ones that follow:
 
 =item SSL_hostname
 
-This can be given to specifiy the hostname used for SNI, which is needed if you
+This can be given to specify the hostname used for SNI, which is needed if you
 have multiple SSL hostnames on the same IP address. If not given it will try to
 determine hostname from PeerAddr, which will fail if only IP was given or if
 this argument is used within start_SSL.
@@ -2113,7 +2113,7 @@ you are setting up an SSL client.  If this is set to 0 (the default), then you w
 only need a certificate and key if you are setting up a server.
 
 SSL_use_cert will implicitly be set if SSL_server is set.
-For convinience it is also set if it was not given but a cert was given for use
+For convenience it is also set if it was not given but a cert was given for use
 (SSL_cert_file or similar).
 
 =item SSL_server
@@ -2149,7 +2149,7 @@ Examples:
 
 This option can be used instead of C<SSL_cert_file> to specify the certificate.
 
-Instead with a file the certifcate is given as an X509* object or array of
+Instead with a file the certificate is given as an X509* object or array of
 X509* objects, where the first X509* is the internal representation of the
 certificate while the following ones are extra certificates.
 The option is useful if you create your certificate dynamically (like in a SSL
@@ -2202,7 +2202,7 @@ If you want to verify that the peer certificate has been signed by a reputable
 certificate authority, then you should use this option to locate the file
 containing the certificateZ<>(s) of the reputable certificate authorities if it is
 not already in the file F<certs/my-ca.pem>.
-If you definitly want no SSL_ca_file used you should set it to undef.
+If you definitely want no SSL_ca_file used you should set it to undef.
 
 =item SSL_ca_path
 
@@ -2211,7 +2211,7 @@ yourself up a directory containing several trusted certificates as separate file
 as well as an index of the certificates.  If you want to use that directory for
 validation purposes, and that directory is not F<ca/>, then use this option to
 point IO::Socket::SSL to the right place to look.
-If you definitly want no SSL_ca_path used you should set it to undef.
+If you definitely want no SSL_ca_path used you should set it to undef.
 
 =item SSL_verify_mode
 
@@ -2361,7 +2361,7 @@ actual socket connection works but the SSL negotiation fails, as in the case of
 an HTTP client connecting to an HTTPS server.  Passing a subroutine ref attached
 to this parameter allows you to gain control of the orphaned socket instead of having it
 be closed forcibly.	 The subroutine, if called, will be passed two parameters:
-a reference to the socket on which the SSL negotiation failed and and the full
+a reference to the socket on which the SSL negotiation failed and the full
 text of the error message.
 
 =item SSL_npn_protocols
@@ -2402,7 +2402,7 @@ if you have used shutdown() or are working on a copy of a socket.
 =item SSL_fast_shutdown
 
 If set to true only a unidirectional shutdown will be done, e.g. only the
-close_notify (see SSL_shutdown(3)) will be called. Otherwise a bidrectional
+close_notify (see SSL_shutdown(3)) will be called. Otherwise a bidirectional
 shutdown will be done. If used within close() it defaults to true, if used
 within stop_SSL() it defaults to false.
 
@@ -2595,7 +2595,7 @@ This is the opposite of start_SSL(), e.g. it will shutdown the SSL connection
 and return to the class before start_SSL(). It gets the same arguments as close(),
 in fact close() calls stop_SSL() (but without downgrading the class).
 
-Will return true if it suceeded and undef if failed. This might be the case for
+Will return true if it succeeded and undef if failed. This might be the case for
 non-blocking sockets. In this case $! is set to EAGAIN and the ssl error to
 SSL_WANT_READ or SSL_WANT_WRITE. In this case the call should be retried again with
 the same arguments once the socket is ready is until it succeeds.
@@ -2675,7 +2675,7 @@ and read/sysread families instead.
 =head1 ERROR HANDLING
 
 If an SSL specific error occurs the global variable C<$SSL_ERROR> will be set.
-If the error occured on an existing SSL socket the method C<errstr> will
+If the error occurred on an existing SSL socket the method C<errstr> will
 give access to the latest socket specific error.
 Both C<$SSL_ERROR> and C<errstr> method give a dualvar similar to C<$!>, e.g.
 providing an error number in numeric context or an error description in string
@@ -2685,7 +2685,7 @@ context.
 
 If you have a non-blocking socket, the expected behavior on read, write, accept
 or connect is to set C<$!> to EAGAIN if the operation can not be completed
-immediatly.
+immediately.
 
 With SSL there are cases, like with SSL handshakes, where the write operation
 can not be completed until it can read from the socket or vice versa. 
