@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = 1.88;
+our $VERSION = 1.89;
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -103,9 +103,9 @@ BEGIN {
     # try IO::Socket::IP or IO::Socket::INET6 for IPv6 support
     if ( $ip6 ) {
 
-	# if we have IO::Socket::IP >= 0.11 we will use this in preference
+	# if we have IO::Socket::IP >= 0.20 we will use this in preference
 	# because it can handle both IPv4 and IPv6
-	if ( eval { require IO::Socket::IP; IO::Socket::IP->VERSION(0.11); } ) {
+	if ( eval { require IO::Socket::IP; IO::Socket::IP->VERSION(0.20); } ) {
 	    @ISA = qw(IO::Socket::IP);
 	    constant->import( CAN_IPV6 => "IO::Socket::IP" );
 
@@ -2016,8 +2016,8 @@ The choice of the super class depends on the installed modules:
 
 =item *
 
-If IO::Socket::IP is installed it will use this module as super class,
-transparently providing IPv6 and IPv4 support.
+If IO::Socket::IP with at least version 0.20 is installed it will use this
+module as super class, transparently providing IPv6 and IPv4 support.
 
 =item *
 

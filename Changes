@@ -1,3 +1,6 @@
+v1.89 2013.05.14
+- if IO::Socket::IP is used it should be at least version 0.20, otherwise
+  we get problems with HTTP::Daemon::SSL and maybe others (RT#81932)
 - Spelling corrections, thanks to dsteinbrunner
 v1.88 2013.05.02
 - consider a value of '' the same as undef for SSL_ca_(path|file), SSL_key*
