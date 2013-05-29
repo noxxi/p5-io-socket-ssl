@@ -15,6 +15,7 @@ example/async_https_server.pl
 example/lwp-with-verifycn.pl
 example/ssl_client.pl
 example/ssl_server.pl
+example/ssl_mitm.pl
 Makefile.PL
 MANIFEST
 patches/Net_SSLeay.patch

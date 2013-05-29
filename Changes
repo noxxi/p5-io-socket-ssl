@@ -1,3 +1,4 @@
+- added support for easy SSL interception (man in the middle)
 v1.89 2013.05.14
 - if IO::Socket::IP is used it should be at least version 0.20, otherwise
   we get problems with HTTP::Daemon::SSL and maybe others (RT#81932)
