@@ -3,6 +3,7 @@ certs/client-cert.pem
 certs/client-key.enc
 certs/client-key.pem
 certs/my-ca.pem
+certs/proxyca.pem
 certs/server-cert.pem
 certs/server-key.enc
 certs/server-key.pem
@@ -47,4 +48,5 @@ t/sysread_write.t
 t/testlib.pl
 t/verify_hostname.t
 t/sni.t
+t/mitm.t
 util/export_certs.pl

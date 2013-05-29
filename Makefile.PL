@@ -93,7 +93,7 @@ WriteMakefile(
     'DISTNAME' => 'IO-Socket-SSL',
     'LICENSE' => 'perl',
     'PREREQ_PM' => {
-	'Net::SSLeay' => 1.21,
+	'Net::SSLeay' => 1.46,
 	'Scalar::Util' => 0,
     },
     'dist' => { COMPRESS => 'gzip', SUFFIX => 'gz', },

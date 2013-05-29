@@ -1,4 +1,10 @@
-- added support for easy SSL interception (man in the middle)
+v1.90 2013.05.27
+- RT#85290, support more digest, especially SHA-2.
+  Thanks to ujvari[AT]microsec[DOT]hu
+- added support for easy SSL interception (man in the middle) based
+  on ideas found in mojo-mitm proxy (which was written by Karel Miko)
+- make 1.46 the minimal required version for Net::SSLeay, because it 
+  introduced lots of useful functions.
 v1.89 2013.05.14
 - if IO::Socket::IP is used it should be at least version 0.20, otherwise
   we get problems with HTTP::Daemon::SSL and maybe others (RT#81932)

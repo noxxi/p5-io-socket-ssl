@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = 1.89;
+our $VERSION = '1.90';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -134,6 +134,7 @@ BEGIN {
     # Do Net::SSLeay initialization
     Net::SSLeay::load_error_strings();
     Net::SSLeay::SSLeay_add_ssl_algorithms();
+    Net::SSLeay::OpenSSL_add_all_digests();
     Net::SSLeay::randomize();
 }
 
@@ -2959,6 +2960,8 @@ Create a new CA certificate, which will be used to sign the cloned certificates.
 This proxy CA certificate should be trusted by the client, or (a properly
 written client) will throw error messages or deny the connections because it
 detected a man in the middle attack.
+Due to the way the interception works there no support for client side
+certificates is possible.
 
 Using openssl such a proxy CA certificate and private key can be created with:
 
