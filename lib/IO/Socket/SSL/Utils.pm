@@ -285,7 +285,7 @@ OpenSSL.
 
 =head1 FUNCTIONS
 
-=over4
+=over 4
 
 =item *
 
