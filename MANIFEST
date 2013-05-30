@@ -19,10 +19,11 @@ example/ssl_server.pl
 example/ssl_mitm.pl
 Makefile.PL
 MANIFEST
-patches/Net_SSLeay.patch
 README
 README.Win32
 lib/IO/Socket/SSL.pm
+lib/IO/Socket/SSL/Intercept.pm
+lib/IO/Socket/SSL/Utils.pm
 t/01loadmodule.t
 t/02settings.t
 t/acceptSSL-timeout.t

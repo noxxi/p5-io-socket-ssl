@@ -1,12 +1,7 @@
 # vim: set sts=4 sw=4 ts=8 ai:
-#
-# a MakeMaker script for IO::Socket::SSL (aspa@hip.fi).
-#
-# $Id: Makefile.PL,v 1.1 2000/07/04 10:09:57 aspa Exp $.
-#
 
 use 5.008; 
-use ExtUtils::MakeMaker;
+use ExtUtils::MakeMaker 6.46;
 
 
 # Test to make sure that Net::SSLeay can be properly seeded!
@@ -70,36 +65,31 @@ It's recommended to install either Net::IDN::Encode, Net::LibIDN or URI version>
 EOM
 }
 
-# check Version
-if ( eval { require Net::SSLeay } and $Net::SSLeay::VERSION <1.33 ) {
-    warn <<"EOM";
-
-WARNING
-You have version $Net::SSLeay::VERSION of Net::SSLeay.
-Support for subjectAltNames in certificates is only available in Version >=1.33
-so verifying a hostname against the certificate will not work.
-It is recommended to upgrade to a current Net::SSLeay.
-
-EOM
-}
 
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 WriteMakefile(
     'NAME' => 'IO::Socket::SSL',
-    'AUTHOR' => 'Steffen Ullrich & Peter Behroozi & Marko Asplund',
     'ABSTRACT' => 'Nearly transparent SSL encapsulation for IO::Socket::INET.',
-    'VERSION_FROM' => 'lib/IO/Socket/SSL.pm',
-    'DISTNAME' => 'IO-Socket-SSL',
+    'AUTHOR' => [ 
+	'Steffen Ullrich <sullr@cpan.org>',
+	'Peter Behroozi',
+	'Marko Asplund' 
+    ],
     'LICENSE' => 'perl',
+    'DISTNAME' => 'IO-Socket-SSL',
+    'META_MERGE' => {
+	resources => {
+	    license     => 'http://dev.perl.org/licenses/',
+	    repository  => 'https://github.com/noxxi/p5-io-socket-ssl',
+	    homepage    => 'https://github.com/noxxi/p5-io-socket-ssl',
+	    bugtracker  => 'https://rt.cpan.org/Dist/Display.html?Queue=IO-Socket-SSL',
+	},
+    },
+    'VERSION_FROM' => 'lib/IO/Socket/SSL.pm',
     'PREREQ_PM' => {
 	'Net::SSLeay' => 1.46,
 	'Scalar::Util' => 0,
     },
     'dist' => { COMPRESS => 'gzip', SUFFIX => 'gz', },
-    META_MERGE => {
-	resources => {
-	    repository => 'https://github.com/noxxi/p5-io-socket-ssl',
-	},
-   },
 );

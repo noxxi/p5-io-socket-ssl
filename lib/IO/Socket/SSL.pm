@@ -3,7 +3,7 @@
 # IO::Socket::SSL:
 # provide an interface to SSL connections similar to IO::Socket modules
 #
-# Current Code Shepherd: Steffen Ullrich <steffen at genua.de>
+# Current Code Shepherd: Steffen Ullrich <sullr at cpan.org>
 # Code Shepherd before: Peter Behroozi, <behrooz at fas.harvard.edu>
 #
 # The original version of this module was written by
@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.90';
+our $VERSION = '1.91';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -1917,248 +1917,10 @@ sub DESTROY {
     }
 }
 
-package IO::Socket::SSL::Intercept;
-use Carp 'croak';
-sub new {
-    my ($class,%args) = @_;
-
-    my $cacert = delete $args{proxy_cert};
-    if ( ! $cacert ) {
-	if ( my $f = delete $args{proxy_cert_file} ) {
-	    my $bio = Net::SSLeay::BIO_new_file($f,'r') or 
-		croak "cannot read $f: $!";
-	    $cacert = Net::SSLeay::PEM_read_bio_X509($bio) or 
-		croak "cannot parse $f as X509 cert: ".
-		Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error());
-	    Net::SSLeay::BIO_free($bio);
-	} else {
-	    croak "no proxy_cert or proxy_cert_file given";
-	}
-    }
-
-    my $cakey  = delete $args{proxy_key};
-    if ( ! $cakey ) {
-	if ( my $f = delete $args{proxy_key_file} ) {
-	    my $bio = Net::SSLeay::BIO_new_file($f,'r') or 
-		croak "cannot read $f: $!";
-	    $cakey = Net::SSLeay::PEM_read_bio_PrivateKey($bio) or 
-		croak "cannot parse $f as private key: ".
-		Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error());
-	    Net::SSLeay::BIO_free($bio);
-	} else {
-	    croak "no proxy_cert or proxy_cert_file given";
-	}
-    }
-
-    my $pubkey = delete $args{pubkey};
-    if ( ! $pubkey ) {
-	if ( my $f = delete $args{pubkey_file} ) {
-	    my $bio = Net::SSLeay::BIO_new_file($f,'r') or 
-		croak "cannot read $f: $!";
-	    $cakey = Net::SSLeay::PEM_read_bio_PrivateKey($bio) or 
-		croak "cannot parse $f as private key: ".
-		Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error());
-	    Net::SSLeay::BIO_free($bio);
-	} else {
-	    $pubkey = Net::SSLeay::EVP_PKEY_new();
-	    my $rsa = Net::SSLeay::RSA_generate_key(2048, 0x10001); # 0x10001 = RSA_F4
-	    Net::SSLeay::EVP_PKEY_assign_RSA($pubkey,$rsa);
-	}
-    }
-
-    my $cache = delete $args{cache} || {};
-
-    my $self = bless {
-	cacert => $cacert,
-	cakey => $cakey,
-	pubkey => $pubkey,
-	serial => delete $args{serial} || 1,
-	cache => $cache,
-    };
-    return $self;
-}
-
-sub DESTROY {
-    # call various ssl _free routines
-    my $self = shift or return;
-    for ( \$self->{cacert}, 
-	map { \$_->{cert} } ref($self->{cache}) ne 'CODE' ? values %{$self->{cache}} :()) {
-	$$_ or next;
-	Net::SSLeay::X509_free($$_);
-	$$_ = undef;
-    }
-    for ( \$self->{cakey}, \$self->{pubkey} ) {
-	$$_ or next;
-	Net::SSLeay::EVP_PKEY_free($$_);
-	$$_ = undef;
-    }
-}
-
-my $sha1_digest;
-sub clone_cert {
-    my ($self,$old_cert,$clone_key) = @_;
-
-    if ( $clone_key and my $clone = _get_cached($self,$clone_key)) {
-	return ($clone,$self->{pubkey});
-    }
-
-    $sha1_digest ||= Net::SSLeay::EVP_get_digestbyname("sha1") or die "SHA1 not available";
-
-    # extract relevant information from cert
-    my $version = Net::SSLeay::X509_get_version($old_cert);
-    my $not_before = Net::SSLeay::P_ASN1_TIME_get_isotime(Net::SSLeay::X509_get_notBefore($old_cert));
-    my $not_after = Net::SSLeay::P_ASN1_TIME_get_isotime(Net::SSLeay::X509_get_notAfter($old_cert));
-    my $subj = Net::SSLeay::X509_get_subject_name($old_cert);
-    my @nids;
-    for ( 0..Net::SSLeay::X509_NAME_entry_count($subj)-1 ) {
-	my $e = Net::SSLeay::X509_NAME_get_entry($subj,$_);
-	my $o = Net::SSLeay::X509_NAME_ENTRY_get_object($e);
-	push @nids, { 
-	    obj => $o, 
-	    data => Net::SSLeay::P_ASN1_STRING_get( Net::SSLeay::X509_NAME_ENTRY_get_data($e))
-	}
-    }
-    my @altsubj = do {
-	my @names = Net::SSLeay::X509_get_subjectAltNames($old_cert);
-	my @r;
-	while (my ($t,$v) = splice(@names,0,2)) {
-	    push @r,[$t,$v]
-	}
-	@r;
-    };
-
-    if ( ! $clone_key ) {
-	$clone_key = "$version\0$not_before\0$not_after\0";
-	$clone_key .= "$_->{obj}\0$_->{data}\0" for(@nids);
-	$clone_key .= "$_->[0]\0$_->[1]\0" for(@altsubj);
-	if ( my $clone = _get_cached($self,$clone_key) ) {
-	    return ($clone,$self->{pubkey});
-	}
-    }
-
-    # create new certificate based on original
-    my $new_cert = Net::SSLeay::X509_new();
-    Net::SSLeay::X509_set_pubkey($new_cert,$self->{pubkey});
-    my $sn = Net::SSLeay::X509_get_serialNumber($new_cert);
-    Net::SSLeay::ASN1_INTEGER_set($sn, ++$self->{serial});
-    Net::SSLeay::X509_set_issuer_name($new_cert, 
-	Net::SSLeay::X509_get_subject_name($self->{cacert}));
-
-    # clone version
-    Net::SSLeay::X509_set_version($new_cert,$version);
-    # clone not_before/not_after
-    Net::SSLeay::P_ASN1_TIME_set_isotime(
-	Net::SSLeay::X509_get_notBefore($new_cert), $not_before);
-    Net::SSLeay::P_ASN1_TIME_set_isotime(
-	Net::SSLeay::X509_get_notAfter($new_cert), $not_after);
-
-    # clone nids
-    $subj = Net::SSLeay::X509_get_subject_name($new_cert);
-    for(@nids) {
-	# 0x1000 = MBSTRING_UTF8
-	Net::SSLeay::X509_NAME_add_entry_by_OBJ($subj, 
-	    $_->{obj}, 0x1000, $_->{data}, -1, 0); 
-    }
-
-    # set extensions
-    Net::SSLeay::P_X509_add_extensions($new_cert, $self->{cacert},
-	&Net::SSLeay::NID_key_usage => 'digitalSignature,keyEncipherment',
-	&Net::SSLeay::NID_subject_key_identifier => 'hash',
-	&Net::SSLeay::NID_authority_key_identifier => 'keyid',
-	&Net::SSLeay::NID_authority_key_identifier => 'issuer',
-	&Net::SSLeay::NID_basic_constraints => 'CA:FALSE',
-	&Net::SSLeay::NID_ext_key_usage => 'serverAuth,clientAuth',
-	&Net::SSLeay::NID_netscape_cert_type => 'server',
-	@altsubj ? ( 
-	    &Net::SSLeay::NID_subject_alt_name => 
-		# 2 = GEN_DNS 
-		join(',', map { $_->[0] == 2 ? "DNS:$_->[1]":$_->[1] } @altsubj)
-	    ): (),
-    );
-
-    # sign
-    Net::SSLeay::X509_sign($new_cert, $self->{cakey}, $sha1_digest);
-    _set_cached($self,$clone_key,$new_cert);
-    return ($new_cert,$self->{pubkey});
-}
-
-sub _get_cached {
-    my ($self,$clone_key) = @_;
-    my $c = $self->{cache};
-    return $c->($clone_key) if ref($c) eq 'CODE';
-    my $e = $c->{$clone_key} or return;
-    $e->{atime} = time();
-    return $e->{cert};
-}
-
-sub _set_cached {
-    my ($self,$clone_key,$cert) = @_;
-    my $c = $self->{cache};
-    return $c->($clone_key,$cert) if ref($c) eq 'CODE';
-    $c->{$clone_key} = { cert => $cert, atime => time() };
-}
-
-
-sub STORABLE_freeze { my $self = shift; $self->serialize() }
-sub STORABLE_thaw   { my ($class,undef,$data) = @_; $class->unserialize($data) }
-
-sub serialize {
-    my $self = shift;
-    my $data = pack("N",1); # version
-    $data .= pack("N/a", Net::SSLeay::PEM_get_string_X509($self->{cacert}));
-    $data .= pack("N/a", Net::SSLeay::PEM_get_string_PrivateKey($self->{cakey}));
-    $data .= pack("N/a", Net::SSLeay::PEM_get_string_PrivateKey($self->{pubkey}));
-    $data .= pack("N",$self->{serial});
-    if ( ref($self->{cache}) eq 'HASH' ) {
-	while ( my($k,$v) = each %{ $self->{cache}} ) {
-	    $data .= pack("N/aN/aN", $k,
-		Net::SSLeay::PEM_get_string_X509($k->{cert}),
-		$k->{atime});
-	}
-    }
-    return $data;
-}
-
-sub unserialize {
-    my ($class,$data) = @_;
-    unpack("N",substr($data,0,4,'')) == 1 or 
-	croak("serialized with wrong version");
-    ( my $cacert,my $cakey,my $pubkey,my $serial,$data) = unpack("N/aN/aN/aNa*",$data);
-    my $self = bless {
-	serial => $serial,
-    }, ref($class)||$class;
-    for( 
-	[ cacert => $cacert,\&Net::SSLeay::PEM_read_bio_X509 ],
-	[ cakey  => $cakey,\&Net::SSLeay::PEM_read_bio_PrivateKey ],
-	[ pubkey => $pubkey,\&Net::SSLeay::PEM_read_bio_PrivateKey ],
-    ) {
-	my ($name,$v,$f) = @$_;
-	my $bio = Net::SSLeay::BIO_new( Net::SSLeay::BIO_s_mem());
-	Net::SSLeay::BIO_write($bio,$v);
-	$self->{$name} = $f->($bio);
-	Net::SSLeay::BIO_free($bio);
-	$self->{$name} or croak "failed to read $name from PEM string: ".
-	    Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error());
-    }
-    $self->{cache} = {} if $data ne '';
-    while ( $data ne '' ) {
-	(my $key,my $cert,my $atime,$data) = unpack("N/aN/aNa*",$data);
-	my $bio = Net::SSLeay::BIO_new( Net::SSLeay::BIO_s_mem());
-	Net::SSLeay::BIO_write($bio,$cert);
-	$cert = Net::SSLeay::PEM_read_bio_X509($bio);
-	Net::SSLeay::BIO_free($bio);
-	$cert or croak "failed to read cert from PEM string: ".
-	    Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error());
-	$self->{cache}{$key} = { cert => $cert, atime => $atime };
-    }
-    return $self;
-}
-
-
-
 
 1;
 
+__END__
 
 =head1 NAME
 
@@ -2227,36 +1989,6 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
     # all data are now SSL encrypted
     print $sock .... 
 
-    # SSL man in the middle --------------------------------------------
-    # create interceptor with proxy certificates
-    my $mitm = IO::Socket::SSL::Intercept->new(
-	proxy_cert_file => 'proxy_cert.pem',
-	proxy_key_file  => 'proxy_key.pem',
-	...
-    );
-    my $listen = IO::Socket::INET->new( LocalAddr => .., Listen => .. );
-    while (1) {
-	# TCP accept new client
-	my $client = $listen->accept or next;
-	# SSL connect to server
-	my $server = IO::Socket::SSL->new(
-	    PeerAddr => ..,
-	    SSL_verify_mode => ...,
-	    ...
-	) or die "ssl connect failed: $!,$SSL_ERROR";
-	# clone server certificate
-	my ($cert,$key) = $mitm->clone_cert( $server->peer_certificate );
-	# and upgrade client side to SSL with cloned certificate
-	IO::Socket::SSL->start_SSL($client,
-	    SSL_server => 1,
-	    SSL_cert => $cert,
-	    SSL_key => $key
-	) or die "upgrade failed: $SSL_ERROR";
-	# now transfer data between $client and $server and analyze
-	# the unencrypted data
-	...
-    }
-
 
 =head1 DESCRIPTION
 
@@ -2268,10 +2000,6 @@ IO::Socket::SSL supports all the extra features that one needs to write a
 full-featured SSL client or server application: multiple SSL contexts, cipher
 selection, certificate verification, Server Name Indication (SNI), Next
 Protocol Negotiation (NPN), SSL version selection and more.
-
-It also provides functionality to clone certificates and sign them with a proxy
-certificate, thus making it easy to intercept SSL connections (man in the
-middle).
 
 If you have never used SSL before, you should read the appendix labelled 'Using SSL'
 before attempting to use this module.
@@ -2942,146 +2670,6 @@ calls to these functions will fail, telling you to use the print/printf/syswrite
 and read/sysread families instead.
 
 =back
-
-=head1 Intercepting SSL
-
-IO::Socket::SSL makes it easy to intercept SSL connections (man in the middle),
-which is a useful for analyzing encrypted traffic for security reasons or for
-testing. This does not break the end-to-end security of SSL, e.g. a properly
-written client will notice the interception unless you explicitly configure the
-client to trust your interceptor.
-Intercepting SSL works the following way:
-
-=over 4
-
-=item *
-
-Create a new CA certificate, which will be used to sign the cloned certificates.
-This proxy CA certificate should be trusted by the client, or (a properly
-written client) will throw error messages or deny the connections because it
-detected a man in the middle attack.
-Due to the way the interception works there no support for client side
-certificates is possible.
-
-Using openssl such a proxy CA certificate and private key can be created with:
-
-  openssl genrsa -out proxy_key.pem 1024
-  openssl req -new -x509 -extensions v3_ca -key proxy_key.pem -out proxy_cert.pem
-  # export as PKCS12 for import into browser
-  openssl pkcs12 -export -in proxy_cert.pem -inkey proxy_key.pem -out proxy_cert.p12
-
-=item * 
-
-Configure client to connect to use intercepting proxy or somehow redirect
-connections from client to the proxy (e.g. packet filter redirects, ARP or DNS
-spoofing etc).
-
-=item *
-
-Accept the TCP connection from the client, e.g. don't do any SSL handshakes with
-the client yet.
-
-=item *
-
-Establish the SSL connection to the server and verify the servers certificate as
-usually. Then create a new certificate based on the original servers
-certificate, but signed by your proxy CA.
-This can be done using IO::Socket::SSL::Intercept.
-
-=item *
-
-Upgrade the TCP connection to the client to SSL using the cloned certificate
-from the server. If the client trusts your proxy CA it will accept the upgrade
-to SSL.
-
-=item *
-
-Transfer data between client and server. While the connections to client and
-server are both encrypted with SSL you will read/write the unencrypted data in
-your proxy application.
-
-=back
-
-IO::Socket::SSL::Intercept helps by creating the cloned certificate with the
-following methods:
-
-=over 4
-
-=item B<< $mitm = IO::Socket::SSL::Intercept->new(%args) >>
-
-This creates a new interceptor object. C<%args> should be
-
-=over 8
-
-=item proxy_cert X509 | proxy_cert_file filename
-
-This is the proxy certificate.
-It can be either given by an X509 object from L<Net::SSLeay>s internal
-representation, or using a file in PEM format.
-
-=item proxy_key EVP_PKEY | proxy_key_file filename
-
-This is the key for the proxy certificate.
-It can be either given by an EVP_PKEY object from L<Net::SSLeay>s internal
-representation, or using a file in PEM format.
-The key should not have a passphrase.
-
-=item pubkey EVP_PKEY | pubkey_file filename
-
-This optional argument specifies the public key used for the cloned certificate.
-It can be either given by an EVP_PKEY object from L<Net::SSLeay>s internal
-representation, or using a file in PEM format.
-If not given it will create a new public key on each call of C<new>.
-
-=item serial INTEGER
-
-This optional argument gives the starting point for the serial numbers of the
-newly created certificates. Default to 1.
-
-=item cache HASH | SUBROUTINE
-
-This optional argument gives a way to cache created certificates, so that they
-don't get recreated on future accesses to the same host.
-If the argument ist not given an internal HASH ist used.
-
-If the argument is a hash it will store for each generated certificate a hash
-reference with C<cert> and C<atime> in the hash, where C<atime> is the time of
-last access (to expire unused entries) and C<cert> is the certificate. Please
-note, that the certificate is in L<Net::SSLeay>s internal X509 format and can
-thus not be simply dumped and restored.
-The key for the hash is an C<ident> either given to C<clone_cert> or generated
-from the original certificate.
-
-If the argument is a subroutine it will be called as C<< $cache->(ident) >>
-to get an existing certificate and with C<< $cache->(ident,cert) >> to cache the
-newly created certificate.
-
-=back
-
-=item B<< ($clone_cert,$key) = $mitm->clone_cert($original_cert,[ $ident ]) >>
-
-This clones the given certificate.
-An ident as the key into the cache can be given (like C<host:port>), if not it
-will be created from the properties of the original certificate.
-It returns the cloned certificate and its key (which is the same for alle
-created certificates).
-
-=item B<< $string = $mitm->serialize >>
-
-This creates a serialized version of the object (e.g. a string) which can then
-be used to persistantly store created certificates over restarts of the
-application. The cache will only be serialized if it is a HASH.
-To work together with L<Storable> the C<STORABLE_freeze> function is defined to
-call C<serialize>.
-
-=item B<< $mitm = IO::Socket::SSL::Intercept->unserialize($string) >>
-
-This restores an Intercept object from a serialized string.
-To work together with L<Storable> the C<STORABLE_thaw> function is defined to
-call C<unserialize>.
-
-=back
-
 
 =head1 ERROR HANDLING
 

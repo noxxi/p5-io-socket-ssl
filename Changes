@@ -1,3 +1,8 @@
+v1.91 2013.05.30
+- added IO::Socket::SSL::Utils for easier manipulation of certificates and keys
+- moved SSL interception into IO::Socket::SSL::Intercept and simplified it 
+  using IO::Socket::SSL::Utils
+- enhance meta information in Makefile.PL
 v1.90 2013.05.27
 - RT#85290, support more digest, especially SHA-2.
   Thanks to ujvari[AT]microsec[DOT]hu
