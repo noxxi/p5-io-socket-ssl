@@ -1,3 +1,7 @@
+v1.92 2013.05.30
+- Intercept: use sha1-fingerprint of original cert for id into cache unless 
+  otherwise given
+- Fix pod error in IO::Socket::SSL::Utils RT#85733
 v1.91 2013.05.30
 - added IO::Socket::SSL::Utils for easier manipulation of certificates and keys
 - moved SSL interception into IO::Socket::SSL::Intercept and simplified it 

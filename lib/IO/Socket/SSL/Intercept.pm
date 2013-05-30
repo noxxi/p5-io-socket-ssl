@@ -4,8 +4,9 @@ use strict;
 use warnings;
 use Carp 'croak';
 use IO::Socket::SSL::Utils;
+use Net::SSLeay;
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 sub new {
     my ($class,%args) = @_;
@@ -66,27 +67,15 @@ sub DESTROY {
 sub clone_cert {
     my ($self,$old_cert,$clone_key) = @_;
 
-    if ( $clone_key and my ($clone,$key) = _get_cached($self,$clone_key)) {
+    $clone_key ||= substr(unpack("H*",Net::SSLeay::X509_get_fingerprint($old_cert,'sha1')),0,16);
+    if ( my ($clone,$key) = _get_cached($self,$clone_key)) {
 	return ($clone,$key);
-    }
-
-    my $hash = CERT_asHash($old_cert);
-    if ( ! $clone_key ) {
-	$clone_key = join("|",
-	    $hash->{not_before},
-	    $hash->{not_after},
-	    join("/",map {  "$_=$hash->{subject}{$_}" } keys %{$hash->{subject}}),
-	    join(",",map {  "$_->[0]:$_->[1]" } @{$hash->{subjectAltNames} || []}),
-	);
-
-	if ( my ($clone,$key) = _get_cached($self,$clone_key) ) {
-	    return ($clone,$key);
-	}
     }
 
     # create new certificate based on original
     my ($clone,$key) = CERT_create(
-	%$hash,
+	%{ CERT_asHash($old_cert) },
+	serial => $self->{serial}++,
 	issuer_cert => $self->{cacert},
 	issuer_key => $self->{cakey},
 	key => $self->{certkey},
