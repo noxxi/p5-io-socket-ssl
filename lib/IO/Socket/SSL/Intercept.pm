@@ -6,7 +6,7 @@ use Carp 'croak';
 use IO::Socket::SSL::Utils;
 use Net::SSLeay;
 
-our $VERSION = '0.02';
+our $VERSION = '1.93';
 
 sub new {
     my ($class,%args) = @_;
