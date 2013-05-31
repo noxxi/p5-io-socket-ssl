@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.92';
+our $VERSION = '1.93';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -800,11 +800,7 @@ sub sysread {
 
 sub peek {
     my $self = shift;
-    if (Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x0090601f) {
-	return $self->generic_read(\&Net::SSLeay::peek, @_);
-    } else {
-	return $self->error("SSL_peek not supported for OpenSSL < v0.9.6a");
-    }
+    return $self->generic_read(\&Net::SSLeay::peek, @_);
 }
 
 
@@ -922,25 +918,6 @@ sub readline {
     }
 
     my ($delim0,$delim1) = $/ eq '' ? ("\n\n","\n"):($/,'');
-
-    if ( Net::SSLeay::OPENSSL_VERSION_NUMBER() < 0x0090601f ) {
-	# no usable peek - need to read byte after byte
-	die "empty \$/ is not supported if I don't have peek" if $delim1 ne '';
-	my $buf = '';
-	while (1) {
-	    my $rv = $self->sysread($buf,1,length($buf));
-	    if ( ! defined $rv ) {
-		next if $!{EINTR};                     # retry
-		last if $!{EAGAIN} || $!{EWOULDBLOCK}; # use everything so far
-		return;                                # return error
-	    } elsif ( ! $rv ) {
-		last
-	    }
-	    index($buf,$delim0) >= 0 and last;
-	}
-	return $buf;
-    }
-
 
     # find first occurrence of $delim0 followed by as much as possible $delim1
     my $buf = '';
@@ -1677,22 +1654,18 @@ sub new {
     }
 
     if ($arg_hash->{'SSL_check_crl'}) {
-	if (Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x0090702f) {
-	    Net::SSLeay::X509_STORE_set_flags(
-		Net::SSLeay::CTX_get_cert_store($ctx),
-		Net::SSLeay::X509_V_FLAG_CRL_CHECK()
-	    );
-	    if ($arg_hash->{'SSL_crl_file'}) {
-		my $bio = Net::SSLeay::BIO_new_file($arg_hash->{'SSL_crl_file'}, 'r');
-		my $crl = Net::SSLeay::PEM_read_bio_X509_CRL($bio);
-		if ( $crl ) {
-		    Net::SSLeay::X509_STORE_add_crl(Net::SSLeay::CTX_get_cert_store($ctx), $crl);
-		} else {
-		    return IO::Socket::SSL->error("Invalid certificate revocation list");
-		}
+	Net::SSLeay::X509_STORE_set_flags(
+	    Net::SSLeay::CTX_get_cert_store($ctx),
+	    Net::SSLeay::X509_V_FLAG_CRL_CHECK()
+	);
+	if ($arg_hash->{'SSL_crl_file'}) {
+	    my $bio = Net::SSLeay::BIO_new_file($arg_hash->{'SSL_crl_file'}, 'r');
+	    my $crl = Net::SSLeay::PEM_read_bio_X509_CRL($bio);
+	    if ( $crl ) {
+		Net::SSLeay::X509_STORE_add_crl(Net::SSLeay::CTX_get_cert_store($ctx), $crl);
+	    } else {
+		return IO::Socket::SSL->error("Invalid certificate revocation list");
 	    }
-	} else {
-	    return IO::Socket::SSL->error("CRL not supported for OpenSSL < v0.9.7b");
 	}
     }
 

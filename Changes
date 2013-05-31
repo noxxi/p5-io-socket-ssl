@@ -1,3 +1,8 @@
+v1.93 2013.05.31
+- need at least OpenSSL version 0.9.8 now, since last 0.9.7 was released 6
+  years ago. Remove code to work around older releases.
+- changed AUTHOR in Makefile.PL from array back to string, because the
+  array feature is not available in MakeMaker shipped with 5.8.9 (RT#85739)
 v1.92 2013.05.30
 - Intercept: use sha1-fingerprint of original cert for id into cache unless 
   otherwise given

@@ -46,6 +46,16 @@ $| = 1;
     }
 }
 
+{
+    # don't support too old OpenSSL versions anymore, only causes trouble
+    my $openssl = eval { 
+	require Net::SSLeay; 
+	Net::SSLeay::OPENSSL_VERSION_NUMBER()
+    };
+    die "minimal required version for OpenSSL is 0.9.8"
+	if $openssl < 0x00908000;
+}
+
 # make sure that we have dualvar from the XS Version of Scalar::Util
 if ( eval { require Scalar::Util } ) {
     eval { Scalar::Util::dualvar( 0,'' ) };
@@ -71,11 +81,7 @@ EOM
 WriteMakefile(
     'NAME' => 'IO::Socket::SSL',
     'ABSTRACT' => 'Nearly transparent SSL encapsulation for IO::Socket::INET.',
-    'AUTHOR' => [ 
-	'Steffen Ullrich <sullr@cpan.org>',
-	'Peter Behroozi',
-	'Marko Asplund' 
-    ],
+    'AUTHOR' => "Steffen Ullrich <sullr@cpan.org>, Peter Behroozi, Marko Asplund",
     'LICENSE' => 'perl',
     'DISTNAME' => 'IO-Socket-SSL',
     'META_MERGE' => {
