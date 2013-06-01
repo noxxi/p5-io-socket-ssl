@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.93';
+our $VERSION = '1.94';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();

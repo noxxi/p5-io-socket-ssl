@@ -1,3 +1,6 @@
+v1.94 2013.06.01
+- Makefile.PL reported wrong version of openssl, if Net::SSLeay was not
+  installed instead of reporting missing dependency to Net::SSLeay.
 v1.93 2013.05.31
 - need at least OpenSSL version 0.9.8 now, since last 0.9.7 was released 6
   years ago. Remove code to work around older releases.

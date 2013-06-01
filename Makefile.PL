@@ -54,7 +54,7 @@ $| = 1;
     };
     die sprintf(
 	"minimal required version for OpenSSL is 0.9.8, but your Net::SSLeay reports 0x%08x",
-	$openssl) if $openssl < 0x00908000;
+	$openssl) if $openssl && $openssl < 0x00908000;
 }
 
 # make sure that we have dualvar from the XS Version of Scalar::Util
