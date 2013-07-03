@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.94';
+our $VERSION = '1.950';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -41,17 +41,23 @@ my %DEFAULT_SSL_ARGS = (
     SSL_npn_protocols => undef,    # meaning depends whether on server or client side
     SSL_honor_cipher_order => 0,   # client order gets preference
     SSL_cipher_list => 'ALL:!LOW',
+);
 
-    # default for SSL_verify_mode should be SSL_VERIFY_PEER for client
-    # for now we keep the default of SSL_VERIFY_NONE but complain, if 
-    # somebody uses this implicit default
-    # SSL_verify_mode => undef,  # set to undef to enable secure default
-    SSL_verify_mode => SSL_VERIFY_NONE,
+my %DEFAULT_SSL_CLIENT_ARGS = (
+    %DEFAULT_SSL_ARGS,
+    SSL_verify_mode => SSL_VERIFY_PEER
+);
+
+my %DEFAULT_SSL_SERVER_ARGS = (
+    %DEFAULT_SSL_ARGS,
+    SSL_verify_mode => SSL_VERIFY_NONE
 );
 
 # global defaults which can be changed using set_defaults
 # either key/value can be set or it can just be set to an external hash
 my $GLOBAL_SSL_ARGS = {};
+my $GLOBAL_SSL_CLIENT_ARGS = {};
+my $GLOBAL_SSL_SERVER_ARGS = {};
 
 # non-XS Versions of Scalar::Util will fail
 BEGIN{
@@ -281,8 +287,9 @@ sub configure_SSL {
     # add user defined defaults
     %$arg_hash = ( 
 	%$GLOBAL_SSL_ARGS, 
+	$is_server ? %$GLOBAL_SSL_SERVER_ARGS : %$GLOBAL_SSL_CLIENT_ARGS,
 	%$arg_hash 
-    ) if %$GLOBAL_SSL_ARGS;
+    );
 
     # common problem forgetting to set SSL_use_cert
     # if client cert is given by user but SSL_use_cert is undef, assume that it
@@ -298,33 +305,8 @@ sub configure_SSL {
 	Proto => 'tcp',
 	SSL_server => $is_server,
 	SSL_use_cert => $is_server,
-	%DEFAULT_SSL_ARGS,
+	$is_server ? %DEFAULT_SSL_SERVER_ARGS : %DEFAULT_SSL_CLIENT_ARGS,
     );
-
-    # make default secure, unless it was set different before
-    $default_args{SSL_verify_mode} = $is_server ? SSL_VERIFY_NONE : SSL_VERIFY_PEER
-	if ! defined $default_args{SSL_verify_mode};
-
-    # complain if SSL_verify_mode is SSL_VERIFY_NONE for client unless it 
-    # was explicitly set this way. In the future the default will change 
-    # to verify the server certificate and apps, which don't provide 
-    # the necessary credentials should fail
-    if ( ! $is_server 
-	and ! $arg_hash->{SSL_reuse_ctx} 
-	and ! exists $arg_hash->{SSL_verify_mode} 
-	and $default_args{SSL_verify_mode} == SSL_VERIFY_NONE ) {
-	carp(
-	    "*******************************************************************\n".
-	    " Using the default of SSL_verify_mode of SSL_VERIFY_NONE for client\n".
-	    " is deprecated! Please set SSL_verify_mode to SSL_VERIFY_PEER\n".
-	    " together with SSL_ca_file|SSL_ca_path for verification.\n".
-	    " If you really don't want to verify the certificate and keep the\n".
-	    " connection open to Man-In-The-Middle attacks please set\n".
-	    " SSL_verify_mode explicitly to SSL_VERIFY_NONE in your application.\n".
-	    "*******************************************************************\n".
-	    " "
-	);
-    }
 
     # add defaults to arg_hash
     %$arg_hash = ( %default_args, %$arg_hash );
@@ -343,7 +325,26 @@ sub configure_SSL {
 	    }
 	    $use_default = 0;
 	}
+
+	$use_default = 0 if $use_default and
+	    ! $is_server && $arg_hash->{SSL_verify_mode} == SSL_VERIFY_NONE
+	    || $arg_hash->{SSL_reuse_ctx};
+
 	if ( $use_default ) {
+
+	    carp(
+		"*******************************************************************\n".
+		" The implicite use of IO::Socket::SSL specific default settings for \n".
+		" CA, cert and key is depreceated.\n".
+		" Please explicitly specify your own CA, cert and key using:\n".
+		"    - SSL_ca_file or SSL_ca_path for the CA\n".
+		"    - SSL_cert_file and SSL_key_file for cert and key\n".
+		" To specify your own system wide defaults you can use \n".
+		" set_defaults, set_client_defaults and set_server_defaults.\n".
+		"*******************************************************************\n".
+		" "
+	    );
+
 	    my %ca = 
 		-f 'certs/my-ca.pem' ? ( SSL_ca_file => 'certs/my-ca.pem' ) :
 		-d 'ca/' ? ( SSL_ca_path => 'ca/' ) :
@@ -356,6 +357,7 @@ sub configure_SSL {
 		SSL_cert_file => 'certs/client-cert.pem',
 	    );
 	    %$arg_hash = ( %$arg_hash, %ca, %certs );
+
 	} else {
 	    for(qw(SSL_cert_file SSL_key_file)) {
 		defined( my $file = $arg_hash->{$_} ) or next;
@@ -1466,6 +1468,20 @@ sub set_defaults {
 { # deprecated API
     no warnings;
     *set_ctx_defaults = \&set_defaults; 
+}
+sub set_client_defaults {
+    my %args = @_;
+    while ( my ($k,$v) = each %args ) {
+	$k =~s{^(SSL_)?}{SSL_};
+	$GLOBAL_SSL_CLIENT_ARGS->{$k} = $v;
+    }
+}
+sub set_server_defaults {
+    my %args = @_;
+    while ( my ($k,$v) = each %args ) {
+	$k =~s{^(SSL_)?}{SSL_};
+	$GLOBAL_SSL_SERVER_ARGS->{$k} = $v;
+    }
 }
 
 sub next_proto_negotiated {
@@ -2615,6 +2631,14 @@ the context, like the SSL_verify* parameter.
 If not given and scheme is hash reference with key callback it will be set to 'unknown'
 
 =back
+
+=item B<IO::Socket::SSL::set_client_defaults(%args)>
+
+Similar to C<set_defaults>, but only sets the defaults for client mode.
+
+=item B<IO::Socket::SSL::set_server_defaults(%args)>
+
+Similar to C<set_defaults>, but only sets the defaults for server mode.
 
 =back
 

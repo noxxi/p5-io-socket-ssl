@@ -62,10 +62,12 @@ unless (fork) {
 }
 
 my $contact = $server->accept;
-
-IO::Socket::SSL::socketToSSL($contact,
-			     {SSL_server => 1,
-			      SSL_verify_mode => 0}) || print "not ";
+IO::Socket::SSL::socketToSSL($contact, {
+    SSL_server => 1,
+    SSL_verify_mode => 0,
+    SSL_cert_file => 'certs/server-cert.pem',
+    SSL_key_file => 'certs/server-key.pem',
+}) || print "not ";
 print "ok\n";
 <$contact>;
 close $contact;

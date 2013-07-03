@@ -1,3 +1,16 @@
+1.950 2013/7/3 
+- MAJOR BEHAVIOR CHANGE:
+  ssl_verify_mode now defaults to verify_peer for client.
+  Until now it used verify_none, but loudly complained since 1.79 about it.
+  It will not complain any longer, but the connection might probably fail.
+  Please don't simply disable ssl verification, but instead set SSL_ca_file
+  etc so that verification succeeds!
+- MAJOR BEHAVIOR CHANGE:
+  it will now complain if the builtin defaults of certs/my-ca.pem or ca/
+  for CA and certs/{server,client}-{key,cert}.pem for cert and key are used,
+  e.g. no certificates are specified explicitly.
+  In the future these insecure (relative path!) defaults will be removed
+  and the CA replaced with the system defaults.
 v1.94 2013.06.01
 - Makefile.PL reported wrong version of openssl, if Net::SSLeay was not
   installed instead of reporting missing dependency to Net::SSLeay.

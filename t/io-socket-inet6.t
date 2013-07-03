@@ -10,7 +10,6 @@ use Socket;
 use IO::Socket::SSL;
 use strict;
 
-
 if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
     print "1..0 # Skipped: fork not implemented on this platform\n";
     exit
@@ -75,9 +74,10 @@ if ( !defined $pid ) {
     close($server);
     my $to_server = IO::Socket::SSL->new( 
 	PeerAddr => $addr, 
-	SSL_verify_mode => 0 ) || do {
+	SSL_verify_mode => 0,
+    ) || do {
     	notok( "connect failed: ".IO::Socket::SSL->errstr() );
-		exit
+	exit
     };
     ok( "client connected" );
 

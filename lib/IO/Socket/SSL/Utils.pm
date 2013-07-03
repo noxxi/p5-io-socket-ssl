@@ -190,7 +190,8 @@ sub CERT_create {
 	# 0x1000 = MBSTRING_UTF8
 	Net::SSLeay::X509_NAME_add_entry_by_txt($subj_e, 
 	    $k, 0x1000, $v, -1, 0)
-	    or croak("failed to add entry for $k");
+	    or croak("failed to add entry for $k - ". 
+	    Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error()));
     }
 
     my @ext = (

@@ -21,6 +21,8 @@ END { kill 9,@pid }
 my $server = IO::Socket::SSL->new(
     LocalAddr => $SSL_SERVER_ADDR,
     LocalPort => 0,
+    SSL_cert_file => 'certs/server-cert.pem',
+    SSL_key_file => 'certs/server-key.pem',
     Listen => 10,
     Reuse => 1,
 );

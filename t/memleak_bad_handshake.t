@@ -33,6 +33,8 @@ if ( ! getsize($$) ) {
 my $server = IO::Socket::SSL->new(
 	LocalAddr => $SSL_SERVER_ADDR,
 	Listen => 200,
+	SSL_cert_file => 'certs/server-cert.pem',
+	SSL_key_file => 'certs/server-key.pem',
 	ReuseAddr => 1,
 );
 my $addr = $SSL_SERVER_ADDR.':'.$server->sockport;
