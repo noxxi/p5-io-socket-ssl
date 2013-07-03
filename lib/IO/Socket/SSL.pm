@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.950';
+our $VERSION = '1.951';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -332,6 +332,19 @@ sub configure_SSL {
 
 	if ( $use_default ) {
 
+	    my %ca = 
+		-f 'certs/my-ca.pem' ? ( SSL_ca_file => 'certs/my-ca.pem' ) :
+		-d 'ca/' ? ( SSL_ca_path => 'ca/' ) :
+		();
+	    my %certs = $is_server ? (
+		SSL_key_file => 'certs/server-key.pem',
+		SSL_cert_file => 'certs/server-cert.pem',
+	    ) : $arg_hash->{SSL_use_cert} ? (
+		SSL_key_file => 'certs/client-key.pem',
+		SSL_cert_file => 'certs/client-cert.pem',
+	    ) :();
+	    %$arg_hash = ( %$arg_hash, %ca, %certs );
+
 	    carp(
 		"*******************************************************************\n".
 		" The implicite use of IO::Socket::SSL specific default settings for \n".
@@ -343,20 +356,8 @@ sub configure_SSL {
 		" set_defaults, set_client_defaults and set_server_defaults.\n".
 		"*******************************************************************\n".
 		" "
-	    );
+	    ) if %ca or %certs;
 
-	    my %ca = 
-		-f 'certs/my-ca.pem' ? ( SSL_ca_file => 'certs/my-ca.pem' ) :
-		-d 'ca/' ? ( SSL_ca_path => 'ca/' ) :
-		();
-	    my %certs = $is_server ? (
-		SSL_key_file => 'certs/server-key.pem',
-		SSL_cert_file => 'certs/server-cert.pem',
-	    ) : (
-		SSL_key_file => 'certs/client-key.pem',
-		SSL_cert_file => 'certs/client-cert.pem',
-	    );
-	    %$arg_hash = ( %$arg_hash, %ca, %certs );
 
 	} else {
 	    for(qw(SSL_cert_file SSL_key_file)) {
@@ -1662,11 +1663,15 @@ sub new {
     }
 
     my $verify_mode = $arg_hash->{SSL_verify_mode};
-    if ( $verify_mode != Net::SSLeay::VERIFY_NONE() and
-	( defined $arg_hash->{SSL_ca_file} || defined $arg_hash->{SSL_ca_path}) and
-	! Net::SSLeay::CTX_load_verify_locations(
-	    $ctx, $arg_hash->{SSL_ca_file} || '',$arg_hash->{SSL_ca_path} || '') ) {
-	return IO::Socket::SSL->error("Invalid certificate authority locations");
+    if ( $verify_mode != Net::SSLeay::VERIFY_NONE()) {
+	if ( defined $arg_hash->{SSL_ca_file} || defined $arg_hash->{SSL_ca_path} ) {
+	    return IO::Socket::SSL->error("Invalid certificate authority locations")
+		if ! Net::SSLeay::CTX_load_verify_locations( $ctx, 
+		    $arg_hash->{SSL_ca_file} || '',$arg_hash->{SSL_ca_path} || '');
+	} else {
+	    # no CA path given, continue with system defaults
+	    Net::SSLeay::CTX_set_default_verify_paths($ctx);
+	}
     }
 
     if ($arg_hash->{'SSL_check_crl'}) {
@@ -2110,64 +2115,43 @@ Set this option to a true value, if the socket should be used as a server.
 If this is not explicitly set it is assumed, if the Listen parameter is given
 when creating the socket.
 
-=item SSL_cert_file
+=item SSL_cert_file | SSL_cert | SSL_key_file | SSL_key
 
-If your SSL certificate is not in the default place (F<certs/server-cert.pem> for servers,
-F<certs/client-cert.pem> for clients), then you should use this option to specify the
-location of your certificate.  
-A certificate is usually needed for an SSL server, but might also be needed, if
-the client should authorize itself with a certificate.
+If you create a server you usually need to specify a server certificate which
+should be verified by the client. Same is true for client certificates, which
+should be verified by the server.
+The certificate can be given as a file in PEM format with SSL_cert_file or 
+as an internal representation of a X509* object with SSL_cert.
+
+For each certificate a key is need, which can either be given as a file in PEM
+format with SSL_key_file or as an internal representation of a EVP_PKEY* object
+with SSL_key.
 
 If your SSL server should be able to use different certificates on the same IP
 address, depending on the name given by SNI, you can use a hash reference
 instead of a file with C<<hostname => cert_file>>.
 
+In case certs and keys are needed but not given it might fall back to builtin
+defaults, see "Defaults for Cert, Key and CA".
+
 Examples:
 
- SSL_cert_file => 'mycert.pem'
+ SSL_cert_file => 'mycert.pem',
+ SSL_key_file => 'mykey.pem',
 
  SSL_cert_file => {
-    "foo.example.org" => 'foo.pem',
-    "bar.example.org" => 'bar.pem',
+    "foo.example.org" => 'foo-cert.pem',
+    "bar.example.org" => 'bar-cert.pem',
     # used when nothing matches or client does not support SNI
-    '' => 'default.pem', 
+    '' => 'default-cert.pem', 
+ }
+ SSL_key_file => {
+    "foo.example.org" => 'foo-key.pem',
+    "bar.example.org" => 'bar-key.pem',
+    # used when nothing matches or client does not support SNI
+    '' => 'default-key.pem', 
  }
 
-=item SSL_cert
-
-This option can be used instead of C<SSL_cert_file> to specify the certificate.
-
-Instead with a file the certificate is given as an X509* object or array of
-X509* objects, where the first X509* is the internal representation of the
-certificate while the following ones are extra certificates.
-The option is useful if you create your certificate dynamically (like in a SSL
-intercepting proxy) or get it from a string (see openssl PEM_read_bio_X509 etc
-for getting a X509* from a string).
-
-For SNI support a hash reference can be given, similar to the
-C<SSL_cert_file> option.
-
-=item SSL_key_file
-
-If your RSA private key is not in default place (F<certs/server-key.pem> for servers,
-F<certs/client-key.pem> for clients), then this is the option that you would use to
-specify a different location.  Keys should be PEM formatted, and if they are
-encrypted, you will be prompted to enter a password before the socket is formed
-(unless you specified the SSL_passwd_cb option).
-
-For SNI support a hash reference can be given, similar to the
-C<SSL_cert_file> option.
-
-=item SSL_key
-
-This option can be used instead of C<SSL_key> to specify the certificate.
-Instead of a file an EVP_PKEY* should be given.
-This option is useful if you don't have your key in a file but create it
-dynamically or get it from a string (see openssl PEM_read_bio_PrivateKey etc
-for getting a EVP_PKEY* from a string).
-
-For SNI support a hash reference can be given, similar to the
-C<SSL_key> option.
 
 =item SSL_dh_file
 
@@ -2184,22 +2168,16 @@ If your private key is encrypted, you might not want the default password prompt
 Net::SSLeay.  This option takes a reference to a subroutine that should return the
 password required to decrypt your private key.
 
-=item SSL_ca_file
+=item SSL_ca_file | SSL_ca_path
 
-If you want to verify that the peer certificate has been signed by a reputable
-certificate authority, then you should use this option to locate the file
-containing the certificateZ<>(s) of the reputable certificate authorities if it is
-not already in the file F<certs/my-ca.pem>.
-If you definitely want no SSL_ca_file used you should set it to undef.
-
-=item SSL_ca_path
-
-If you are unusually friendly with the OpenSSL documentation, you might have set
-yourself up a directory containing several trusted certificates as separate files
-as well as an index of the certificates.  If you want to use that directory for
-validation purposes, and that directory is not F<ca/>, then use this option to
-point IO::Socket::SSL to the right place to look.
-If you definitely want no SSL_ca_path used you should set it to undef.
+Usually you want to verify that the peer certificate has been signed by a
+trusted certificate authority. In this case you should use this option to
+specify the file (SSL_ca_file) or directory (SSL_ca_path) containing the
+certificateZ<>(s) of the trusted certificate authorities.
+If both SSL_ca_file and SSL_ca_path are undefined and not builtin defaults (see
+"Defaults for Cert, Key and CA".) can be used, it will try to use the system
+defaults used built into the OpenSSL library.
+If you really don't want to set a CA set this key to C<''>.
 
 =item SSL_verify_mode
 
@@ -2210,11 +2188,7 @@ SSL_VERIFY_CLIENT_ONCE (verify client once; ignored for clients).
 See OpenSSL man page for SSL_CTX_set_verify for more information.
 
 The default is SSL_VERIFY_NONE for server  (e.g. no check for client
-certificate).
-For historical reasons the default for client is currently also SSL_VERIFY_NONE,
-but this will change to SSL_VERIFY_PEER in the near future. To aid transition a
-warning is issued if the client is used with the default SSL_VERIFY_NONE, unless
-SSL_verify_mode was explicitly set by the application.
+certificate) and SSL_VERIFY_PEER for client (check server certificate).
 
 =item SSL_verify_callback
 
@@ -2667,6 +2641,35 @@ calls to these functions will fail, telling you to use the print/printf/syswrite
 and read/sysread families instead.
 
 =back
+
+=head2 Defaults for Cert, Key and CA
+
+Only if no SSL_key*, no SSL_cert* and no SSL_ca* options are given it will fall
+back to the following builtin defaults:
+
+=over 4
+
+=item SSL_cert_file
+
+Depending on the SSL_server setting it will be either C<certs/server-cert.pem>
+or C<certs/client-cert.pem>.
+
+=item SSL_key_file
+
+Depending on the SSL_server setting it will be either C<certs/server-key.pem>
+or C<certs/client-key.pem>.
+
+=item SSL_ca_file | SSL_ca_path
+
+It will set SSL_ca_file to C<certs/my-ca.pem> if it exist.
+Otherwise it will set SSL_ca_path to C<ca/> if it exist.
+
+=back
+
+B<Please note, that these defaults are depreciated and will be removed in the
+near future>, e.g. you should specify all the certificates and keys you use.
+If you don't specify a CA file or path it will fall back to the system default
+built into OpenSSL.
 
 =head1 ERROR HANDLING
 
