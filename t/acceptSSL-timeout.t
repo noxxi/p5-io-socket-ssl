@@ -42,7 +42,12 @@ sub server {
 	print "Waiting\n";
 	my $client = $server->accept || die "accept failed: $!";
 	print "Connect from ".$client->peerhost.':'.$client->peerport."\n";
-	if ( IO::Socket::SSL->start_SSL( $client, SSL_server => 1, Timeout => 5 )) {
+	if ( IO::Socket::SSL->start_SSL( $client,
+		SSL_server => 1,
+		Timeout => 5,
+		SSL_cert_file => 'certs/server-cert.pem',
+		SSL_key_file => 'certs/server-key.pem',
+	)) {
 		print "SSL Handshake OK\n";
 		print $client "Hi!\n";
 	} else {
