@@ -48,7 +48,7 @@ sub PEM_string2cert {
 sub PEM_cert2string {
     my $cert = shift;
     return Net::SSLeay::PEM_get_string_X509($cert)
-	or croak("cannot get string from cert");
+	|| croak("cannot get string from cert");
 }
 
 sub PEM_file2key {
@@ -84,7 +84,7 @@ sub PEM_string2key {
 sub PEM_key2string {
     my $key = shift;
     return Net::SSLeay::PEM_get_string_PrivateKey($key)
-	or croak("cannot get string from key");
+	|| croak("cannot get string from key");
 }
 
 sub CERT_free {

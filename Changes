@@ -1,3 +1,6 @@
+1.953 2013/7/22
+- fixes to IO::Socket::SSL::Utils, thanks to rurban[AT]x-ray[DOT]at,
+  RT#87052
 1.952 2013/7/11
 - fix t/acceptSSL-timeout.t on Win32, RT#86862
 1.951 2013/7/3 
