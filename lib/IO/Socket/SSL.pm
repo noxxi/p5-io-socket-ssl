@@ -1938,7 +1938,7 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
 
 	# easy hostname verification 
 	SSL_verifycn_name => 'foo.bar', # defaults to PeerHost
-	SSL_verifycn_schema => 'http',
+	SSL_verifycn_scheme => 'http',
 
 	# SNI support
 	SSL_hostname => 'foo.bar', # defaults to PeerHost
