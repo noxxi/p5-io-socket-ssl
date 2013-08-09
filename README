@@ -4,17 +4,7 @@ interface to SSL sockets. The class is a descendent of
 IO::Socket::INET.
 
 In order to use IO::Socket::SSL you need to have Net::SSLeay
-v1.21 or newer installed but at least version 1.30 is recommended
-to support features like session caching.
-
-To support the checks for common name and subject alternative
-names (verify_hostname_of_cert) you need at least Net::SSLeay
-version 1.33. Unfortunatly this version was not yet released
-at the time IO::Socket::SSL version 1.14 was released, so you
-might try the release Net::SSLeay 1.33_01 or better use the most
-current version from SVN at svn://svn.debian.org/net-ssleay/
-because 1.33_01 still contained critical bugs (see 
-http://svn.debian.org/wsvn/net-ssleay/?rev=222&sc=1)
+v1.46 or newer installed.
 
 For those who do not have a built-in random number generator
 (including most users of Solaris), you should install one
