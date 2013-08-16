@@ -1158,6 +1158,9 @@ sub new_from_fd {
     # Annoying workaround for Perl 5.6.1 and below:
     $handle = $ISA[0]->new_from_fd($handle, '+<');
 
+    # IO::Socket::INET6 expects io_socket_domain is correctly set to determine INET or INET6.
+    ${*$handle}{'io_socket_domain'} = ${*$fd}{'io_socket_domain'} if ref $fd && exists ${*$fd}{'io_socket_domain'};
+
     return $class->start_SSL($handle, @_);
 }
 
