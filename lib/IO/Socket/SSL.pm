@@ -14,7 +14,7 @@
 package IO::Socket::SSL;
 
 use IO::Socket;
-use Net::SSLeay 1.21;
+use Net::SSLeay 1.46;
 use Exporter ();
 use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
