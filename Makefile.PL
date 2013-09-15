@@ -1,7 +1,7 @@
 # vim: set sts=4 sw=4 ts=8 ai:
 
 use 5.008; 
-use ExtUtils::MakeMaker 6.46;
+use ExtUtils::MakeMaker;
 
 
 # Test to make sure that Net::SSLeay can be properly seeded!
@@ -85,18 +85,20 @@ WriteMakefile(
     'AUTHOR' => "Steffen Ullrich <sullr@cpan.org>, Peter Behroozi, Marko Asplund",
     'LICENSE' => 'perl',
     'DISTNAME' => 'IO-Socket-SSL',
-    'META_MERGE' => {
-	resources => {
-	    license     => 'http://dev.perl.org/licenses/',
-	    repository  => 'https://github.com/noxxi/p5-io-socket-ssl',
-	    homepage    => 'https://github.com/noxxi/p5-io-socket-ssl',
-	    bugtracker  => 'https://rt.cpan.org/Dist/Display.html?Queue=IO-Socket-SSL',
-	},
-    },
     'VERSION_FROM' => 'lib/IO/Socket/SSL.pm',
     'PREREQ_PM' => {
 	'Net::SSLeay' => 1.46,
 	'Scalar::Util' => 0,
     },
     'dist' => { COMPRESS => 'gzip', SUFFIX => 'gz', },
+    $ExtUtils::MakeMaker::VERSION >= 6.46 ? (
+	'META_MERGE' => {
+	    resources => {
+		license     => 'http://dev.perl.org/licenses/',
+		repository  => 'https://github.com/noxxi/p5-io-socket-ssl',
+		homepage    => 'https://github.com/noxxi/p5-io-socket-ssl',
+		bugtracker  => 'https://rt.cpan.org/Dist/Display.html?Queue=IO-Socket-SSL',
+	    },
+	},
+    ):(),
 );

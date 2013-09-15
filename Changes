@@ -1,3 +1,6 @@
+1.954 2013/9/15
+- accept older versions of ExtUtils::MakeMaker and add meta information
+  like link to repository only for newer versions.
 1.953 2013/7/22
 - fixes to IO::Socket::SSL::Utils, thanks to rurban[AT]x-ray[DOT]at,
   RT#87052
