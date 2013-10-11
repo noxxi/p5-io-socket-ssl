@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.954';
+our $VERSION = '1.955';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -1377,7 +1377,7 @@ sub get_cipher {
 
 sub errstr {
     my $self = shift;
-    return ((ref($self) ? ${*$self}{'_SSL_last_err'} : $SSL_ERROR) or '');
+    return (ref($self) ? ${*$self}{'_SSL_last_err'} : $SSL_ERROR) || '';
 }
 
 sub fatal_ssl_error {
@@ -1596,8 +1596,9 @@ sub new {
 	return $ctx_object if ($ctx_object = ${*$ctx_object}{'_SSL_ctx'});
     }
 
+    my $ssl_op = Net::SSLeay::OP_ALL();
+
     my $ver;
-    my $disable_ver = 0;
     for (split(/\s*:\s*/,$arg_hash->{SSL_version})) {
 	m{^(!?)(?:(SSL(?:v2|v3|v23|v2/3))|(TLSv1[12]?))$}i 
 	or croak("invalid SSL_version specified");
@@ -1605,7 +1606,7 @@ sub new {
 	( my $v = lc($2||$3) ) =~s{^(...)}{\U$1};
 	$v =~s{/}{}; # interpret SSLv2/3 as SSLv23
 	if ( $not ) {
-	    $disable_ver |= 
+	    $ssl_op |= 
 		$v eq 'SSLv2'  ? 0x01000000 : # SSL_OP_NO_SSLv2 
 		$v eq 'SSLv3'  ? 0x02000000 : # SSL_OP_NO_SSLv3 
 		$v eq 'TLSv1'  ? 0x04000000 : # SSL_OP_NO_TLSv1
@@ -1628,10 +1629,10 @@ sub new {
     my $ctx = $ctx_new_sub->() or return 
 	IO::Socket::SSL->error("SSL Context init failed");
 
-    Net::SSLeay::CTX_set_options($ctx, Net::SSLeay::OP_ALL() | $disable_ver );
-    if ( $arg_hash->{SSL_honor_cipher_order} ) {
-	Net::SSLeay::CTX_set_options($ctx, 0x00400000);
-    }
+    # SSL_OP_CIPHER_SERVER_PREFERENCE
+    $ssl_op |= 0x00400000 if $arg_hash->{SSL_honor_cipher_order};
+
+    Net::SSLeay::CTX_set_options($ctx,$ssl_op);
 
     # if we don't set session_id_context if client certificate is expected
     # client session caching will fail
@@ -1776,6 +1777,25 @@ sub new {
 	    my $rv = Net::SSLeay::CTX_set_tmp_dh( $ctx,$dh );
 	    Net::SSLeay::DH_free( $dh );
 	    $rv || return IO::Socket::SSL->error( "Failed to set DH from $f" );
+	}
+
+	if ( my $curve = $arg_hash->{SSL_ecdh_curve} ) {
+	    return IO::Socket::SSL->error(
+		"ECDH curve needs Net::SSLeay>=1.56 and OpenSSL>=1.0")
+		if ! defined( &Net::SSLeay::CTX_set_tmp_ecdh );
+	    if ( $curve !~ /^\d+$/ ) {
+		# name of curve, find NID
+		$curve = Net::SSLeay::OBJ_txt2nid($curve) 
+		    || return IO::Socket::SSL->error(
+		    "cannot find NID for curve name '$curve'");
+	    }
+	    my $ecdh = Net::SSLeay::EC_KEY_new_by_curve_name($curve) or 
+		return IO::Socket::SSL->error(
+		"cannot create curve for NID $curve");
+	    Net::SSLeay::CTX_set_tmp_ecdh($ctx,$ecdh) or
+		return IO::Socket::SSL->error(
+		"failed to set ECDH curve context");
+	    Net::SSLeay::EC_KEY_free($ecdh);
 	}
     }
 
@@ -2157,10 +2177,19 @@ Examples:
 
 If you want Diffie-Hellman key exchange you need to supply a suitable file here
 or use the SSL_dh parameter. See dhparam command in openssl for more information.
+To create a server which provides perfect forward secrecy you need to either
+give the DH parameters or (better, because faster) the ECDH curve.
 
 =item SSL_dh
 
 Like SSL_dh_file, but instead of giving a file you use a preloaded or generated DH*.
+
+=item SSL_ecdh_curve
+
+If you want Elliptic Curve Diffie-Hellmann key exchange you need to supply the
+OID or NID of a suitable curve (like 'prime256v1') here.
+To create a server which provides perfect forward secrecy you need to either
+give the DH parameters or (better, because faster) the ECDH curve.
 
 =item SSL_passwd_cb
 

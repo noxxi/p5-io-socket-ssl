@@ -12,6 +12,7 @@ certs/server-wildcard.pem
 certs/test-ca.pem
 Changes
 docs/debugging.txt
+docs/net-ssley-ecdh.patch
 example/async_https_server.pl
 example/lwp-with-verifycn.pl
 example/ssl_client.pl
@@ -50,4 +51,5 @@ t/testlib.pl
 t/verify_hostname.t
 t/sni.t
 t/mitm.t
+t/ecdhe.t
 util/export_certs.pl

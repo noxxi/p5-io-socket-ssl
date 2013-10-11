@@ -1,0 +1,40 @@
+Index: typemap
+===================================================================
+--- typemap	(revision 382)
++++ typemap	(working copy)
+@@ -6,6 +6,7 @@
+ SSL *		T_PTR
+ RSA *		T_PTR
+ DH *		T_PTR
++EC_KEY *        T_PTR
+ const X509 *        T_PTR
+ const X509_CRL *    T_PTR
+ const X509_REQ *    T_PTR
+Index: SSLeay.xs
+===================================================================
+--- SSLeay.xs	(revision 382)
++++ SSLeay.xs	(working copy)
+@@ -4127,6 +4127,23 @@
+      SSL_CTX *	ctx
+      RSA *	rsa
+ 
++#if OPENSSL_VERSION_NUMBER > 0x10000000L
++
++EC_KEY *
++EC_KEY_new_by_curve_name(nid)
++    int nid
++
++void
++EC_KEY_free(key)
++    EC_KEY * key
++
++long
++SSL_CTX_set_tmp_ecdh(ctx,ecdh);
++     SSL_CTX *	ctx
++     EC_KEY  *	ecdh
++
++#endif
++
+ void *
+ SSL_get_app_data(s)
+      SSL *	s

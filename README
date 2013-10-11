@@ -6,6 +6,10 @@ IO::Socket::INET.
 In order to use IO::Socket::SSL you need to have Net::SSLeay
 v1.46 or newer installed.
 
+To use ECDH curves (needed for perfect forward secrecy) you need
+to use Net::SSLeay >= 1.56 (not released at time of writing) or
+patch Net::SSLeay yourself using docs/net-ssley-ecdh.patch.
+
 For those who do not have a built-in random number generator
 (including most users of Solaris), you should install one
 before attempting to install IO::Socket::SSL.  If you don't

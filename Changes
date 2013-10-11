@@ -1,3 +1,6 @@
+1.955 2013/10/11
+- support for perfect forward secrecy using ECDH, if the Net::SSLeay version
+  supports it.
 1.954 2013/9/15
 - accept older versions of ExtUtils::MakeMaker and add meta information
   like link to repository only for newer versions.
