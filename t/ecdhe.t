@@ -14,7 +14,7 @@ if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
 }
 
 if ( ! defined &Net::SSLeay::CTX_set_tmp_ecdh ) {
-    print "1..0 # no support for ecdh with this openssl/Net::SSLeay\n";
+    print "1..0 # Skipped: no support for ecdh with this openssl/Net::SSLeay\n";
     exit
 }
 
