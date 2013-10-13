@@ -282,7 +282,12 @@ sub configure {
 
 sub configure_SSL {
     my ($self, $arg_hash) = @_;
-    my $is_server = $arg_hash->{'SSL_server'} || $arg_hash->{'Listen'} || 0;
+
+    $arg_hash->{Proto} ||= 'tcp';
+    my $is_server = $arg_hash->{SSL_server};
+    if ( ! defined $is_server ) {
+	$is_server = $arg_hash->{SSL_server} = $arg_hash->{Listen} || 0;
+    }
 
     # add user defined defaults
     %$arg_hash = ( 
@@ -291,131 +296,22 @@ sub configure_SSL {
 	%$arg_hash 
     );
 
-    # common problem forgetting to set SSL_use_cert
-    # if client cert is given by user but SSL_use_cert is undef, assume that it
-    # should be set
-    if ( ! $is_server && ! defined $arg_hash->{SSL_use_cert}
-	&& ( grep { $arg_hash->{$_} } qw(SSL_cert SSL_cert_file))
-	&& ( grep { $arg_hash->{$_} } qw(SSL_key SSL_key_file)) ) {
-	$arg_hash->{SSL_use_cert} = 1
-    }
-
-    # library defaults
-    my %default_args = (
-	Proto => 'tcp',
-	SSL_server => $is_server,
-	SSL_use_cert => $is_server,
-	$is_server ? %DEFAULT_SSL_SERVER_ARGS : %DEFAULT_SSL_CLIENT_ARGS,
-    );
-
-    # add defaults to arg_hash
-    %$arg_hash = ( %default_args, %$arg_hash );
-
-    # use default path to certs and ca unless another one was given
-    # don't mix default path with user specified path, either we use all
-    # or no defaults
-    {
-	my $use_default = 1;
-	for (qw( SSL_cert SSL_cert_file SSL_key SSL_key_file SSL_ca_file SSL_ca_path )) {
-	    next if ! defined $arg_hash->{$_};
-	    # some apps set keys '' to signal that it is not set, replace with undef
-	    if ( $arg_hash->{$_} eq '' ) {
-		$arg_hash->{$_} = undef;
-		next;
-	    }
-	    $use_default = 0;
-	}
-
-	$use_default = 0 if $use_default and
-	    ! $is_server && $arg_hash->{SSL_verify_mode} == SSL_VERIFY_NONE
-	    || $arg_hash->{SSL_reuse_ctx};
-
-	if ( $use_default ) {
-
-	    my %ca = 
-		-f 'certs/my-ca.pem' ? ( SSL_ca_file => 'certs/my-ca.pem' ) :
-		-d 'ca/' ? ( SSL_ca_path => 'ca/' ) :
-		();
-	    my %certs = $is_server ? (
-		SSL_key_file => 'certs/server-key.pem',
-		SSL_cert_file => 'certs/server-cert.pem',
-	    ) : $arg_hash->{SSL_use_cert} ? (
-		SSL_key_file => 'certs/client-key.pem',
-		SSL_cert_file => 'certs/client-cert.pem',
-	    ) :();
-	    %$arg_hash = ( %$arg_hash, %ca, %certs );
-
-	    carp(
-		"*******************************************************************\n".
-		" The implicite use of IO::Socket::SSL specific default settings for \n".
-		" CA, cert and key is depreceated.\n".
-		" Please explicitly specify your own CA, cert and key using:\n".
-		"    - SSL_ca_file or SSL_ca_path for the CA\n".
-		"    - SSL_cert_file and SSL_key_file for cert and key\n".
-		" To specify your own system wide defaults you can use \n".
-		" set_defaults, set_client_defaults and set_server_defaults.\n".
-		"*******************************************************************\n".
-		" "
-	    ) if %ca or %certs;
-
-
-	} else {
-	    for(qw(SSL_cert_file SSL_key_file)) {
-		defined( my $file = $arg_hash->{$_} ) or next;
-		for my $f (ref($file) eq 'HASH' ? values(%$file):$file ) {
-		    die "$_ $f does not exist" if ! -f $f;
-		    die "$_ $f is not accessable" if ! -r _;
-		}
-	    }
-	    if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
-		die "SSL_ca_file $f does not exist" if ! -f $f;
-		die "SSL_ca_file $f is not accessable" if ! -r _;
-	    }
-	    if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
-		die "only SSL_ca_path or SSL_ca_file should be given" 
-		    if defined $arg_hash->{SSL_ca_file};
-		die "SSL_ca_path $d does not exist" if ! -d $d;
-		die "SSL_ca_path $d is not accessable" if ! -r _;
-	    }
+    my $ctx = $arg_hash->{'SSL_reuse_ctx'};
+    if ($ctx) {
+	if ($ctx->isa('IO::Socket::SSL::SSL_Context') and
+	    $ctx->{context}) {
+	    # valid context
+	} elsif ( $ctx = ${*$ctx}{_SSL_ctx} ) {
+	    # reuse context from existing SSL object
 	}
     }
 
-    #Avoid passing undef arguments to Net::SSLeay
-    defined($arg_hash->{$_}) or delete($arg_hash->{$_}) foreach (keys %$arg_hash);
-
-    my $vcn_scheme = delete $arg_hash->{SSL_verifycn_scheme};
-    if ( $vcn_scheme && $vcn_scheme ne 'none' ) {
-	# don't access ${*self} inside callback - this seems to create
-	# circular references from the ssl object to the context and back
-
-	# use SSL_verifycn_name or determine from PeerAddr
-	my $host = $arg_hash->{SSL_verifycn_name};
-	if (not defined($host)) {
-	    if ( $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} ) {
-		$host =~s{:[a-zA-Z0-9_\-]+$}{};
-	    }
-	}
-	$host ||= ref($vcn_scheme) && $vcn_scheme->{callback} && 'unknown';
-	$host or return $self->error( "Cannot determine peer hostname for verification" );
-
-	my $vcb = $arg_hash->{SSL_verify_callback};
-	$arg_hash->{SSL_verify_callback} = sub {
-	    my ($ok,$ctx_store,$certname,$error,$cert) = @_;
-	    $ok = $vcb->($ok,$ctx_store,$certname,$error,$cert) if $vcb;
-	    $ok or return 0;
-	    my $depth = Net::SSLeay::X509_STORE_CTX_get_error_depth($ctx_store);
-	    return $ok if $depth != 0;
-
-	    # verify name
-	    my $rv = verify_hostname_of_cert( $host,$cert,$vcn_scheme );
-	    # just do some code here against optimization because x509 has no
-	    # increased reference and CRYPTO_add is not available from Net::SSLeay
-	    return $rv;
-	};
-    }
+    # create context
+    # this will fill in defaults in $arg_hash
+    $ctx ||= IO::Socket::SSL::SSL_Context->new($arg_hash);
 
     ${*$self}{'_SSL_arguments'} = $arg_hash;
-    ${*$self}{'_SSL_ctx'} = IO::Socket::SSL::SSL_Context->new($arg_hash) || return;
+    ${*$self}{'_SSL_ctx'} = $ctx;
     ${*$self}{'_SSL_opened'} = 1 if $is_server;
 
     return $self;
@@ -480,11 +376,6 @@ sub connect_SSL {
 
 	Net::SSLeay::set_fd($ssl, $fileno)
 	    || return $self->error("SSL filehandle association failed");
-
-	if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
-	    Net::SSLeay::set_cipher_list($ssl, $cl )
-		|| return $self->error("Failed to set SSL cipher list");
-	}
 
 	if ( $can_client_sni ) {
 	    my $host;
@@ -676,11 +567,6 @@ sub accept_SSL {
 
 	Net::SSLeay::set_fd($ssl, $fileno)
 	    || return $socket->error("SSL filehandle association failed");
-
-	if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
-	    Net::SSLeay::set_cipher_list($ssl, $cl )
-		|| return $socket->error("Failed to set SSL cipher list");
-	}
     }
 
     $ssl ||= ${*$socket}{'_SSL_object'};
@@ -1586,14 +1472,124 @@ sub new {
     #DEBUG( "$class @_" );
     my $arg_hash = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
 
-    my $ctx_object = $arg_hash->{'SSL_reuse_ctx'};
-    if ($ctx_object) {
-	return $ctx_object if ($ctx_object->isa('IO::Socket::SSL::SSL_Context') and
-	    $ctx_object->{context});
+    # common problem forgetting to set SSL_use_cert
+    # if client cert is given by user but SSL_use_cert is undef, assume that it
+    # should be set
+    my $is_server = $arg_hash->{SSL_server};
+    if ( ! $is_server && ! defined $arg_hash->{SSL_use_cert}
+	&& ( grep { $arg_hash->{$_} } qw(SSL_cert SSL_cert_file))
+	&& ( grep { $arg_hash->{$_} } qw(SSL_key SSL_key_file)) ) {
+	$arg_hash->{SSL_use_cert} = 1
+    }
 
-	# The following "double entendre" applies only if someone passed
-	# in an IO::Socket::SSL object instead of an actual context.
-	return $ctx_object if ($ctx_object = ${*$ctx_object}{'_SSL_ctx'});
+    # add library defaults
+    %$arg_hash = (
+	SSL_use_cert => $is_server,
+	$is_server ? %DEFAULT_SSL_SERVER_ARGS : %DEFAULT_SSL_CLIENT_ARGS,
+	%$arg_hash 
+    );
+
+    # Avoid passing undef arguments to Net::SSLeay
+    defined($arg_hash->{$_}) or delete($arg_hash->{$_}) for(keys %$arg_hash);
+
+    # use default path to certs and ca unless another one was given
+    # don't mix default path with user specified path, either we use all
+    # or no defaults
+    {
+	my $use_default = 1;
+	for (qw( SSL_cert SSL_cert_file SSL_key SSL_key_file SSL_ca_file SSL_ca_path )) {
+	    next if ! defined $arg_hash->{$_};
+	    # some apps set keys '' to signal that it is not set, replace with undef
+	    if ( $arg_hash->{$_} eq '' ) {
+		$arg_hash->{$_} = undef;
+		next;
+	    }
+	    $use_default = 0;
+	}
+
+	$use_default = 0 if $use_default 
+	    and ! $is_server 
+	    and ! $arg_hash->{SSL_verify_mode};
+
+	if ( $use_default ) {
+
+	    my %ca = 
+		-f 'certs/my-ca.pem' ? ( SSL_ca_file => 'certs/my-ca.pem' ) :
+		-d 'ca/' ? ( SSL_ca_path => 'ca/' ) :
+		();
+	    my %certs = $is_server ? (
+		SSL_key_file => 'certs/server-key.pem',
+		SSL_cert_file => 'certs/server-cert.pem',
+	    ) : $arg_hash->{SSL_use_cert} ? (
+		SSL_key_file => 'certs/client-key.pem',
+		SSL_cert_file => 'certs/client-cert.pem',
+	    ) :();
+	    %$arg_hash = ( %$arg_hash, %ca, %certs );
+
+	    carp(
+		"*******************************************************************\n".
+		" The implicite use of IO::Socket::SSL specific default settings for \n".
+		" CA, cert and key is depreceated.\n".
+		" Please explicitly specify your own CA, cert and key using:\n".
+		"    - SSL_ca_file or SSL_ca_path for the CA\n".
+		"    - SSL_cert_file and SSL_key_file for cert and key\n".
+		" To specify your own system wide defaults you can use \n".
+		" set_defaults, set_client_defaults and set_server_defaults.\n".
+		"*******************************************************************\n".
+		" "
+	    ) if %ca or %certs;
+
+	} else {
+	    for(qw(SSL_cert_file SSL_key_file)) {
+		defined( my $file = $arg_hash->{$_} ) or next;
+		for my $f (ref($file) eq 'HASH' ? values(%$file):$file ) {
+		    die "$_ $f does not exist" if ! -f $f;
+		    die "$_ $f is not accessable" if ! -r _;
+		}
+	    }
+	    if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
+		die "SSL_ca_file $f does not exist" if ! -f $f;
+		die "SSL_ca_file $f is not accessable" if ! -r _;
+	    }
+	    if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
+		die "only SSL_ca_path or SSL_ca_file should be given" 
+		    if defined $arg_hash->{SSL_ca_file};
+		die "SSL_ca_path $d does not exist" if ! -d $d;
+		die "SSL_ca_path $d is not accessable" if ! -r _;
+	    }
+	}
+    }
+
+    my $vcn_scheme = delete $arg_hash->{SSL_verifycn_scheme};
+    if ( $vcn_scheme && $vcn_scheme ne 'none' ) {
+	# don't access ${*self} inside callback - this seems to create
+	# circular references from the ssl object to the context and back
+
+	# use SSL_verifycn_name or determine from PeerAddr
+	my $host = $arg_hash->{SSL_verifycn_name};
+	if (not defined($host)) {
+	    if ( $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} ) {
+		$host =~s{:[a-zA-Z0-9_\-]+$}{};
+	    }
+	}
+	$host ||= ref($vcn_scheme) && $vcn_scheme->{callback} && 'unknown';
+	$host or return IO::Socket::SSL->error(
+	    "Cannot determine peer hostname for verification" );
+
+	my $vcb = $arg_hash->{SSL_verify_callback};
+	$arg_hash->{SSL_verify_callback} = sub {
+	    my ($ok,$ctx_store,$certname,$error,$cert) = @_;
+	    $ok = $vcb->($ok,$ctx_store,$certname,$error,$cert) if $vcb;
+	    $ok or return 0;
+	    my $depth = Net::SSLeay::X509_STORE_CTX_get_error_depth($ctx_store);
+	    return $ok if $depth != 0;
+
+	    # verify name
+	    my $rv = IO::Socket::SSL::verify_hostname_of_cert( $host,$cert,$vcn_scheme );
+	    # just do some code here against optimization because x509 has no
+	    # increased reference and CRYPTO_add is not available from Net::SSLeay
+	    return $rv;
+	};
     }
 
     my $ssl_op = Net::SSLeay::OP_ALL();
@@ -1816,32 +1812,34 @@ sub new {
 
     Net::SSLeay::CTX_set_verify($ctx, $verify_mode, $verify_callback);
 
+    if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
+	Net::SSLeay::CTX_set_cipher_list($ctx, $cl )
+	    || return IO::Socket::SSL->error("Failed to set SSL cipher list");
+    }
+
     if ( my $cb = $arg_hash->{SSL_create_ctx_callback} ) {
 	$cb->($ctx);
     }
 
-    $ctx_object = { context => $ctx };
-    $ctx_object->{has_verifycb} = 1 if $verify_callback;
+    my $self = bless { context => $ctx },$class;
+    $self->{has_verifycb} = 1 if $verify_callback;
     $DEBUG>=3 && DEBUG( "new ctx $ctx" );
     $CTX_CREATED_IN_THIS_THREAD{$ctx} = 1;
 
     if ( my $cache = $arg_hash->{SSL_session_cache} ) {
 	# use predefined cache
-	$ctx_object->{session_cache} = $cache
+	$self->{session_cache} = $cache
     } elsif ( my $size = $arg_hash->{SSL_session_cache_size}) {
-	return IO::Socket::SSL->error("Session caches not supported for Net::SSLeay < v1.26")
-	    if $Net::SSLeay::VERSION < 1.26;
-	$ctx_object->{session_cache} = IO::Socket::SSL::Session_Cache->new( $size );
+	$self->{session_cache} = IO::Socket::SSL::Session_Cache->new( $size );
     }
 
-
-    return bless $ctx_object, $class;
+    return $self;
 }
 
 
 sub session_cache {
-    my $ctx = shift;
-    my $cache = $ctx->{'session_cache'} || return;
+    my $self = shift;
+    my $cache = $self->{session_cache} || return;
     my ($addr,$port,$session) = @_;
     $port ||= $addr =~s{:(\w+)$}{} && $1; # host:port
     my $key = "$addr:$port";
@@ -1926,8 +1924,8 @@ sub add_session {
 sub DESTROY {
     my $self = shift;
     delete(@{$self}{'_head','_maxsize'});
-    foreach my $key (keys %$self) {
-	Net::SSLeay::SESSION_free($self->{$key}->{session});
+    for (values %$self) {
+	Net::SSLeay::SESSION_free($_->{session} || next);
     }
 }
 
@@ -2288,8 +2286,7 @@ SSL_check_crl.
 
 =item SSL_reuse_ctx
 
-If you have already set the above options (SSL_version through SSL_check_crl;
-this does not include SSL_cipher_list yet) for a previous instance of
+If you have already set the above options for a previous instance of
 IO::Socket::SSL, then you can reuse the SSL context of that instance by passing
 it as the value for the SSL_reuse_ctx parameter.  You may also create a
 new instance of the IO::Socket::SSL::SSL_Context class, using any context options
