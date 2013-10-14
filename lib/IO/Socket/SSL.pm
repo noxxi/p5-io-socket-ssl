@@ -1617,9 +1617,11 @@ sub new {
     }
 
     my $ctx_new_sub =  UNIVERSAL::can( 'Net::SSLeay',
-	$ver eq 'SSLv2' ? 'CTX_v2_new' :
-	$ver eq 'SSLv3' ? 'CTX_v3_new' :
-	$ver eq 'TLSv1' ? 'CTX_tlsv1_new' :
+	$ver eq 'SSLv2'  ? 'CTX_v2_new' :
+	$ver eq 'SSLv3'  ? 'CTX_v3_new' :
+	$ver eq 'TLSv1'  ? 'CTX_tlsv1_new' :
+	$ver eq 'TLSv11' ? 'CTX_tlsv1_1_new' :
+	$ver eq 'TLSv12' ? 'CTX_tlsv1_2_new' :
 	'CTX_new'
     ) or return IO::Socket::SSL->error("SSL Version $ver not supported");
     my $ctx = $ctx_new_sub->() or return 
@@ -2083,8 +2085,10 @@ See section "SNI Support" for details of SNI the support.
 =item SSL_version
 
 Sets the version of the SSL protocol used to transmit data. 'SSLv23' auto-negotiates 
-between SSLv2 and SSLv3, while 'SSLv2', 'SSLv3' or 'TLSv1' restrict the protocol
-to the specified version. All values are case-insensitive.
+between SSLv2 and SSLv3, while 'SSLv2', 'SSLv3', 'TLSv1', 'TLSv11' or 'TLSv12'
+restrict the protocol to the specified version. All values are case-insensitive.
+Support for 'TLSv11' and 'TLSv12' requires recent versions of Net::SSLeay
+and openssl.
 
 You can limit to set of supported protocols by adding !version separated by ':'.
 
