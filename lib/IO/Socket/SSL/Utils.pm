@@ -89,7 +89,7 @@ sub PEM_key2string {
 
 sub CERT_free {
     my $cert = shift or return;
-    Net::SSLeay::EVP_X509_free($cert);
+    Net::SSLeay::X509_free($cert);
 }
 
 sub KEY_free {

@@ -11,7 +11,7 @@
 - fix t/acceptSSL-timeout.t on Win32, RT#86862
 1.951 2013/7/3 
 - better document builtin defaults for key,cert,CA and how they are depreceated
-- use Net::SSLeay::SSL_CTX_set_default_verify_paths to use openssl's builtin
+- use Net::SSLeay::CTX_set_default_verify_paths to use openssl's builtin
   defaults for CA unless CA path/file was given (or IO::Socket::SSL builtins
   used)
 1.950 2013/7/3 
