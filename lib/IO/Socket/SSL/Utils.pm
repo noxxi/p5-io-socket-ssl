@@ -362,7 +362,7 @@ with localtime or similar functions.
 
 =back
 
-=item * CERT_create(hash) -> cert
+=item * CERT_create(hash) -> (cert,key)
 
 Creates a certificate based on the given hash.
 Additionally to the information described in C<CERT_asHash> the following keys
@@ -376,7 +376,8 @@ if true declare certificate as CA, defaults to false
 
 =item key key 
 
-use given key as key for certificate, otherwise a new one will be generated
+use given key as key for certificate, otherwise a new one will be generated and
+returned
 
 =item issuer_cert cert 
 

@@ -267,7 +267,6 @@ sub configure {
 
     # because Net::HTTPS simple redefines blocking() to {} (e.g
     # return undef) and IO::Socket::INET does not like this we
-
     # set Blocking only explicitly if it was set
     $arg_hash->{Blocking} = 1 if defined ($blocking);
 
@@ -1108,43 +1107,69 @@ sub dump_peer_certificate {
     #  - wildcards_in_alt (0, 'leftmost', 'anywhere')
     #  - wildcards_in_cn (0, 'leftmost', 'anywhere')
     #  - check_cn (0, 'always', 'when_only')
+    # unfortunatly there are a lot of different schemes used, see RFC 6125 for a
+    # summary, which references all of the following except RFC4217/ftp
 
     my %scheme = (
-	# rfc 4513
-	ldap => {
-	    wildcards_in_cn  => 0,
-	    wildcards_in_alt => 'leftmost',
-	    check_cn         => 'always',
-	},
-	# rfc 2818
-	http => {
-	    wildcards_in_cn  => 'anywhere',
-	    wildcards_in_alt => 'anywhere',
-	    check_cn         => 'when_only',
-	},
-	# rfc 3207
-	# This is just a dumb guess
-	# RFC3207 itself just says, that the client should expect the
-	# domain name of the server in the certificate. It doesn't say
-	# anything about wildcards, so I forbid them. It doesn't say
-	# anything about alt names, but other documents show, that alt
-	# names should be possible. The check_cn value again is a guess.
-	# Fix the spec!
-	smtp => {
-	    wildcards_in_cn  => 0,
-	    wildcards_in_alt => 0,
-	    check_cn         => 'always'
-	},
 	none => {}, # do not check
     );
 
-    $scheme{www}  = $scheme{http}; # alias
-    $scheme{xmpp} = $scheme{http}; # rfc 3920
-    $scheme{pop3} = $scheme{ldap}; # rfc 2595
-    $scheme{imap} = $scheme{ldap}; # rfc 2595
-    $scheme{acap} = $scheme{ldap}; # rfc 2595
-    $scheme{nntp} = $scheme{ldap}; # rfc 4642
-    $scheme{ftp}  = $scheme{http}; # rfc 4217
+    for(qw(
+	rfc2818 http www 
+	rfc3920 xmpp
+	rfc4217 ftp
+    )) {
+	$scheme{$_} = {
+	    wildcards_in_cn  => 'anywhere',
+	    wildcards_in_alt => 'anywhere',
+	    check_cn         => 'when_only',
+	}
+    }
+
+    for(qw(
+	rfc4513 ldap
+    )) {
+	$scheme{$_} = {
+	    wildcards_in_cn  => 0,
+	    wildcards_in_alt => 'leftmost',
+	    check_cn         => 'always',
+	};
+    }
+
+    for(qw(
+	rfc2595 smtp
+	rfc4642 imap pop3 acap
+	rfc5539 nntp
+	rfc5538 netconf
+	rfc5425 syslog
+	rfc5953 snmp
+    )) {
+	$scheme{$_} = {
+	    wildcards_in_cn  => 'leftmost',
+	    wildcards_in_alt => 'leftmost',
+	    check_cn         => 'always'
+	};
+    }
+    for(qw(
+	rfc5971 gist
+    )) {
+	$scheme{$_} = {
+	    wildcards_in_cn  => 'leftmost',
+	    wildcards_in_alt => 'leftmost',
+	    check_cn         => 'when_only',
+	};
+    }
+
+    for(qw(
+	rfc5922 sip
+    )) {
+	$scheme{$_} = {
+	    wildcards_in_cn  => 0,
+	    wildcards_in_alt => 0,
+	    check_cn         => 'always',
+	};
+    }
+
 
     # function to verify the hostname
     #
@@ -1198,15 +1223,19 @@ sub dump_peer_certificate {
 	    $wtyp ||= '';
 	    my $pattern;
 	    ### IMPORTANT!
-	    # we accept only a single wildcard and only for a single part of the FQDN
+	    # We accept only a single wildcard and only for a single part of the FQDN
 	    # e.g *.example.org does match www.example.org but not bla.www.example.org
 	    # The RFCs are in this regard unspecific but we don't want to have to
 	    # deal with certificates like *.com, *.co.uk or even *
-	    # see also http://nils.toedtmann.net/pub/subjectAltName.txt
+	    # see also http://nils.toedtmann.net/pub/subjectAltName.txt .
+	    # Also, we fall back to leftmost matches if the identity is an IDNA
+	    # name, see RFC6125 and the discussion at 
+	    # http://bugs.python.org/issue17997#msg194950
 	    if ( $wtyp eq 'anywhere' and $name =~m{^([a-zA-Z0-9_\-]*)\*(.+)} ) {
-		$pattern = qr{^\Q$1\E[a-zA-Z0-9_\-]*\Q$2\E$}i;
+		return if $1 ne '' and substr($identity,0,4) eq 'xn--'; # IDNA
+		$pattern = qr{^\Q$1\E[a-zA-Z0-9_\-]+\Q$2\E$}i;
 	    } elsif ( $wtyp eq 'leftmost' and $name =~m{^\*(\..+)$} ) {
-		$pattern = qr{^[a-zA-Z0-9_\-]*\Q$1\E$}i;
+		$pattern = qr{^[a-zA-Z0-9_\-]+\Q$1\E$}i;
 	    } else {
 		$pattern = qr{^\Q$name\E$}i;
 	    }
