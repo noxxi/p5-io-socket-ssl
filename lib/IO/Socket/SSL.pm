@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.955';
+our $VERSION = '1.956';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -31,6 +31,18 @@ use constant SSL_VERIFY_CLIENT_ONCE => Net::SSLeay::VERIFY_CLIENT_ONCE();
 use constant SSL_SENT_SHUTDOWN => 1;
 use constant SSL_RECEIVED_SHUTDOWN => 2;
 
+# capabilities of underlying Net::SSLeay/openssl
+my $can_client_sni;  # do we support SNI on the client side
+my $can_server_sni;  # do we support SNI on the server side
+my $can_npn;         # do we support NPN
+my $can_ecdh;        # do we support ECDH key exchange
+BEGIN {
+    $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x01000000;
+    $can_server_sni = defined &Net::SSLeay::get_servername;
+    $can_npn        = defined &Net::SSLeay::P_next_proto_negotiated;
+    $can_ecdh       = defined &Net::SSLeay::CTX_set_tmp_ecdh;
+}
+
 # global defaults
 my %DEFAULT_SSL_ARGS = (
     SSL_check_crl => 0,
@@ -39,8 +51,9 @@ my %DEFAULT_SSL_ARGS = (
     SSL_verifycn_scheme => undef,  # don't verify cn
     SSL_verifycn_name => undef,    # use from PeerAddr/PeerHost
     SSL_npn_protocols => undef,    # meaning depends whether on server or client side
-    SSL_honor_cipher_order => 0,   # client order gets preference
-    SSL_cipher_list => 'ALL:!LOW',
+    SSL_cipher_list => 
+	'EECDH+AESGCM+ECDSA EECDH+AESGCM EECDH+ECDSA +AES256 EECDH EDH+AESGCM '.
+	'EDH ALL +SHA +3DES +RC4 !LOW !EXP !eNULL !aNULL !DES !MD5 !PSK !SRP',
 );
 
 my %DEFAULT_SSL_CLIENT_ARGS = (
@@ -50,7 +63,28 @@ my %DEFAULT_SSL_CLIENT_ARGS = (
 
 my %DEFAULT_SSL_SERVER_ARGS = (
     %DEFAULT_SSL_ARGS,
-    SSL_verify_mode => SSL_VERIFY_NONE
+    SSL_verify_mode => SSL_VERIFY_NONE,
+    SSL_honor_cipher_order => 1,   # trust server to know the best cipher
+    SSL_dh => do {
+        my $bio = Net::SSLeay::BIO_new(Net::SSLeay::BIO_s_mem());
+        # generated with: openssl dhparam 2048
+        Net::SSLeay::BIO_write($bio,<<'DH');
+-----BEGIN DH PARAMETERS-----
+MIIBCAKCAQEAr8wskArj5+1VCVsnWt/RUR7tXkHJ7mGW7XxrLSPOaFyKyWf8lZht
+iSY2Lc4oa4Zw8wibGQ3faeQu/s8fvPq/aqTxYmyHPKCMoze77QJHtrYtJAosB9SY
+CN7s5Hexxb5/vQ4qlQuOkVrZDiZO9GC4KaH9mJYnCoAsXDhDft6JT0oRVSgtZQnU
+gWFKShIm+JVjN94kGs0TcBEesPTK2g8XVHK9H8AtSUb9BwW2qD/T5RmgNABysApO
+Ps2vlkxjAHjJcqc3O+OiImKik/X2rtBTZjpKmzN3WWTB0RJZCOWaLlDO81D01o1E
+aZecz3Np9KIYey900f+X7zC2bJxEHp95ywIBAg==
+-----END DH PARAMETERS-----
+DH
+        my $dh = Net::SSLeay::PEM_read_bio_DHparams($bio);
+        Net::SSLeay::BIO_free($bio);
+        $dh or die "no DH";
+        $dh;
+    },
+    $can_ecdh ? ( SSL_ecdh_curve => 'prime256v1' ):(),
+
 );
 
 # global defaults which can be changed using set_defaults
@@ -182,15 +216,6 @@ BEGIN {
 	    croak "cannot handle international domains, please install Net::LibIDN, Net::IDN::Encode or URI"
 	}
     }
-}
-
-my $can_client_sni;  # do we support SNI on the client side
-my $can_server_sni;  # do we support SNI on the server side
-my $can_npn;         # do we support NPN
-BEGIN {
-    $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x01000000;
-    $can_server_sni = defined &Net::SSLeay::get_servername;
-    $can_npn        = defined &Net::SSLeay::P_next_proto_negotiated;
 }
 
 # Export some stuff
@@ -1791,11 +1816,7 @@ sub new {
 	    });
 	}
 
-	if ( my $dh = $arg_hash->{SSL_dh} ) {
-	    # binary, e.g. DH*
-	    Net::SSLeay::CTX_set_tmp_dh( $ctx,$dh )
-		|| return IO::Socket::SSL->error( "Failed to set DH from SSL_dh" );
-	} elsif ( my $f = $arg_hash->{SSL_dh_file} ) {
+	if ( my $f = $arg_hash->{SSL_dh_file} ) {
 	    my $bio = Net::SSLeay::BIO_new_file( $f,'r' )
 		|| return IO::Socket::SSL->error( "Failed to open DH file $f" );
 	    my $dh = Net::SSLeay::PEM_read_bio_DHparams($bio);
@@ -1804,12 +1825,16 @@ sub new {
 	    my $rv = Net::SSLeay::CTX_set_tmp_dh( $ctx,$dh );
 	    Net::SSLeay::DH_free( $dh );
 	    $rv || return IO::Socket::SSL->error( "Failed to set DH from $f" );
+	} elsif ( my $dh = $arg_hash->{SSL_dh} ) {
+	    # binary, e.g. DH*
+	    Net::SSLeay::CTX_set_tmp_dh( $ctx,$dh )
+		|| return IO::Socket::SSL->error( "Failed to set DH from SSL_dh" );
 	}
 
 	if ( my $curve = $arg_hash->{SSL_ecdh_curve} ) {
 	    return IO::Socket::SSL->error(
 		"ECDH curve needs Net::SSLeay>=1.56 and OpenSSL>=1.0")
-		if ! defined( &Net::SSLeay::CTX_set_tmp_ecdh );
+		if ! $can_ecdh;
 	    if ( $curve !~ /^\d+$/ ) {
 		# name of curve, find NID
 		$curve = Net::SSLeay::OBJ_txt2nid($curve) 
@@ -2134,21 +2159,22 @@ case setting the version to 'SSLv23:!SSLv2:!TLSv11:!TLSv12' might help.
 =item SSL_cipher_list
 
 If this option is set the cipher list for the connection will be set to the
-given value, e.g. something like 'ALL:!LOW:!EXP:!ADH'. Look into the OpenSSL
+given value, e.g. something like 'ALL:!LOW:!EXP:!aNULL'. Look into the OpenSSL
 documentation (L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>)
 for more details.
 
-If this option is not set 'ALL:!LOW' will be used.
+If this option is not set a secure default will be used, which prefers ciphers
+with forward secrecy, disables anonymous authentication and disables known
+insecure ciphers like MD5, DES etc.
 To use OpenSSL builtin default (whatever this is) set it to ''.
+But, with the IO::Socket::SSL own default cipher list one currently gets a grade
+A at SSL labs, much better than the openssl default.
 
 =item SSL_honor_cipher_order
 
 If this option is true the cipher order the server specified is used instead
-of the order proposed by the client. To mitigate BEAST attack you might use
-something like
-
-  SSL_honor_cipher_order => 1,
-  SSL_cipher_list => 'RC4-SHA:ALL:!ADH:!LOW',
+of the order proposed by the client. This option defaults to true to make use of
+our secure cipher list setting.
 
 =item SSL_use_cert
 
@@ -2208,8 +2234,13 @@ Examples:
 
 If you want Diffie-Hellman key exchange you need to supply a suitable file here
 or use the SSL_dh parameter. See dhparam command in openssl for more information.
-To create a server which provides perfect forward secrecy you need to either
-give the DH parameters or (better, because faster) the ECDH curve.
+To create a server which provides forward secrecy you need to either give the DH
+parameters or (better, because faster) the ECDH curve.
+
+If neither C<SSL_dh_file> not C<SSL_dh> is set a builtin DH parameter with a
+length of 2048 bit is used to offer DH key exchange by default. If you don't
+want this (e.g. disable DH key exchange) explicitly set this or the C<SSL_dh>
+parameter to undef.
 
 =item SSL_dh
 
@@ -2219,8 +2250,11 @@ Like SSL_dh_file, but instead of giving a file you use a preloaded or generated 
 
 If you want Elliptic Curve Diffie-Hellmann key exchange you need to supply the
 OID or NID of a suitable curve (like 'prime256v1') here.
-To create a server which provides perfect forward secrecy you need to either
-give the DH parameters or (better, because faster) the ECDH curve.
+To create a server which provides forward secrecy you need to either give the DH
+parameters or (better, because faster) the ECDH curve.
+
+This parameter defaults to 'prime256v1' (builtin of OpenSSL) to offer ECDH key
+exchange by default. If you don't want this explicitly set it to undef.
 
 =item SSL_passwd_cb
 

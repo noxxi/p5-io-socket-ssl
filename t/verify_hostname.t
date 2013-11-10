@@ -84,9 +84,9 @@ if ( $pid == 0 ) {
 	my @tests = (
 		'127.0.0.1' => [qw( smtp ldap www)],
 		'server.local' => [qw(smtp ldap)],
-		'blafasel.server.local' => [qw(ldap www)],
+		'blafasel.server.local' => [qw(smtp ldap www)],
 		'lala.blafasel.server.local' => [],
-		'www.other.local' => [qw(www)],
+		'www.other.local' => [qw()],
 		'www-13.other.local' => [qw(www)],
 		'www-13.lala.other.local' => [],
 		'smtp.mydomain.local' => [qw(smtp ldap www)],
