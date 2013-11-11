@@ -194,7 +194,7 @@ if ( grep { !$_ } @clients > 0 ) {
     exit;
 }
 &ok("Client init");
-@clients = ();
+close($_) for @clients;
 
 @clients = map { scalar $_->accept } @servers;
 if ( grep { !$_ } @clients > 0 ) {
