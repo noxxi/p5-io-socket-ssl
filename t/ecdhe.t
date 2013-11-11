@@ -1,12 +1,12 @@
-#!perl -w
+#!perl
 # Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl t/ecdh.t'
+# `make test'. After `make install' it should work as `perl t/ecdhe.t'
 
-
+use strict;
+use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-use strict;
 
 if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
     print "1..0 # Skipped: fork not implemented on this platform\n";
@@ -48,10 +48,10 @@ if ( !defined $pid ) {
 
     $ID = 'client';
     close($server);
-    my $to_server = IO::Socket::SSL->new( 
-	PeerAddr => $addr, 
+    my $to_server = IO::Socket::SSL->new(
+	PeerAddr => $addr,
 	SSL_verify_mode => 0 ) || do {
-    	notok( "connect failed: $SSL_ERROR" );
+	notok( "connect failed: $SSL_ERROR" );
 	exit
     };
     ok( "client connected" );
@@ -66,7 +66,7 @@ if ( !defined $pid ) {
 } else {                ###### Server
 
     my $to_client = $server->accept || do {
-    	notok( "accept failed: $SSL_ERROR" );
+	notok( "accept failed: $SSL_ERROR" );
 	kill(9,$pid);
 	exit;
     };

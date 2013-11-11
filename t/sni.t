@@ -1,6 +1,7 @@
-#!perl -w
+#!perl
 
 use strict;
+use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
@@ -20,12 +21,9 @@ if ( ! IO::Socket::SSL->can_client_sni() ) {
     exit;
 }
 
-use vars qw( $SSL_SERVER_ADDR );
-do "t/ssl_settings.req" || do "ssl_settings.req";
-
 print "1..17\n";
 my $server = IO::Socket::SSL->new(
-    LocalAddr => $SSL_SERVER_ADDR,
+    LocalAddr => '127.0.0.1',
     Listen => 2,
     ReuseAddr => 1,
     SSL_server => 1,
@@ -47,7 +45,7 @@ my $server = IO::Socket::SSL->new(
 warn "\$!=$!, \$\@=$@, S\$SSL_ERROR=$SSL_ERROR" if ! $server;
 print "not ok\n", exit if !$server;
 print "ok # Server Initialization\n";
-my $SSL_SERVER_PORT = $server->sockport;
+my $saddr = $server->sockhost.':'.$server->sockport;
 
 # www13.other.local should match default ''
 # all other should match the specific entries
@@ -63,9 +61,8 @@ if ( $pid == 0 ) {
     close($server);
 
     for my $host (@tests) {
-	my $client = IO::Socket::SSL->new( 
-	    PeerAddr => $SSL_SERVER_ADDR,
-	    PeerPort => $SSL_SERVER_PORT,
+	my $client = IO::Socket::SSL->new(
+	    PeerAddr => $saddr,
 	    SSL_verify_mode => 1,
 	    SSL_hostname => $host,
 	    SSL_ca_file => 'certs/my-ca.pem',
@@ -86,5 +83,3 @@ for my $host (@tests) {
     print "ok # server got SNI name $host\n";
 }
 wait;
-
-

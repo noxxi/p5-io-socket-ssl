@@ -8,7 +8,7 @@ use Time::Local;
 use Exporter 'import';
 
 our $VERSION = '0.01';
-our @EXPORT = qw( 
+our @EXPORT = qw(
     PEM_file2cert PEM_string2cert PEM_cert2file PEM_cert2string
     PEM_file2key PEM_string2key PEM_key2file PEM_key2string
     KEY_free CERT_free
@@ -17,7 +17,7 @@ our @EXPORT = qw(
 
 sub PEM_file2cert {
     my $file = shift;
-    my $bio = Net::SSLeay::BIO_new_file($file,'r') or 
+    my $bio = Net::SSLeay::BIO_new_file($file,'r') or
 	croak "cannot read $file: $!";
     my $cert = Net::SSLeay::PEM_read_bio_X509($bio);
     Net::SSLeay::BIO_free($bio);
@@ -53,7 +53,7 @@ sub PEM_cert2string {
 
 sub PEM_file2key {
     my $file = shift;
-    my $bio = Net::SSLeay::BIO_new_file($file,'r') or 
+    my $bio = Net::SSLeay::BIO_new_file($file,'r') or
 	croak "cannot read $file: $!";
     my $cert = Net::SSLeay::PEM_read_bio_PrivateKey($bio);
     Net::SSLeay::BIO_free($bio);
@@ -124,7 +124,7 @@ sub CERT_asHash {
     for ( 0..Net::SSLeay::X509_NAME_entry_count($subj)-1 ) {
 	my $e = Net::SSLeay::X509_NAME_get_entry($subj,$_);
 	my $o = Net::SSLeay::X509_NAME_ENTRY_get_object($e);
-	$subj{ Net::SSLeay::OBJ_obj2txt($o) } = 
+	$subj{ Net::SSLeay::OBJ_obj2txt($o) } =
 	    Net::SSLeay::P_ASN1_STRING_get(
 		Net::SSLeay::X509_NAME_ENTRY_get_data($e));
     }
@@ -155,12 +155,12 @@ sub CERT_create {
     my $cert = Net::SSLeay::X509_new();
     $sha1_digest ||= do {
 	Net::SSLeay::SSLeay_add_ssl_algorithms();
-	Net::SSLeay::EVP_get_digestbyname("sha1") 
+	Net::SSLeay::EVP_get_digestbyname("sha1")
 	    or die "SHA1 not available";
     };
 
-    Net::SSLeay::ASN1_INTEGER_set( 
-	Net::SSLeay::X509_get_serialNumber($cert), 
+    Net::SSLeay::ASN1_INTEGER_set(
+	Net::SSLeay::X509_get_serialNumber($cert),
 	delete $args{serial} || rand(2**32),
     );
 
@@ -173,7 +173,7 @@ sub CERT_create {
 	Net::SSLeay::X509_get_notBefore($cert),
 	delete $args{not_before} || time()
     );
-    
+
     # not_after default to now+365 days
     Net::SSLeay::ASN1_TIME_set(
 	Net::SSLeay::X509_get_notAfter($cert),
@@ -188,9 +188,9 @@ sub CERT_create {
     };
     while ( my ($k,$v) = each %$subj ) {
 	# 0x1000 = MBSTRING_UTF8
-	Net::SSLeay::X509_NAME_add_entry_by_txt($subj_e, 
+	Net::SSLeay::X509_NAME_add_entry_by_txt($subj_e,
 	    $k, 0x1000, $v, -1, 0)
-	    or croak("failed to add entry for $k - ". 
+	    or croak("failed to add entry for $k - ".
 	    Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error()));
     }
 
@@ -200,7 +200,7 @@ sub CERT_create {
 	&Net::SSLeay::NID_authority_key_identifier => 'issuer',
     );
     if ( my $altsubj = delete $args{subjectAltNames} ) {
-	push @ext, 
+	push @ext,
 	    &Net::SSLeay::NID_subject_alt_name =>
 	    join(',', map { "$_->[0]:$_->[1]" } @$altsubj)
     }
@@ -209,7 +209,7 @@ sub CERT_create {
     Net::SSLeay::X509_set_pubkey($cert,$key);
 
     if ( delete $args{CA} ) {
-	Net::SSLeay::X509_set_issuer_name($cert, 
+	Net::SSLeay::X509_set_issuer_name($cert,
 	    Net::SSLeay::X509_get_subject_name($cert));
 	Net::SSLeay::P_X509_add_extensions($cert,$cert,
 	    @ext,
@@ -218,9 +218,9 @@ sub CERT_create {
 	Net::SSLeay::X509_sign($cert,$key,$sha1_digest);
 
     } else {
-	my $issuer_cert = delete $args{issuer_cert} 
+	my $issuer_cert = delete $args{issuer_cert}
 	    || croak "no issuer_cert given";
-	my $issuer_key  = delete $args{issuer_key}  
+	my $issuer_key  = delete $args{issuer_key}
 	    || croak "no issuer_key given";
 	Net::SSLeay::P_X509_add_extensions($cert, $issuer_cert,
 	    @ext,
@@ -229,7 +229,7 @@ sub CERT_create {
 	    &Net::SSLeay::NID_ext_key_usage => 'serverAuth,clientAuth',
 	    &Net::SSLeay::NID_netscape_cert_type => 'server',
 	);
-	Net::SSLeay::X509_set_issuer_name($cert, 
+	Net::SSLeay::X509_set_issuer_name($cert,
 	    Net::SSLeay::X509_get_subject_name($issuer_cert));
 	Net::SSLeay::X509_sign($cert,$issuer_key,$sha1_digest);
     }
@@ -240,7 +240,7 @@ sub CERT_create {
 
 
 my %mon2i = qw(
-    Jan 0 Feb 1 Mar 2 Apr 3 May 4 Jun 5 
+    Jan 0 Feb 1 Mar 2 Apr 3 May 4 Jun 5
     Jul 6 Aug 7 Sep 8 Oct 9 Nov 10 Dec 11
 );
 sub _asn1t2t {
@@ -336,15 +336,15 @@ Extracts the information from the certificate into a hash:
 
 =over 8
 
-=item serial 
+=item serial
 
 The serial number
 
-=item version 
+=item version
 
 Certificate version, usually 2 (x509v3)
 
-=item subject 
+=item subject
 
 Hash with the parts of the subject, e.g. commonName, countryName,
 organizationName, stateOrProvinceName, localityName.
@@ -370,20 +370,20 @@ can be given:
 
 =over 8
 
-=item CA true|false 
+=item CA true|false
 
 if true declare certificate as CA, defaults to false
 
-=item key key 
+=item key key
 
 use given key as key for certificate, otherwise a new one will be generated and
 returned
 
-=item issuer_cert cert 
+=item issuer_cert cert
 
 set issuer for new certificate
 
-=item issuer_key key 
+=item issuer_key key
 
 sign new certificate with given key
 

@@ -1,6 +1,7 @@
-#!perl -w
+#!perl
 
 use strict;
+use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
@@ -13,18 +14,15 @@ if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
 
 print "1..8\n";
 
-use vars qw( $SSL_SERVER_ADDR );
-do "t/ssl_settings.req" || do "ssl_settings.req";
 my @pid;
 END { kill 9,@pid }
 
 my $server = IO::Socket::SSL->new(
-    LocalAddr => $SSL_SERVER_ADDR,
+    LocalAddr => '127.0.0.1',
     LocalPort => 0,
     SSL_cert_file => 'certs/server-cert.pem',
     SSL_key_file => 'certs/server-key.pem',
     Listen => 10,
-    Reuse => 1,
 );
 ok($server,"server ssl socket");
 my $saddr = $server->sockhost.':'.$server->sockport;
@@ -32,9 +30,9 @@ defined( my $pid = fork ) or die $!;
 exit( server()) if ! $pid; # child -> server()
 push @pid,$pid;
 close($server);
-    
+
 my $proxy = IO::Socket::INET->new(
-    LocalAddr => $SSL_SERVER_ADDR,
+    LocalAddr => '127.0.0.1',
     LocalPort => 0,
     Listen => 10,
     Reuse => 1,
@@ -54,9 +52,9 @@ my $cl = IO::Socket::SSL->new(
 );
 ssl_ok($cl,"ssl connected to server");
 ok( $cl->peer_certificate('subject') =~ m{server\.local}, "subject w/o mitm");
-ok( $cl->peer_certificate('issuer') =~ m{IO::Socket::SSL Demo CA}, 
+ok( $cl->peer_certificate('issuer') =~ m{IO::Socket::SSL Demo CA},
     "issuer w/o mitm");
-    
+
 # connect to proxy, check certificate
 $cl = IO::Socket::SSL->new(
     PeerAddr => $paddr,
@@ -65,9 +63,9 @@ $cl = IO::Socket::SSL->new(
 );
 ssl_ok($cl,"ssl connected to proxy");
 ok( $cl->peer_certificate('subject') =~ m{server\.local}, "subject w/ mitm");
-ok( $cl->peer_certificate('issuer') =~ m{IO::Socket::SSL::Intercept}, 
+ok( $cl->peer_certificate('issuer') =~ m{IO::Socket::SSL::Intercept},
     "issuer w/ mitm");
-   
+
 
 sub server {
     while (1) {
@@ -122,4 +120,3 @@ sub ssl_ok {
 	exit
     }
 }
-

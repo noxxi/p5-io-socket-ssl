@@ -1,22 +1,20 @@
-#!perl -w
+#!perl
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl t/nonblock.t'
 
 
+use strict;
+use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 use IO::Select;
 use Errno qw( EAGAIN EINPROGRESS EPIPE ECONNRESET );
-use strict;
-
-use vars qw( $SSL_SERVER_ADDR );
-do "t/ssl_settings.req" || do "ssl_settings.req";
 
 if ( ! eval "use 5.006; use IO::Select; return 1" ) {
     print "1..0 # Skipped: no support for nonblocking sockets\n";
     exit;
-} 
+}
 if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
     print "1..0 # Skipped: fork not implemented on this platform\n";
     exit
@@ -32,29 +30,20 @@ $SIG{PIPE} = 'IGNORE'; # use EPIPE not signal handler
 $|=1;
 print "1..27\n";
 
-#################################################################
-# create Server socket before forking client, so that it is
-# guaranteed to be listening
-#################################################################
-my %tls_options = (
-    SSL_version => 'TLSv1',
-    SSL_cipher_list => 'HIGH',
-);
-
-
 # first create simple non-blocking tcp-server
 my $ID = 'server';
 my $server = IO::Socket::INET->new(
     Blocking => 0,
-    LocalAddr => $SSL_SERVER_ADDR,
+    LocalAddr => '127.0.0.1',
+    LocalPort => 0,
     Listen => 2,
-    ReuseAddr => 1,
 );
 
 print "not ok: $!\n", exit if !$server; # Address in use?
 ok("Server Initialization");
 
-my ($SSL_SERVER_PORT) = unpack_sockaddr_in( $server->sockname );
+my $saddr = $server->sockhost.':'.$server->sockport;
+my $ssock = $server->sockname;
 
 defined( my $pid = fork() ) || die $!;
 if ( $pid == 0 ) {
@@ -65,16 +54,9 @@ if ( $pid == 0 ) {
 
     close($server);
     $ID = 'client';
-    my %extra_options = $Net::SSLeay::VERSION>=1.16 ?
-	(
-	    SSL_key_file => "certs/server-key.enc", 
-	    SSL_passwd_cb => sub { return "bluebell" },
-	) : (
-	    SSL_key_file => "certs/server-key.pem"
-	);
 
     # fast: try connect_SSL immediatly after sending plain text
-    #	connect_SSL should fail on the first attempt because server 
+    #	connect_SSL should fail on the first attempt because server
     #	is not ready yet
     # slow: wait before calling connect_SSL
     #	connect_SSL should succeed, because server was already waiting
@@ -84,21 +66,16 @@ if ( $pid == 0 ) {
 	# initial socket is unconnected, tcp, nonblocking
 	my $to_server = IO::Socket::INET->new( Proto => 'tcp', Blocking => 0 );
 
-	my $server_addr = pack_sockaddr_in( 
-	    $SSL_SERVER_PORT, 
-	    inet_aton( $SSL_SERVER_ADDR )
-	);
-
 	# nonblocking connect of tcp socket
 	while (1) {
-	    connect($to_server,$server_addr ) && last;
+	    connect($to_server,$ssock ) && last;
 	    if ( $!{EINPROGRESS} ) {
 		diag( 'connect in progress' );
 		IO::Select->new( $to_server )->can_write(30) && next;
 		print "not ";
 		last;
-	    } elsif ( $!{EALREADY} ) {	
-		diag( 'connect not yet completed'); 
+	    } elsif ( $!{EALREADY} ) {
+		diag( 'connect not yet completed');
 		# just wait
 		select(undef,undef,undef,0.1);
 		next;
@@ -117,7 +94,7 @@ if ( $pid == 0 ) {
 	# work around (older?) systems where IO::Socket::INET
 	# cannot do non-blocking connect by forcing non-blocking
 	# again (we want to test non-blocking behavior of IO::Socket::SSL,
-        # not IO::Socket::INET)
+	# not IO::Socket::INET)
 	$to_server->blocking(0);
 
 	# send some plain text on non-ssl socket
@@ -125,7 +102,7 @@ if ( $pid == 0 ) {
 	while ( $pmsg ne '' ) {
 	    my $w = syswrite( $to_server,$pmsg );
 	    if ( ! defined $w ) {
-	    	if ( ! $!{EAGAIN} ) {
+		if ( ! $!{EAGAIN} ) {
 		    diag("syswrite failed with $!");
 		    print "not ";
 		    last;
@@ -136,7 +113,7 @@ if ( $pid == 0 ) {
 		    last;
 		};
 	    } elsif ( $w>0 ) {
-	    	diag("wrote $w bytes");
+		diag("wrote $w bytes");
 		substr($pmsg,0,$w,'');
 	    } else {
 		die "syswrite returned 0";
@@ -152,8 +129,8 @@ if ( $pid == 0 ) {
 	if ( ! IO::Socket::SSL->start_SSL( $to_server,
 	    SSL_startHandshake => 0,
 	    SSL_verify_mode => 0,
-	    %extra_options,
-	    %tls_options,
+	    SSL_key_file => "certs/server-key.enc",
+	    SSL_passwd_cb => sub { return "bluebell" },
 	)) {
 	    diag( 'start_SSL return undef' );
 	    print "not ";
@@ -189,7 +166,7 @@ if ( $pid == 0 ) {
 
 	# send some data
 	# we send up to 500000 bytes, server reads first 10 bytes and then sleeps
-	# before reading more. In total server only reads 30000 bytes 
+	# before reading more. In total server only reads 30000 bytes
 	# the sleep will cause the internal buffers to fill up so that the syswrite
 	# should return with EAGAIN+SSL_WANT_WRITE.
 	# the socket close should cause EPIPE or ECONNRESET
@@ -203,8 +180,8 @@ if ( $pid == 0 ) {
 	# AIX seems to get very slow if you set the sndbuf on localhost, so don't to it
 	# https://rt.cpan.org/Public/Bug/Display.html?id=72305
 	if ( $^O !~m/aix/i ) {
-	    eval q{ 
-		setsockopt( $to_server, SOL_SOCKET, SO_SNDBUF, pack( "I",8192 ));  
+	    eval q{
+		setsockopt( $to_server, SOL_SOCKET, SO_SNDBUF, pack( "I",8192 ));
 		diag( "sndbuf=".unpack( "I",getsockopt( $to_server, SOL_SOCKET, SO_SNDBUF )));
 	    };
 	}
@@ -220,7 +197,7 @@ if ( $pid == 0 ) {
 	for( my $i=0;$i<50000;$i++ ) {
 	    my $offset = 0;
 	    while (1) {
-	        if ( $can && ! IO::Select->new($to_server)->$can(30)) {
+		if ( $can && ! IO::Select->new($to_server)->$can(30)) {
 		    diag("fail $can");
 		    print "not ";
 		    last WRITE;
@@ -244,7 +221,7 @@ if ( $pid == 0 ) {
 			last WRITE;
 		    } else {
 			print "not ";
-		    	last WRITE;
+			last WRITE;
 		    }
 		    next;
 		} elsif ( $n == 0 ) {
@@ -266,11 +243,11 @@ if ( $pid == 0 ) {
 	    }
 	}
 	ok( "syswrite" );
-	
+
 	if ( ! $attempts && $test_might_fail ) {
 		ok( " write attempts failed, but OK nevertheless because setsockopt failed" );
 	} else {
-	   	print "not " if !$attempts;
+		print "not " if !$attempts;
 	    ok( "multiple write attempts" );
 	}
 
@@ -283,16 +260,9 @@ if ( $pid == 0 ) {
     ############################################################
     # SERVER == parent process
     ############################################################
-    my %extra_options = $Net::SSLeay::VERSION>=1.16 ?
-	(
-	    SSL_key_file => "certs/client-key.enc", 
-	    SSL_passwd_cb => sub { return "opossum" }
-	) : (
-	    SSL_key_file => "certs/client-key.pem"
-	);
 
     # pendant to tests in client. Where client is slow (sleep
-    # between plain text sending and connect_SSL) I need to 
+    # between plain text sending and connect_SSL) I need to
     # be fast and where client is fast I need to be slow (sleep
     # between receiving plain text and accept_SSL)
 
@@ -329,8 +299,8 @@ if ( $pid == 0 ) {
 	    SSL_ca_file => "certs/test-ca.pem",
 	    SSL_use_cert => 1,
 	    SSL_cert_file => "certs/client-cert.pem",
-	    %extra_options,
-	    %tls_options,
+	    SSL_key_file => "certs/client-key.enc",
+	    SSL_passwd_cb => sub { return "opossum" },
 	)) {
 	    diag( 'start_SSL return undef' );
 	    print "not ";
@@ -370,7 +340,7 @@ if ( $pid == 0 ) {
 	# reading 10 bytes
 	# then sleeping so that buffers from client to server gets
 	# filled up and clients receives EAGAIN+SSL_WANT_WRITE
-	
+
 	IO::Select->new( $from_client )->can_read(30);
 	( sysread( $from_client, $buf,10 ) == 10 ) || print "not ";
 	#diag($buf);
@@ -384,7 +354,7 @@ if ( $pid == 0 ) {
 	READ:
 	while ( ( my $diff = 30000 - $bytes_received ) > 0 ) {
 	    if ( $can && ! IO::Select->new($from_client)->$can(30)) {
-	    	diag("failed $can");
+		diag("failed $can");
 		print "not ";
 		last READ;
 	    }

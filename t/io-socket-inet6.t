@@ -1,14 +1,13 @@
-#!perl -w
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl t/dhe.t'
+#!perl
 
 # make sure IO::Socket::IP will not be used
 BEGIN { $INC{'IO/Socket/IP.pm'} = undef }
 
+use strict;
+use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-use strict;
 
 if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
     print "1..0 # Skipped: fork not implemented on this platform\n";
@@ -18,30 +17,30 @@ if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
 # check first if we have loaded IO::Socket::IP, as if so we won't need or use
 # IO::Socket::INET6
 if( IO::Socket::SSL->CAN_IPV6 eq "IO::Socket::IP" ) {
-	print "1..0 # Skipped: using IO::Socket::IP instead\n";
-	exit;
+    print "1..0 # Skipped: using IO::Socket::IP instead\n";
+    exit;
 }
 
 # check if we have loaded INET6, IO::Socket::SSL should do it by itself
 # if it is available
 unless( IO::Socket::SSL->CAN_IPV6 eq "IO::Socket::INET6" ) {
-	# not available or IO::Socket::SSL forgot to load it
-	if ( ! eval { require IO::Socket::INET6 } ) {
-		print "1..0 # Skipped: no IO::Socket::INET6 available\n";
-	} else {
-		print "1..1\nnot ok # automatic use of INET6\n";
-	}
-	exit
+    # not available or IO::Socket::SSL forgot to load it
+    if ( ! eval { require IO::Socket::INET6 } ) {
+	print "1..0 # Skipped: no IO::Socket::INET6 available\n";
+    } else {
+	print "1..1\nnot ok # automatic use of INET6\n";
+    }
+    exit
 }
 
 my $addr = '::1';
 # check if we can use ::1, e.g if the computer has IPv6 enabled
 if ( ! IO::Socket::INET6->new(
-	Listen => 10,
-	LocalAddr => $addr,
+    Listen => 10,
+    LocalAddr => $addr,
 )) {
-	print "1..0 # no IPv6 enabled on this computer\n";
-	exit
+    print "1..0 # no IPv6 enabled on this computer\n";
+    exit
 }
 
 $|=1;
@@ -72,11 +71,11 @@ if ( !defined $pid ) {
 
     $ID = 'client';
     close($server);
-    my $to_server = IO::Socket::SSL->new( 
-	PeerAddr => $addr, 
-	SSL_verify_mode => 0,
+    my $to_server = IO::Socket::SSL->new(
+    PeerAddr => $addr,
+    SSL_verify_mode => 0,
     ) || do {
-    	notok( "connect failed: ".IO::Socket::SSL->errstr() );
+	notok( "connect failed: ".IO::Socket::SSL->errstr() );
 	exit
     };
     ok( "client connected" );
@@ -84,9 +83,9 @@ if ( !defined $pid ) {
 } else {                ###### Server
 
     my $to_client = $server->accept || do {
-    	notok( "accept failed: ".$server->errstr() );
-		kill(9,$pid);
-		exit;
+	notok( "accept failed: ".$server->errstr() );
+	kill(9,$pid);
+	exit;
     };
     ok( "Server accepted" );
     wait;

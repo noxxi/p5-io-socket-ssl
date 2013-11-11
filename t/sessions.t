@@ -1,17 +1,13 @@
-#!perl -w
+#!perl
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl t/core.t'
 
+use strict;
+use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-eval {require "t/ssl_settings.req";} ||
-eval {require "ssl_settings.req";};
 
-$NET_SSLEAY_VERSION = $Net::SSLeay::VERSION;
-
-$numtests = 35;
-$|=1;
 
 foreach ($^O) {
     if (/MacOS/ or /VOS/ or /vmesa/ or /riscos/ or /amigaos/) {
@@ -20,48 +16,37 @@ foreach ($^O) {
     }
 }
 
-if ($NET_SSLEAY_VERSION < 1.26) {
-    print "1..0 \# Skipped: Net::SSLeay version less than 1.26\n";
-    exit;
-}
-
+$|=1;
+my $numtests = 35;
 print "1..$numtests\n";
 
-my %server_options = (
-    SSL_key_file => "certs/server-key.enc", 
-    SSL_passwd_cb => sub { return "bluebell" },
-    LocalAddr => $SSL_SERVER_ADDR,
-    Listen => 2,
-    Timeout => 30,
-    ReuseAddr => 1,
-    SSL_verify_mode => SSL_VERIFY_NONE, 
-    SSL_ca_file => "certs/test-ca.pem",
-    SSL_cert_file => "certs/server-cert.pem",
-    SSL_version => 'TLSv1',
-    SSL_cipher_list => 'HIGH'
-);
+my @servers = map {
+    IO::Socket::SSL->new(
+	LocalAddr => '127.0.0.1',
+	LocalPort => 0,
+	Listen => 2,
+	Timeout => 30,
+	ReuseAddr => 1,
+	SSL_key_file => "certs/server-key.enc",
+	SSL_passwd_cb => sub { return "bluebell" },
+	SSL_verify_mode => SSL_VERIFY_NONE,
+	SSL_ca_file => "certs/test-ca.pem",
+	SSL_cert_file => "certs/server-cert.pem",
+    )
+} (1..3);
 
-
-my @servers = (IO::Socket::SSL->new( %server_options),
-	       IO::Socket::SSL->new( %server_options),
-	       IO::Socket::SSL->new( %server_options));
-
-if (!$servers[0] or !$servers[1] or !$servers[2]) {
+if ( grep { !$_ } @servers > 0 ) {
     print "not ok # Server init\n";
     exit;
 }
 &ok("Server initialization");
 
-my ($SSL_SERVER_PORT)  = unpack_sockaddr_in( $servers[0]->sockname );
-my ($SSL_SERVER_PORT2) = unpack_sockaddr_in( $servers[1]->sockname );
-my ($SSL_SERVER_PORT3) = unpack_sockaddr_in( $servers[2]->sockname );
-
-
+my @saddr = map { $_->sockhost.':'.$_->sockport } @servers;
 unless (fork) {
-    close $_ foreach @servers;
+    @servers = ();
     my $ctx = IO::Socket::SSL::SSL_Context->new(
 	 SSL_passwd_cb => sub { return "opossum" },
-    	 SSL_verify_mode => SSL_VERIFY_PEER,
+	 SSL_verify_mode => SSL_VERIFY_PEER,
 	 SSL_ca_file => "certs/test-ca.pem",
 	 SSL_ca_path => '',
 	 SSL_version => 'TLSv1',
@@ -76,7 +61,7 @@ unless (fork) {
     }
     &ok("Context init");
 
-    
+
     # Bogus session test
     unless ($ctx->session_cache("bogus", "bogus", 0)) {
 	print "not ";
@@ -117,23 +102,20 @@ unless (fork) {
 
     IO::Socket::SSL::set_default_context($ctx);
 
-    my $sock3 = IO::Socket::INET->new(
-    	PeerAddr => $SSL_SERVER_ADDR,
-	PeerPort => $SSL_SERVER_PORT3
-    );
+    my $sock3 = IO::Socket::INET->new($saddr[2]);
     my @clients = (
-	IO::Socket::SSL->new(	
-	    PeerAddr => "$SSL_SERVER_ADDR:$SSL_SERVER_PORT",
+	IO::Socket::SSL->new(
+	    PeerAddr => $saddr[0],
 	    SSL_verify_mode => 0
 	),
-        IO::Socket::SSL->new(
-	    PeerAddr => "$SSL_SERVER_ADDR:$SSL_SERVER_PORT2",
+	IO::Socket::SSL->new(
+	    PeerAddr => $saddr[1],
 	    SSL_verify_mode => 0
 	),
-        IO::Socket::SSL->start_SSL( $sock3 , SSL_verify_mode => 0),
+	IO::Socket::SSL->start_SSL( $sock3 , SSL_verify_mode => 0),
     );
-    
-    if (!$clients[0] or !$clients[1] or !$clients[2]) {
+
+    if ( grep { !$_ } @clients >0 ) {
 	print "not ok \# Client init\n";
 	exit;
     }
@@ -155,15 +137,14 @@ unless (fork) {
     }
     &ok("Cache Tail Check");
 
-    if ($cache->{'_head'} ne $cache->{"$SSL_SERVER_ADDR:$SSL_SERVER_PORT3"}) {
+    if ($cache->{'_head'} ne $cache->{$saddr[2]}) {
 	print "not ";
     }
     &ok("Cache Insertion Test");
 
-    my @server_ports = ($SSL_SERVER_PORT, $SSL_SERVER_PORT2, $SSL_SERVER_PORT3);
     for (0..2) {
-	if (Net::SSLeay::get_session($clients[$_]->_get_ssl_object) ne 
-	    $cache->{"$SSL_SERVER_ADDR:$server_ports[$_]"}->{session}) {
+	if (Net::SSLeay::get_session($clients[$_]->_get_ssl_object) ne
+	    $cache->{$saddr[$_]}->{session}) {
 	    print "not ";
 	}
 	&ok("Cache Entry Test $_");
@@ -172,11 +153,10 @@ unless (fork) {
 
     @clients = map {
 	IO::Socket::SSL->new(
-	    PeerAddr => $SSL_SERVER_ADDR,
-	    PeerPort => $_,
+	    PeerAddr => $_,
 	    SSL_verify_mode => 0,
 	)
-    } ( $SSL_SERVER_PORT, $SSL_SERVER_PORT2, $SSL_SERVER_PORT3 );
+    } @saddr;
 
     if (keys(%$cache) != 6) {
 	print "not ";
@@ -189,8 +169,8 @@ unless (fork) {
     &ok("Cache Keys Check 5");
 
     for (0..2) {
-	if (Net::SSLeay::get_session($clients[$_]->_get_ssl_object) ne 
-	    $cache->{"$SSL_SERVER_ADDR:$server_ports[$_]"}->{session}) {
+	if (Net::SSLeay::get_session($clients[$_]->_get_ssl_object) ne
+	    $cache->{$saddr[$_]}->{session}) {
 	    print "not ";
 	}
 	&ok("Second Cache Entry Test $_");
@@ -209,17 +189,15 @@ unless (fork) {
 }
 
 my @clients = map { scalar $_->accept } @servers;
-if (!$clients[0] or !$clients[1] or !$clients[2]) {
+if ( grep { !$_ } @clients > 0 ) {
     print "not ok \# Client init\n";
     exit;
 }
 &ok("Client init");
-
-close $_ foreach (@clients);
-
+@clients = ();
 
 @clients = map { scalar $_->accept } @servers;
-if (!$clients[0] or !$clients[1] or !$clients[2]) {
+if ( grep { !$_ } @clients > 0 ) {
     print $SSL_ERROR;
     print "not ok \# Client init 2\n";
     exit;

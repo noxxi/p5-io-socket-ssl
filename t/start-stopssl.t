@@ -1,5 +1,7 @@
+#!perl
 
 use strict;
+use warnings;
 use IO::Socket::INET;
 use IO::Socket::SSL;
 
@@ -8,20 +10,17 @@ if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
     exit
 }
 
-use vars qw( $SSL_SERVER_ADDR );
-do "t/ssl_settings.req" || do "ssl_settings.req";
-
 $|=1;
 my @tests = qw( start stop start close );
 print "1..16\n";
 
 my $server = IO::Socket::INET->new(
-    LocalAddr => $SSL_SERVER_ADDR,
+    LocalAddr => '127.0.0.1',
+    LocalPort => 0,
     Listen => 2,
-    ReuseAddr => 1,
 ) || die "not ok #tcp listen failed: $!\n";
 print "ok #listen\n";
-my ($SSL_SERVER_PORT) = unpack_sockaddr_in( $server->sockname );
+my $saddr = $server->sockhost.':'.$server->sockport;
 
 defined( my $pid = fork() ) || die $!;
 $pid ? server():client();
@@ -31,7 +30,7 @@ exit(0);
 
 sub client {
     close($server);
-    my $client = IO::Socket::INET->new( "$SSL_SERVER_ADDR:$SSL_SERVER_PORT" ) or
+    my $client = IO::Socket::INET->new($saddr) or
 	die "not ok #client connect: $!\n";
     $client->autoflush;
     print "ok #client connect\n";
@@ -45,7 +44,7 @@ sub client {
 
 	    #print STDERR ">>$$(client) start\n";
 	    IO::Socket::SSL->start_SSL($client, SSL_verify_mode => 0 )
-	    	|| die "not ok #client::start_SSL: $SSL_ERROR\n";
+		|| die "not ok #client::start_SSL: $SSL_ERROR\n";
 	    #print STDERR "<<$$(client) start\n";
 	    print "ok # client::start_SSL\n";
 
@@ -97,7 +96,7 @@ sub server {
 	    ref($client) eq "IO::Socket::SSL" or print "not ";
 	    print "ok # server::class=".ref($client)."\n";
 	    print $client "OK\n";
-	
+
 	} elsif ( $line eq 'stop' ) {
 	    $client->stop_SSL || die "not ok #server::stop_SSL\n";
 	    print "ok #server::stop_SSL\n";
@@ -117,4 +116,3 @@ sub server {
 	}
     }
 }
-

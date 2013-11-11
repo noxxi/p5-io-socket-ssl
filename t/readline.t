@@ -1,8 +1,8 @@
-#!perl -w
+#!perl
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl t/readline.t'
 
-# This tests the behavior of readline with the variety of 
+# This tests the behavior of readline with the variety of
 # cases with $/:
 # $/ undef - read all
 # $/ ''    - read up to next nonempty line: .*?\n\n+
@@ -11,10 +11,11 @@
 # scalar context - get first match
 # array context  - get all matches
 
+use strict;
+use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-use strict;
 
 if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
     print "1..0 # Skipped: fork not implemented on this platform\n";
@@ -25,7 +26,7 @@ my @tests;
 push @tests, [
     "multi\nple\n\n1234567890line\n\n\n\nbla\n\nblubb\n\nblip",
     sub {
-    	my $c = shift;
+	my $c = shift;
 	local $/ = "\n\n";
 	my $b;
 	($b=<$c>) eq "multi\nple\n\n" || die "LFLF failed ($b)";
@@ -43,7 +44,7 @@ push @tests, [
 push @tests, [
     "some\nstring\nwith\nsome\nlines\nwhatever",
     sub {
-    	my $c = shift;
+	my $c = shift;
 	local $/ = "\n";
 	my $b;
 	($b=<$c>) eq "some\n" || die "LF failed ($b)";
@@ -55,7 +56,7 @@ push @tests, [
 push @tests, [
     "some\nstring\nwith\nsome\nlines\nwhatever",
     sub {
-    	my $c = shift;
+	my $c = shift;
 	local $/ = "\n";
 	my @c = <$c>;
 	die "LF @ failed: @c" unless $c[0] eq "some\n" &&
@@ -68,10 +69,10 @@ push @tests, [
 push @tests, [
     "some\nstring\nwith\nsome\nlines\nwhatever",
     sub {
-    	my $c = shift;
+	my $c = shift;
 	local $/;
 	my @c = <$c>;
-	die "undef @ failed: @c" unless 
+	die "undef @ failed: @c" unless
 	    $c[0] eq "some\nstring\nwith\nsome\nlines\nwhatever"
 	    && @c == 1;
 
@@ -81,10 +82,10 @@ push @tests, [
 push @tests, [
     "1234567890",
     sub {
-    	my $c = shift;
+	my $c = shift;
 	local $/ = \2;
 	my @c = <$c>;
-	die "\\2 @ failed: @c" unless 
+	die "\\2 @ failed: @c" unless
 	    $c[0] eq '12' && $c[1] eq '34' && $c[2] eq '56' &&
 	    $c[3] eq '78' && $c[4] eq '90' && @c == 5;
 
@@ -94,7 +95,7 @@ push @tests, [
 push @tests, [
     [ "bla\n","0","blubb\n","no newline" ],
     sub {
-    	my $c = shift;
+	my $c = shift;
 	my $l = <$c>;
 	$l eq "bla\n" or die "'bla\\n' failed";
 	$l = <$c>;
@@ -155,7 +156,7 @@ $ID = 'client';
 close($server);
 my $testid = "Test00";
 foreach my $test (@tests) {
-    my $to_server = IO::Socket::SSL->new( 
+    my $to_server = IO::Socket::SSL->new(
 	PeerAddr => $addr,
 	SSL_verify_mode => 0 ) || do {
 	notok( "connect failed: ".IO::Socket::SSL->errstr() );

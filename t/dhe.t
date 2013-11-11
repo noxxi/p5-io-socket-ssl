@@ -1,4 +1,4 @@
-#!perl -w
+#!perl
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl t/dhe.t'
 
@@ -8,10 +8,11 @@
 # http://groups.google.de/group/mailing.openssl.users/msg/d60330cfa7a6034b
 # So this test simple uses a 384bit RSA key to make sure that DHE is used.
 
+use strict;
+use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-use strict;
 
 
 if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
@@ -34,7 +35,7 @@ my $server = IO::Socket::SSL->new(
     SSL_dh_file   => "certs/server-rsa384-dh.pem",
     # at least 0.9.8[ab] have problems if we don't explicitly disable
     # RSA or EXPORT56, and 1.0.1 complains if we have RSA authentication
-    # enabled 
+    # enabled
     SSL_cipher_list => 'ALL:RSA:!aRSA',
 ) || do {
     notok($!);
@@ -53,11 +54,11 @@ if ( !defined $pid ) {
 
     $ID = 'client';
     close($server);
-    my $to_server = IO::Socket::SSL->new( 
-	PeerAddr => $addr, 
+    my $to_server = IO::Socket::SSL->new(
+	PeerAddr => $addr,
 	SSL_cipher_list => 'ALL:RSA:!aRSA',
 	SSL_verify_mode => 0 ) || do {
-    	notok( "connect failed: $SSL_ERROR" );
+	notok( "connect failed: $SSL_ERROR" );
 	exit
     };
     ok( "client connected" );
@@ -65,7 +66,7 @@ if ( !defined $pid ) {
 } else {                ###### Server
 
     my $to_client = $server->accept || do {
-    	notok( "accept failed: $SSL_ERROR" );
+	notok( "accept failed: $SSL_ERROR" );
 	kill(9,$pid);
 	exit;
     };

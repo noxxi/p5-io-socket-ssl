@@ -1,14 +1,15 @@
-#!perl -w
+#!perl
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl t/dhe.t'
 
 # make sure IO::Socket::INET6 will not be used
 BEGIN { $INC{'IO/Socket/INET6.pm'} = undef }
 
+use strict;
+use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-use strict;
 
 
 if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
@@ -19,23 +20,23 @@ if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
 # check if we have loaded IO::Socket::IP, IO::Socket::SSL should do it by
 # itself if it is available
 unless( IO::Socket::SSL->CAN_IPV6 eq "IO::Socket::IP" ) {
-	# not available or IO::Socket::SSL forgot to load it
-	if ( ! eval { require IO::Socket::IP; IO::Socket::IP->VERSION(0.20) } ) {
-		print "1..0 # Skipped: no IO::Socket::IP 0.20 available\n";
-	} else {
-		print "1..1\nnot ok # automatic use of IO::Socket::IP\n";
-	}
-	exit
+    # not available or IO::Socket::SSL forgot to load it
+    if ( ! eval { require IO::Socket::IP; IO::Socket::IP->VERSION(0.20) } ) {
+	print "1..0 # Skipped: no IO::Socket::IP 0.20 available\n";
+    } else {
+	print "1..1\nnot ok # automatic use of IO::Socket::IP\n";
+    }
+    exit
 }
 
 my $addr = '::1';
 # check if we can use ::1, e.g if the computer has IPv6 enabled
 if ( ! IO::Socket::IP->new(
-	Listen => 10,
-	LocalAddr => $addr,
+    Listen => 10,
+    LocalAddr => $addr,
 )) {
-	print "1..0 # no IPv6 enabled on this computer\n";
-	exit
+    print "1..0 # no IPv6 enabled on this computer\n";
+    exit
 }
 
 $|=1;
@@ -67,20 +68,20 @@ if ( !defined $pid ) {
     $ID = 'client';
     close($server);
     my $to_server = IO::Socket::SSL->new(
-	PeerAddr => $addr,
-	SSL_verify_mode => 0
+    PeerAddr => $addr,
+    SSL_verify_mode => 0
     ) || do {
-    	notok( "connect failed: ".IO::Socket::SSL->errstr() );
-		exit
+	notok( "connect failed: ".IO::Socket::SSL->errstr() );
+	exit
     };
     ok( "client connected" );
 
 } else {                ###### Server
 
     my $to_client = $server->accept || do {
-    	notok( "accept failed: ".$server->errstr() );
-		kill(9,$pid);
-		exit;
+	notok( "accept failed: ".$server->errstr() );
+	kill(9,$pid);
+	exit;
     };
     ok( "Server accepted" );
     wait;

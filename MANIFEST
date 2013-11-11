@@ -26,7 +26,6 @@ lib/IO/Socket/SSL.pm
 lib/IO/Socket/SSL/Intercept.pm
 lib/IO/Socket/SSL/Utils.pm
 t/01loadmodule.t
-t/02settings.t
 t/acceptSSL-timeout.t
 t/auto_verify_hostname.t
 t/cert_no_file.t
@@ -42,7 +41,6 @@ t/npn.t
 t/readline.t
 t/sessions.t
 t/signal-readline.t
-t/ssl_settings.req
 t/startssl-failed.t
 t/startssl.t
 t/start-stopssl.t

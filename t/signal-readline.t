@@ -1,57 +1,54 @@
-#!perl -w
+#!perl
 
 use strict;
+use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 
 if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
-	print "1..0 # Skipped: fork not implemented on this platform\n";
-	exit
+    print "1..0 # Skipped: fork not implemented on this platform\n";
+    exit
 }
 
 if ( $^O =~m{mswin32}i ) {
-	print "1..0 # Skipped: signals not relevant on this platform\n";
-	exit
+    print "1..0 # Skipped: signals not relevant on this platform\n";
+    exit
 }
-
-use vars qw( $SSL_SERVER_ADDR );
-do "t/ssl_settings.req" || do "ssl_settings.req";
 
 print "1..9\n";
 
 my $server = IO::Socket::SSL->new(
-	LocalAddr => $SSL_SERVER_ADDR,
-	Listen => 2,
-	ReuseAddr => 1,
-	SSL_server => 1,
-	SSL_ca_file => "certs/test-ca.pem",
-	SSL_cert_file => "certs/server-wildcard.pem",
-	SSL_key_file => "certs/server-wildcard.pem",
+    LocalAddr => '127.0.0.1',
+    LocalPort => 0,
+    Listen => 2,
+    SSL_server => 1,
+    SSL_ca_file => "certs/test-ca.pem",
+    SSL_cert_file => "certs/server-wildcard.pem",
+    SSL_key_file => "certs/server-wildcard.pem",
 );
 warn "\$!=$!, \$\@=$@, S\$SSL_ERROR=$SSL_ERROR" if ! $server;
 print "not ok\n", exit if !$server;
 ok("Server Initialization");
-my $SSL_SERVER_PORT = $server->sockport;
+my $saddr = $server->sockhost.':'.$server->sockport;
 
 defined( my $pid = fork() ) || die $!;
 if ( $pid == 0 ) {
 
-	$SIG{HUP} = sub { ok("got hup") };
+    $SIG{HUP} = sub { ok("got hup") };
 
-	close($server);
-	my $client = IO::Socket::SSL->new( 
-	    PeerAddr => $SSL_SERVER_ADDR,
-	    PeerPort => $SSL_SERVER_PORT,
-	    SSL_verify_mode => 0
-	) || print "not ";
-	ok( "client ssl connect" );
+    close($server);
+    my $client = IO::Socket::SSL->new(
+	PeerAddr => $saddr,
+	SSL_verify_mode => 0
+    ) || print "not ";
+    ok( "client ssl connect" );
 
-	my $line = <$client>;
-	print "not " if $line ne "foobar\n";
-	ok("got line");
+    my $line = <$client>;
+    print "not " if $line ne "foobar\n";
+    ok("got line");
 
-	exit;
+    exit;
 }
 
 my $csock = $server->accept;
@@ -75,4 +72,3 @@ ok("wait: $?");
 
 
 sub ok { print "ok #$_[0]\n"; }
-

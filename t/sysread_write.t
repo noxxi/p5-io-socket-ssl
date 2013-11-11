@@ -1,4 +1,4 @@
-#!perl -w
+#!perl
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl t/sysread_write.t'
 
@@ -6,13 +6,11 @@
 # that the latter ones are blocking until they read/write everything while
 # the sys* function also can read/write partial data.
 
+use strict;
+use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-use strict;
-
-use vars qw( $SSL_SERVER_ADDR );
-do "t/ssl_settings.req" || do "ssl_settings.req";
 
 if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
     print "1..0 # Skipped: fork not implemented on this platform\n";
@@ -30,20 +28,16 @@ print "1..9\n";
 # first create simple ssl-server
 my $ID = 'server';
 my $server = IO::Socket::SSL->new(
-    LocalAddr => $SSL_SERVER_ADDR,
+    LocalAddr => '127.0.0.1',
+    LocalPort => 0,
     Listen => 2,
-    ReuseAddr => 1,
-    SSL_server => 1,
-    SSL_verify_mode => 0x00,
-    SSL_ca_file => "certs/test-ca.pem",
     SSL_cert_file => "certs/client-cert.pem",
     SSL_key_file => "certs/client-key.pem",
 );
-
-print "not ok: $!\n", exit if !$server; # Address in use?
+print "not ok: $!\n", exit if !$server;
 ok("Server Initialization");
 
-my ($SSL_SERVER_PORT) = unpack_sockaddr_in( $server->sockname );
+my $saddr = $server->sockhost.':'.$server->sockport;
 
 defined( my $pid = fork() ) || die $!;
 if ( $pid == 0 ) {
@@ -55,12 +49,11 @@ if ( $pid == 0 ) {
     close($server);
     $ID = 'client';
 
-    my $to_server = IO::Socket::SSL->new( 
-	PeerAddr => $SSL_SERVER_ADDR,
-	PeerPort => $SSL_SERVER_PORT,
-	SSL_verify_mode => 0x00,
+    my $to_server = IO::Socket::SSL->new(
+	PeerAddr => $saddr,
+	SSL_ca_file => "certs/test-ca.pem",
     ) || do {
-    	print "not ok: connect failed: $!\n";
+	print "not ok: connect failed: $!\n";
 	exit
     };
 
@@ -71,13 +64,13 @@ if ( $pid == 0 ) {
     # (and not block).
     alarm(10);
     $SIG{ALRM} = sub {
-    	print "not ok: timed out\n";
+	print "not ok: timed out\n";
 	exit;
     };
     #DEBUG( "send 2x512 byte" );
-    unless ( syswrite( $to_server, 'x' x 512 ) == 512 
-    	and syswrite( $to_server, 'x' x 512 ) == 512 ) {
-    	print "not ok: write to small: $!\n";
+    unless ( syswrite( $to_server, 'x' x 512 ) == 512
+	and syswrite( $to_server, 'x' x 512 ) == 512 ) {
+	print "not ok: write to small: $!\n";
 	exit;
     }
 
@@ -112,7 +105,7 @@ if ( $pid == 0 ) {
     ############################################################
 
     my $to_client = $server->accept || do {
-    	print "not ok: accept failed: $!\n";
+	print "not ok: accept failed: $!\n";
 	kill(9,$pid);
 	exit;
     };
@@ -122,7 +115,7 @@ if ( $pid == 0 ) {
     my $partial;
     while ( $total > 0 ) {
 	#DEBUG( "reading 66 of $total bytes pending=".$to_client->pending() );
-    	my $n = sysread( $to_client, my $buf,66 );
+	my $n = sysread( $to_client, my $buf,66 );
 	#DEBUG( "read $n bytes" );
 	if ( !$n ) {
 	    print "not ok: read failed: $!\n";
@@ -141,9 +134,9 @@ if ( $pid == 0 ) {
     ok( "send ack back" );
 
     # just read so that the writes will not block
-    $to_client->read( my $buf,18000 ); 
-    $to_client->read( $buf,18000 ); 
-	
+    $to_client->read( my $buf,18000 );
+    $to_client->read( $buf,18000 );
+
 
     # wait until client exits
     wait;

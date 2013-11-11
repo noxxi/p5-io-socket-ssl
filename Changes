@@ -1,3 +1,18 @@
+1.957 2013/11/11
+- fixed t/core.t: test uses cipher_list of HIGH, which includes anonymous
+  authorization. With the DH param given by default since 1.956 old versions of
+  openssl (like 0.9.8k) used cipher ADH-AES256-SHA (e.g. anonymous
+  authorization) instead of AES256-SHA and thus the check for the peer
+  certificate failed (because ADH does not exchanges certificates).
+  Fixed by explicitly specifying HIGH:!aNULL as cipher
+- cleaned up tests: 
+  - remove ssl_settings.req and 02settings.t, because all tests now create a
+    simple socket at 127.0.0.1 and thus global settings are no longer needed.
+  - some tests did not have use strict(!), fixed it.
+  - removed special handling for older Net::SSLeay versions, which are less than
+    our minimum requirement
+  - some syntax enhancements, removed some SSL_version and SSL_cipher_list
+    options where they were not really needed
 1.956 2013/11/10
 lots of behavior changes for more secure defaults:
 - BEHAVIOR CHANGE: make default cipher list more secure, especially

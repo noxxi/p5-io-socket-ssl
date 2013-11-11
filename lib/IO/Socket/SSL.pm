@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.956';
+our $VERSION = '1.957';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -51,7 +51,7 @@ my %DEFAULT_SSL_ARGS = (
     SSL_verifycn_scheme => undef,  # don't verify cn
     SSL_verifycn_name => undef,    # use from PeerAddr/PeerHost
     SSL_npn_protocols => undef,    # meaning depends whether on server or client side
-    SSL_cipher_list => 
+    SSL_cipher_list =>
 	'EECDH+AESGCM+ECDSA EECDH+AESGCM EECDH+ECDSA +AES256 EECDH EDH+AESGCM '.
 	'EDH ALL +SHA +3DES +RC4 !LOW !EXP !eNULL !aNULL !DES !MD5 !PSK !SRP',
 );
@@ -66,9 +66,9 @@ my %DEFAULT_SSL_SERVER_ARGS = (
     SSL_verify_mode => SSL_VERIFY_NONE,
     SSL_honor_cipher_order => 1,   # trust server to know the best cipher
     SSL_dh => do {
-        my $bio = Net::SSLeay::BIO_new(Net::SSLeay::BIO_s_mem());
-        # generated with: openssl dhparam 2048
-        Net::SSLeay::BIO_write($bio,<<'DH');
+	my $bio = Net::SSLeay::BIO_new(Net::SSLeay::BIO_s_mem());
+	# generated with: openssl dhparam 2048
+	Net::SSLeay::BIO_write($bio,<<'DH');
 -----BEGIN DH PARAMETERS-----
 MIIBCAKCAQEAr8wskArj5+1VCVsnWt/RUR7tXkHJ7mGW7XxrLSPOaFyKyWf8lZht
 iSY2Lc4oa4Zw8wibGQ3faeQu/s8fvPq/aqTxYmyHPKCMoze77QJHtrYtJAosB9SY
@@ -78,10 +78,10 @@ Ps2vlkxjAHjJcqc3O+OiImKik/X2rtBTZjpKmzN3WWTB0RJZCOWaLlDO81D01o1E
 aZecz3Np9KIYey900f+X7zC2bJxEHp95ywIBAg==
 -----END DH PARAMETERS-----
 DH
-        my $dh = Net::SSLeay::PEM_read_bio_DHparams($bio);
-        Net::SSLeay::BIO_free($bio);
-        $dh or die "no DH";
-        $dh;
+	my $dh = Net::SSLeay::PEM_read_bio_DHparams($bio);
+	Net::SSLeay::BIO_free($bio);
+	$dh or die "no DH";
+	$dh;
     },
     $can_ecdh ? ( SSL_ecdh_curve => 'prime256v1' ):(),
 
@@ -179,7 +179,7 @@ BEGIN {
 }
 
 sub DEBUG {
-    $DEBUG or return; 
+    $DEBUG or return;
     my (undef,$file,$line) = caller;
     my $msg = shift;
     $file = '...'.substr( $file,-17 ) if length($file)>20;
@@ -314,10 +314,10 @@ sub configure_SSL {
     }
 
     # add user defined defaults
-    %$arg_hash = ( 
-	%$GLOBAL_SSL_ARGS, 
+    %$arg_hash = (
+	%$GLOBAL_SSL_ARGS,
 	$is_server ? %$GLOBAL_SSL_SERVER_ARGS : %$GLOBAL_SSL_CLIENT_ARGS,
-	%$arg_hash 
+	%$arg_hash
     );
 
     my $ctx = $arg_hash->{'SSL_reuse_ctx'};
@@ -848,7 +848,7 @@ sub readline {
 
 	# peek into available data w/o reading
 	my $pending = Net::SSLeay::pending($ssl);
-	if ( $pending and 
+	if ( $pending and
 	    ( my $pb = Net::SSLeay::peek( $ssl,$pending )) ne '' ) {
 	    $buf .= $pb
 	} else {
@@ -921,7 +921,7 @@ sub stop_SSL {
 	    my $fast = $stop_args->{SSL_fast_shutdown};
 	    my $status = Net::SSLeay::get_shutdown($ssl);
 	    if ( $fast && $status != 0) {
-		# shutdown done, either status has  
+		# shutdown done, either status has
 		# SSL_SENT_SHUTDOWN or SSL_RECEIVED_SHUTDOWN or both,
 		# so the handshake is at least in process
 		$shutdown_done = 1;
@@ -1081,29 +1081,13 @@ sub dump_peer_certificate {
     my %dispatcher = (
 	issuer =>  sub { Net::SSLeay::X509_NAME_oneline( Net::SSLeay::X509_get_issuer_name( shift )) },
 	subject => sub { Net::SSLeay::X509_NAME_oneline( Net::SSLeay::X509_get_subject_name( shift )) },
-    );
-    if ( $Net::SSLeay::VERSION >= 1.30 ) {
-	# I think X509_NAME_get_text_by_NID got added in 1.30
-	$dispatcher{commonName} = sub {
+	commonName => sub {
 	    my $cn = Net::SSLeay::X509_NAME_get_text_by_NID(
 		Net::SSLeay::X509_get_subject_name( shift ), NID_CommonName);
-	    $cn =~s{\0$}{}; # work around Bug in Net::SSLeay <1.33
 	    $cn;
-	}
-    } else {
-	$dispatcher{commonName} = sub {
-	    croak "you need at least Net::SSLeay version 1.30 for getting commonName"
-	}
-    }
-
-    if ( $Net::SSLeay::VERSION >= 1.33 ) {
-	# X509_get_subjectAltNames did not really work before
-	$dispatcher{subjectAltNames} = sub { Net::SSLeay::X509_get_subjectAltNames( shift ) };
-    } else {
-	$dispatcher{subjectAltNames} = sub {
-	    croak "you need at least Net::SSLeay version 1.33 for getting subjectAltNames"
-	};
-    }
+	},
+	subjectAltNames => sub { Net::SSLeay::X509_get_subjectAltNames( shift ) },
+    );
 
     # alternative names
     $dispatcher{authority} = $dispatcher{issuer};
@@ -1140,7 +1124,7 @@ sub dump_peer_certificate {
     );
 
     for(qw(
-	rfc2818 http www 
+	rfc2818 http www
 	rfc3920 xmpp
 	rfc4217 ftp
     )) {
@@ -1228,7 +1212,7 @@ sub dump_peer_certificate {
 	my $ipn;
 	if ( CAN_IPV6 and $identity =~m{:} ) {
 	    # no IPv4 or hostname have ':'  in it, try IPv6.
-	    $ipn = inet_pton(AF_INET6,$identity) 
+	    $ipn = inet_pton(AF_INET6,$identity)
 		or croak "'$identity' is not IPv6, but neither IPv4 nor hostname";
 	} elsif ( $identity =~m{^\d+\.\d+\.\d+\.\d+$} ) {
 	     # definitely no hostname, try IPv4
@@ -1254,7 +1238,7 @@ sub dump_peer_certificate {
 	    # deal with certificates like *.com, *.co.uk or even *
 	    # see also http://nils.toedtmann.net/pub/subjectAltName.txt .
 	    # Also, we fall back to leftmost matches if the identity is an IDNA
-	    # name, see RFC6125 and the discussion at 
+	    # name, see RFC6125 and the discussion at
 	    # http://bugs.python.org/issue17997#msg194950
 	    if ( $wtyp eq 'anywhere' and $name =~m{^([a-zA-Z0-9_\-]*)\*(.+)} ) {
 		return if $1 ne '' and substr($identity,0,4) eq 'xn--'; # IDNA
@@ -1351,7 +1335,7 @@ sub error {
 	$DEBUG>=2 && DEBUG( $error."\n".$self->get_ssleay_error());
     }
     # if no new error occurred report last again
-    if ( ! @err and my $err = 
+    if ( ! @err and my $err =
 	ref($self) ? ${*$self}{'_SSL_last_err'} : $SSL_ERROR ) {
 	push @err,$err;
     }
@@ -1408,7 +1392,7 @@ sub set_defaults {
 }
 { # deprecated API
     no warnings;
-    *set_ctx_defaults = \&set_defaults; 
+    *set_ctx_defaults = \&set_defaults;
 }
 sub set_client_defaults {
     my %args = @_;
@@ -1540,7 +1524,7 @@ sub new {
     %$arg_hash = (
 	SSL_use_cert => $is_server,
 	$is_server ? %DEFAULT_SSL_SERVER_ARGS : %DEFAULT_SSL_CLIENT_ARGS,
-	%$arg_hash 
+	%$arg_hash
     );
 
     # Avoid passing undef arguments to Net::SSLeay
@@ -1561,13 +1545,13 @@ sub new {
 	    $use_default = 0;
 	}
 
-	$use_default = 0 if $use_default 
-	    and ! $is_server 
+	$use_default = 0 if $use_default
+	    and ! $is_server
 	    and ! $arg_hash->{SSL_verify_mode};
 
 	if ( $use_default ) {
 
-	    my %ca = 
+	    my %ca =
 		-f 'certs/my-ca.pem' ? ( SSL_ca_file => 'certs/my-ca.pem' ) :
 		-d 'ca/' ? ( SSL_ca_path => 'ca/' ) :
 		();
@@ -1606,7 +1590,7 @@ sub new {
 		die "SSL_ca_file $f is not accessable" if ! -r _;
 	    }
 	    if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
-		die "only SSL_ca_path or SSL_ca_file should be given" 
+		die "only SSL_ca_path or SSL_ca_file should be given"
 		    if defined $arg_hash->{SSL_ca_file};
 		die "SSL_ca_path $d does not exist" if ! -d $d;
 		die "SSL_ca_path $d is not accessable" if ! -r _;
@@ -1650,15 +1634,15 @@ sub new {
 
     my $ver;
     for (split(/\s*:\s*/,$arg_hash->{SSL_version})) {
-	m{^(!?)(?:(SSL(?:v2|v3|v23|v2/3))|(TLSv1[12]?))$}i 
+	m{^(!?)(?:(SSL(?:v2|v3|v23|v2/3))|(TLSv1[12]?))$}i
 	or croak("invalid SSL_version specified");
 	my $not = $1;
 	( my $v = lc($2||$3) ) =~s{^(...)}{\U$1};
 	$v =~s{/}{}; # interpret SSLv2/3 as SSLv23
 	if ( $not ) {
-	    $ssl_op |= 
-		$v eq 'SSLv2'  ? 0x01000000 : # SSL_OP_NO_SSLv2 
-		$v eq 'SSLv3'  ? 0x02000000 : # SSL_OP_NO_SSLv3 
+	    $ssl_op |=
+		$v eq 'SSLv2'  ? 0x01000000 : # SSL_OP_NO_SSLv2
+		$v eq 'SSLv3'  ? 0x02000000 : # SSL_OP_NO_SSLv3
 		$v eq 'TLSv1'  ? 0x04000000 : # SSL_OP_NO_TLSv1
 		$v eq 'TLSv11' ? 0x00000400 : # SSL_OP_NO_TLSv1_1
 		$v eq 'TLSv12' ? 0x08000000 : # SSL_OP_NO_TLSv1_2
@@ -1678,7 +1662,7 @@ sub new {
 	$ver eq 'TLSv12' ? 'CTX_tlsv1_2_new' :
 	'CTX_new'
     ) or return IO::Socket::SSL->error("SSL Version $ver not supported");
-    my $ctx = $ctx_new_sub->() or return 
+    my $ctx = $ctx_new_sub->() or return
 	IO::Socket::SSL->error("SSL Context init failed");
 
     # SSL_OP_CIPHER_SERVER_PREFERENCE
@@ -1690,7 +1674,7 @@ sub new {
     # client session caching will fail
     # if user does not provide explicit id just use the stringification
     # of the context
-    if ( my $id = $arg_hash->{SSL_session_id_context} 
+    if ( my $id = $arg_hash->{SSL_session_id_context}
 	|| ( $arg_hash->{SSL_verify_mode} & 0x01 ) && "$ctx" ) {
 	Net::SSLeay::CTX_set_session_id_context($ctx,$id,length($id));
     }
@@ -1719,7 +1703,7 @@ sub new {
     if ( $verify_mode != Net::SSLeay::VERIFY_NONE()) {
 	if ( defined $arg_hash->{SSL_ca_file} || defined $arg_hash->{SSL_ca_path} ) {
 	    return IO::Socket::SSL->error("Invalid certificate authority locations")
-		if ! Net::SSLeay::CTX_load_verify_locations( $ctx, 
+		if ! Net::SSLeay::CTX_load_verify_locations( $ctx,
 		    $arg_hash->{SSL_ca_file} || '',$arg_hash->{SSL_ca_path} || '');
 	} else {
 	    # no CA path given, continue with system defaults
@@ -1766,7 +1750,7 @@ sub new {
 	$sni{''}{ctx} = $ctx if exists $sni{''}; # default if no SNI
 	for my $sni (values %sni) {
 	    # we need a new context for each server
-	    my $snictx = $sni->{ctx} ||= $ctx_new_sub->() or return 
+	    my $snictx = $sni->{ctx} ||= $ctx_new_sub->() or return
 		IO::Socket::SSL->error("SSL Context init failed");
 
 	    if ( my $pkey = $sni->{SSL_key} ) {
@@ -1837,11 +1821,11 @@ sub new {
 		if ! $can_ecdh;
 	    if ( $curve !~ /^\d+$/ ) {
 		# name of curve, find NID
-		$curve = Net::SSLeay::OBJ_txt2nid($curve) 
+		$curve = Net::SSLeay::OBJ_txt2nid($curve)
 		    || return IO::Socket::SSL->error(
 		    "cannot find NID for curve name '$curve'");
 	    }
-	    my $ecdh = Net::SSLeay::EC_KEY_new_by_curve_name($curve) or 
+	    my $ecdh = Net::SSLeay::EC_KEY_new_by_curve_name($curve) or
 		return IO::Socket::SSL->error(
 		"cannot create curve for NID $curve");
 	    Net::SSLeay::CTX_set_tmp_ecdh($ctx,$ecdh) or
@@ -2010,7 +1994,7 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
 	SSL_ca_path => '/etc/ssl/certs', # typical CA path on Linux
 	# on OpenBSD instead: SSL_ca_file => '/etc/ssl/cert.pem'
 
-	# easy hostname verification 
+	# easy hostname verification
 	SSL_verifycn_name => 'foo.bar', # defaults to PeerHost
 	SSL_verifycn_scheme => 'http',
 
@@ -2037,7 +2021,7 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
     ) or die "failed to listen: $!";
 
     # accept client
-    my $client = $server->accept or die 
+    my $client = $server->accept or die
 	"failed to accept or ssl handshake: $!,$SSL_ERROR";
 
     # Upgrade existing socket to SSL ---------------------------------
@@ -2055,7 +2039,7 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
 	or die "hostname verification failed";
 
     # all data are now SSL encrypted
-    print $sock .... 
+    print $sock ....
 
 
 =head1 DESCRIPTION
@@ -2100,7 +2084,7 @@ With IO::Socket::INET you only get IPv4 support.
 
 Please be aware, that with the IPv6 capable super classes, it will lookup first
 for the IPv6 address of a given hostname. If the resolver provides an IPv6
-address, but the host cannot be reached by IPv6, there will be no automatic 
+address, but the host cannot be reached by IPv6, there will be no automatic
 fallback to IPv4.
 To avoid these problems you can either force IPv4 by specifying and AF_INET
 as C<Domain> of the socket or globally enforce IPv4 by loading IO::Socket::SSL
@@ -2138,7 +2122,7 @@ See section "SNI Support" for details of SNI the support.
 
 =item SSL_version
 
-Sets the version of the SSL protocol used to transmit data. 'SSLv23' auto-negotiates 
+Sets the version of the SSL protocol used to transmit data. 'SSLv23' auto-negotiates
 between SSLv2 and SSLv3, while 'SSLv2', 'SSLv3', 'TLSv1', 'TLSv11' or 'TLSv12'
 restrict the protocol to the specified version. All values are case-insensitive.
 Support for 'TLSv11' and 'TLSv12' requires recent versions of Net::SSLeay
@@ -2146,14 +2130,14 @@ and openssl.
 
 You can limit to set of supported protocols by adding !version separated by ':'.
 
-The default SSL_version is 'SSLv23:!SSLv2' which means, that SSLv2, SSLv3 and TLSv1 
-are supported for initial protocol handshakes, but SSLv2 will not be accepted, leaving 
+The default SSL_version is 'SSLv23:!SSLv2' which means, that SSLv2, SSLv3 and TLSv1
+are supported for initial protocol handshakes, but SSLv2 will not be accepted, leaving
 only SSLv3 and TLSv1. You can also use !TLSv11 and !TLSv12 to disable TLS versions
 1.1 and 1.2 while allowing TLS version 1.0.
 
 Setting the version instead to 'TLSv1' will probably break interaction with lots of
 clients which start with SSLv2 and then upgrade to TLSv1. On the other side some
-clients just close the connection when they receive a TLS version 1.1 request. In this 
+clients just close the connection when they receive a TLS version 1.1 request. In this
 case setting the version to 'SSLv23:!SSLv2:!TLSv11:!TLSv12' might help.
 
 =item SSL_cipher_list
@@ -2197,7 +2181,7 @@ when creating the socket.
 If you create a server you usually need to specify a server certificate which
 should be verified by the client. Same is true for client certificates, which
 should be verified by the server.
-The certificate can be given as a file in PEM format with SSL_cert_file or 
+The certificate can be given as a file in PEM format with SSL_cert_file or
 as an internal representation of a X509* object with SSL_cert.
 
 For each certificate a key is need, which can either be given as a file in PEM
@@ -2220,13 +2204,13 @@ Examples:
     "foo.example.org" => 'foo-cert.pem',
     "bar.example.org" => 'bar-cert.pem',
     # used when nothing matches or client does not support SNI
-    '' => 'default-cert.pem', 
+    '' => 'default-cert.pem',
  }
  SSL_key_file => {
     "foo.example.org" => 'foo-key.pem',
     "bar.example.org" => 'bar-key.pem',
     # used when nothing matches or client does not support SNI
-    '' => 'default-key.pem', 
+    '' => 'default-key.pem',
  }
 
 
@@ -2275,7 +2259,7 @@ If you really don't want to set a CA set this key to C<''>.
 
 =item SSL_verify_mode
 
-This option sets the verification mode for the peer certificate.  
+This option sets the verification mode for the peer certificate.
 You may combine SSL_VERIFY_PEER (verify_peer), SSL_VERIFY_FAIL_IF_NO_PEER_CERT
 (fail verification if no peer certificate exists; ignored for clients),
 SSL_VERIFY_CLIENT_ONCE (verify client once; ignored for clients).
@@ -2373,7 +2357,7 @@ argument.
 
 Example for limiting the server session cache size:
 
-  SSL_create_ctx_callback => sub { 
+  SSL_create_ctx_callback => sub {
       my $ctx = shift;
 	  Net::SSLeay::CTX_sess_set_cache_size($ctx,128);
   }
@@ -2422,14 +2406,14 @@ text of the error message.
 =item SSL_npn_protocols
 
 If used on the server side it specifies list of protocols advertised by SSL
-server as an array ref, e.g. ['spdy/2','http1.1']. 
+server as an array ref, e.g. ['spdy/2','http1.1'].
 On the client side it specifies the protocols offered by the client for NPN
 as an array ref.
 See also method L<next_proto_negotiated>.
 
 Next Protocol Negotioation (NPN) is available with Net::SSLeay 1.46+ and openssl-1.0.1+.
 To check support you might call C<IO::Socket::SSL->can_npn()>.
-If you use this option with an unsupported Net::SSLeay/OpenSSL it will 
+If you use this option with an unsupported Net::SSLeay/OpenSSL it will
 throw an error.
 
 =back
@@ -2550,7 +2534,7 @@ match it checks against the common name, but there are no wildcards allowed.
 
 =item http (rfc2818), alias is www
 
-Extended wildcards in subjectAltNames and common name are possible, e.g. 
+Extended wildcards in subjectAltNames and common name are possible, e.g.
 *.example.org or even www*.example.org. The common
 name will be only checked if no names are given in subjectAltNames.
 
@@ -2780,7 +2764,7 @@ or connect is to set C<$!> to EAGAIN if the operation can not be completed
 immediately.
 
 With SSL there are cases, like with SSL handshakes, where the write operation
-can not be completed until it can read from the socket or vice versa. 
+can not be completed until it can read from the socket or vice versa.
 In these cases C<$!> is set to EGAIN like expected, and additionally
 C<$SSL_ERROR> is set to either SSL_WANT_READ or SSL_WANT_WRITE.
 Thus if you get EAGAIN on a SSL socket you must check C<$SSL_ERROR> for
@@ -2796,7 +2780,7 @@ occurs it will return nothing, even if it already received some data.
 =head1 SNI Support
 
 Newer extensions to SSL can distinguish between multiple hostnames on the same
-IP address using Server Name Indication (SNI). 
+IP address using Server Name Indication (SNI).
 
 Support for SNI on the client side was added somewhere in the OpenSSL 0.9.8
 series, but only with 1.0 a bug was fixed when the server could not decide about
@@ -2863,7 +2847,7 @@ See the 'example' directory.
 =head1 BUGS
 
 IO::Socket::SSL depends on Net::SSLeay.  Up to version 1.43 of Net::SSLeay
-it was not thread safe, although it did probably work if you did not use 
+it was not thread safe, although it did probably work if you did not use
 SSL_verify_callback and SSL_password_cb.
 
 If you use IO::Socket::SSL together with threads you should load it (e.g. use or
@@ -2881,8 +2865,8 @@ Non-blocking and timeouts (which are based on non-blocking) are not
 supported on Win32, because the underlying IO::Socket::INET does not support
 non-blocking on this platform.
 
-If you have a server and it looks like you have a memory leak you might 
-check the size of your session cache. Default for Net::SSLeay seems to be 
+If you have a server and it looks like you have a memory leak you might
+check the size of your session cache. Default for Net::SSLeay seems to be
 20480, see the example for SSL_create_ctx_callback for how to limit it.
 
 The default for SSL_verify_mode on the client is currently SSL_VERIFY_NONE,
