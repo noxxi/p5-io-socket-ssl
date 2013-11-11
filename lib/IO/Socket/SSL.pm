@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.957';
+our $VERSION = '1.958';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -151,7 +151,9 @@ BEGIN {
 
 	# if we have IO::Socket::INET6 we will use this not IO::Socket::INET
 	# because it can handle both IPv4 and IPv6
-	} elsif( eval { require IO::Socket::INET6; } ) {
+	# require at least 2.55 because of 
+	# https://rt.cpan.org/Ticket/Display.html?id=39550
+	} elsif( eval { require IO::Socket::INET6; IO::Socket::INET6->VERSION(2.55) } ) {
 	    @ISA = qw(IO::Socket::INET6);
 	    constant->import( CAN_IPV6 => "IO::Socket::INET6" );
 	} else {
@@ -267,21 +269,6 @@ sub CLONE { %CREATED_IN_THIS_THREAD = (); }
 sub configure {
     my ($self, $arg_hash) = @_;
     return _invalid_object() unless($self);
-
-    # work around Bug in IO::Socket::INET6 where it doesn't use the
-    # right family for the socket on BSD systems:
-    # http://rt.cpan.org/Ticket/Display.html?id=39550
-    if ( CAN_IPV6 eq "IO::Socket::INET6" && ! $arg_hash->{Domain} &&
-	! ( $arg_hash->{LocalAddr} || $arg_hash->{LocalHost} ) &&
-	(my $peer = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost})) {
-	# set Domain to AF_INET/AF_INET6 if there is only one choice
-	($peer, my $port) = IO::Socket::INET6::_sock_info( $peer,$arg_hash->{PeerPort},6 );
-	my @res = Socket6::getaddrinfo( $peer,$port,AF_UNSPEC,SOCK_STREAM );
-	if (@res == 5) {
-	    $arg_hash->{Domain} = $res[0];
-	    $DEBUG>=2 && DEBUG('set domain to '.$res[0] );
-	}
-    }
 
     # force initial blocking
     # otherwise IO::Socket::SSL->new might return undef if the

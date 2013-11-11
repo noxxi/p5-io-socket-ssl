@@ -1,3 +1,6 @@
+1.958 2013/11/11
+- cleanup: remove workaround for old IO::Socket::INET6 but instead require at
+  least version 2.55 which is now 5 years old
 1.957 2013/11/11
 - fixed t/core.t: test uses cipher_list of HIGH, which includes anonymous
   authorization. With the DH param given by default since 1.956 old versions of
