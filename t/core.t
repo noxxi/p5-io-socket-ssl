@@ -20,8 +20,8 @@ foreach ($^O) {
 my $CAN_NONBLOCK = $^O =~m{mswin32}i ? 0 : eval "use 5.006; use IO::Select; 1";
 my $CAN_PEEK = &Net::SSLeay::OPENSSL_VERSION_NUMBER >= 0x0090601f;
 
-my $numtests = 36;
-$numtests+=9 if $CAN_NONBLOCK;
+my $numtests = 40;
+$numtests+=5 if $CAN_NONBLOCK;
 $numtests+=3 if $CAN_PEEK;
 
 print "1..$numtests\n";

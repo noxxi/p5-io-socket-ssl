@@ -1,6 +1,9 @@
+1.959 2013/11/12
+- bugfix test core.t windows only
 1.958 2013/11/11
 - cleanup: remove workaround for old IO::Socket::INET6 but instead require at
   least version 2.55 which is now 5 years old
+- fix t/session.t #RT90240, thanks to  paul[AT]city-fan[DOT]org
 1.957 2013/11/11
 - fixed t/core.t: test uses cipher_list of HIGH, which includes anonymous
   authorization. With the DH param given by default since 1.956 old versions of
@@ -8,6 +11,7 @@
   authorization) instead of AES256-SHA and thus the check for the peer
   certificate failed (because ADH does not exchanges certificates).
   Fixed by explicitly specifying HIGH:!aNULL as cipher
+  RT#90221, thanks to  paul[AT]city-fan[DOT]org
 - cleaned up tests: 
   - remove ssl_settings.req and 02settings.t, because all tests now create a
     simple socket at 127.0.0.1 and thus global settings are no longer needed.
