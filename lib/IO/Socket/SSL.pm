@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.959';
+our $VERSION = '1.960';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -151,7 +151,7 @@ BEGIN {
 
 	# if we have IO::Socket::INET6 we will use this not IO::Socket::INET
 	# because it can handle both IPv4 and IPv6
-	# require at least 2.55 because of 
+	# require at least 2.55 because of
 	# https://rt.cpan.org/Ticket/Display.html?id=39550
 	} elsif( eval { require IO::Socket::INET6; IO::Socket::INET6->VERSION(2.55) } ) {
 	    @ISA = qw(IO::Socket::INET6);
@@ -2028,6 +2028,48 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
     # all data are now SSL encrypted
     print $sock ....
 
+    # use non-blocking socket (BEWARE OF SELECT!) -------------------
+    my $cl = IO::Socket::SSL->new($dst);
+    $cl->blocking(0);
+    my $sel = IO::Select->new($cl);
+    while (1) {
+	# with SSL a call for reading n bytes does not result in reading of n
+	# bytes from the socket, but instead it must read at least one full SSL
+	# frame. If the socket has no new bytes, but there are unprocessed data
+	# from the SSL frame can_read will block!
+
+	# wait for data on socket
+	$sel->can_read();
+
+	# new data on socket or eof
+	READ:
+	# this does not read only 1 byte from socket, but reads the complete SSL
+	# frame and then just returns one byte. On subsequent calls it than
+	# returns more byte of the same SSL frame until it needs to read the
+	# next frame.
+	my $n = sysread( $cl,my $buf,1);
+	if ( ! defined $n ) {
+	    die $! if not ${EAGAIN};
+	    next if $SSL_ERROR == SSL_WANT_READ;
+	    if ( $SSL_ERROR == SSL_WANT_WRITE ) {
+		# need to write data on renegotiation
+		$sel->can_write;
+		next;
+	    }
+	    die "something went wrong: $SSL_ERROR";
+	} elsif ( ! $n ) {
+	    last; # eof
+	} else {
+	    # read next bytes
+	    # we might have still data within the current SSL frame
+	    # thus first process these data instead of waiting on the underlying
+	    # socket object
+	    goto READ if $self->pending;  # goto sysread
+	    next;                         # goto $sel->can_read
+	}
+    }
+
+
 
 =head1 DESCRIPTION
 
@@ -2042,6 +2084,10 @@ Protocol Negotiation (NPN), SSL version selection and more.
 
 If you have never used SSL before, you should read the appendix labelled 'Using SSL'
 before attempting to use this module.
+
+If you want to use SSL with non-blocking sockets and/or within an event loop
+please read very carefully the sections about non-blocking I/O and polling of SSL
+sockets.
 
 If you are trying to use it with threads see the BUGS section.
 
@@ -2134,12 +2180,13 @@ given value, e.g. something like 'ALL:!LOW:!EXP:!aNULL'. Look into the OpenSSL
 documentation (L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>)
 for more details.
 
-If this option is not set a secure default will be used, which prefers ciphers
-with forward secrecy, disables anonymous authentication and disables known
-insecure ciphers like MD5, DES etc.
-To use OpenSSL builtin default (whatever this is) set it to ''.
-But, with the IO::Socket::SSL own default cipher list one currently gets a grade
-A at SSL labs, much better than the openssl default.
+Unless you fail to contact your peer because of no shared ciphers it is
+recommended to leave this option at the default setting. The default setting
+prefers ciphers with forward secrecy, disables anonymous authentication and
+disables known insecure ciphers like MD5, DES etc. This gives a grade A result
+at the tests of SSL Labs.
+To use the less secure OpenSSL builtin default (whatever this is) set
+SSL_cipher_list to ''.
 
 =item SSL_honor_cipher_order
 
@@ -2439,20 +2486,40 @@ you close it, set this option to a true value.
 
 =back
 
-=item B<peek(...)>
+=item B<sysread( BUF, LEN, [ OFFSET ] )>
 
-This function has exactly the same syntax as sysread(), and performs nearly the same
-task (reading data from the socket) but will not advance the read position so
-that successive calls to peek() with the same arguments will return the same results.
-This function requires OpenSSL 0.9.6a or later to work.
+This function behaves from the outside the same as B<sysread> in other
+L<IO::Socket> objects. But in reality it reads not only LEN bytes from the
+underlying socket, but at least one SSL frame. It then returns up to LEN bytes
+it decrypted from the SSL frames. The rest of the decrypted bytes is buffered
+inside the SSL object and will be returned on further calls. So the next sysread
+might not even read from the underlying socket but just return buffered data.
 
+Also, calls to sysread might fail, because it must first finish an SSL
+handshake.
+
+To understand these behaviors is essential, if you write applications which use
+event loops and/or non-blocking sockets. Please read the specific sections in
+this documentation.
+
+=item B<syswrite( BUF, [ LEN, [ OFFSET ]] )>
+
+This functions behaves from the outside the same as B<syswrite> in other
+L<IO::Socket> objects. But SSL specific behavior applies if used with
+non-blocking sockets. Pease read the specific section in this documentation.
+
+=item B<peek( BUF, LEN, [ OFFSET ])>
+
+This function has exactly the same syntax as B<sysread>, and performs nearly the
+same task but will not advance the read position so that successive calls to
+peek() with the same arguments will return the same results.  This function
+requires OpenSSL 0.9.6a or later to work.
 
 =item B<pending()>
 
-This function will let you know how many bytes of data are immediately ready for reading
-from the socket.  This is especially handy if you are doing reads on a blocking socket
-or just want to know if new data has been sent over the socket.
-
+This function gives you the number of bytes available without reading from the
+underlying socket object. This function is essential if you work with event
+loops, please see the section about polling SSL sockets.
 
 =item B<get_cipher()>
 
@@ -2744,14 +2811,37 @@ Both C<$SSL_ERROR> and C<errstr> method give a dualvar similar to C<$!>, e.g.
 providing an error number in numeric context or an error description in string
 context.
 
-=head1 NON-BLOCKING I/O
+=head1 Polling of SSL Sockets (e.g. select, poll and other event loops)
+
+If you sysread one byte on a normal socket it will result in a syscall to read
+one byte. Thus, if more than one byte is available on the socket it will be kept
+in the network stack of your OS and the next select or poll call will return the
+socket as readable.
+But, with SSL you don't deliver single bytes. Multiple data bytes are packet
+and encrypted together in an SSL frame. Decryption can only be done on the whole
+frame, so a sysread for one byte actually reads the complete SSL frame from the
+socket, decrypts it and returns the first decrypted byte. Further sysreads will
+return more bytes from the same frame until all bytes are returned and the
+next SSL frame will be read from the socket.
+
+Thus, in order to decide if you can read more data (e.g. if sysread will block)
+you must check, if there are still data in the current SSL frame by calling
+C<pending> and if there are no data pending you might check the underlying
+socket with select or poll.
+Please see the example on top of this documentation on how to use SSL within a
+select loop.
+
+=head1 Non-blocking I/O
 
 If you have a non-blocking socket, the expected behavior on read, write, accept
 or connect is to set C<$!> to EAGAIN if the operation can not be completed
 immediately.
 
-With SSL there are cases, like with SSL handshakes, where the write operation
-can not be completed until it can read from the socket or vice versa.
+With SSL handshakes might occure at any time, even within an established
+connections. In this cases it is necessary to finish the handshake, before
+you can read or write data. This might result in situations, where you want to
+read but must first finish the write of a handshake or where you want to write
+but must first finish a read.
 In these cases C<$!> is set to EGAIN like expected, and additionally
 C<$SSL_ERROR> is set to either SSL_WANT_READ or SSL_WANT_WRITE.
 Thus if you get EAGAIN on a SSL socket you must check C<$SSL_ERROR> for
@@ -2943,31 +3033,41 @@ L<http://www.tldp.org/HOWTO/SSL-Certificates-HOWTO/>.  Read on for a quick overv
 
 The usual reason for using SSL is to keep your data safe.  This means that not only
 do you have to encrypt the data while it is being transported over a network, but
-you also have to make sure that the right person gets the data.	 To accomplish this
-with SSL, you have to use certificates.	 A certificate closely resembles a
-Government-issued ID (at least in places where you can trust them).	 The ID contains some sort of
-identifying information such as a name and address, and is usually stamped with a seal
-of Government Approval.	 Theoretically, this means that you may trust the information on
-the card and do business with the owner of the card.  The same ideas apply to SSL certificates,
-which have some identifying information and are "stamped" [most people refer to this as
-I<signing> instead] by someone (a Certificate Authority) who you trust will adequately
-verify the identifying information.	 In this case, because of some clever number theory,
-it is extremely difficult to falsify the stamping process.	Another useful consequence
-of number theory is that the certificate is linked to the encryption process, so you may
-encrypt data (using information on the certificate) that only the certificate owner can
+you also have to make sure that the right person gets the data, e.g. you need to
+authenticate the person.
+To accomplish this with SSL, you have to use certificates.
+A certificate closely resembles a Government-issued ID (at least in places where
+you can trust them). The ID contains some sort of identifying information such
+as a name and address, and is usually stamped with a seal of Government
+Approval. Theoretically, this means that you may trust the information on the
+card and do business with the owner of the card.
+The same ideas apply to SSL certificates, which have some identifying
+information and are "stamped" (signed) by someone (a CA, e.g. Certificate
+Authority) who you trust will adequately verify the identifying information. In
+this case, because of some clever number theory, it is extremely difficult to
+falsify the signing process. Another useful consequence of number theory is that
+the certificate is linked to the encryption process, so you may encrypt data
+(using information on the certificate) that only the certificate owner can
 decrypt.
 
-What does this mean for you?  It means that at least one person in the party has to
-have an ID to get drinks :-).  Seriously, it means that one of the people communicating
-has to have a certificate to ensure that your data is safe.	 For client/server
-interactions, the server must B<always> have a certificate.	 If the server wants to
-verify that the client is safe, then the client must also have a personal certificate.
-To verify that a certificate is safe, one compares the stamped "seal" [commonly called
-an I<encrypted digest/hash/signature>] on the certificate with the official "seal" of
-the Certificate Authority to make sure that they are the same.	To do this, you will
-need the [unfortunately named] certificate of the Certificate Authority.  With all these
-in hand, you can set up a SSL connection and be reasonably confident that no-one is
-reading your data.
+What does this mean for you?
+So most common case is that at least the server has a certificate which the
+client can verify, but the server may also ask back for a certificate to
+authenticate the client.
+To verify that a certificate is trusted, one checks if the certificate is signed
+by the expected CA (Certificate Authority), which often means any CA installed
+on the system (IO::Socket::SSL tries to use the CAs installed on the system by
+default). So if you trust the CA, trust the number theory and trust the
+used algorithms you can be confident, that no-one is reading your data.
+
+Beside the authentication using certificates there is also anonymous
+authentication, which effectivly means no authentication. In this case it is
+easy for somebody in between to intercept the connection, e.g. playing man in
+the middle and nobody notices.
+By default IO::Socket::SSL uses only ciphers which require certificates and
+which are safe enough, but if you want to set your own cipher_list make sure,
+that you explicitly exclude anonymous authentication. E.g. setting the cipher
+list to HIGH is not enough, you should use at least HIGH:!aNULL.
 
 =head2 The Short of It (Summary)
 
