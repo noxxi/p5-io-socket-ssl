@@ -2489,11 +2489,18 @@ you close it, set this option to a true value.
 =item B<sysread( BUF, LEN, [ OFFSET ] )>
 
 This function behaves from the outside the same as B<sysread> in other
-L<IO::Socket> objects. But in reality it reads not only LEN bytes from the
-underlying socket, but at least one SSL frame. It then returns up to LEN bytes
-it decrypted from the SSL frames. The rest of the decrypted bytes is buffered
-inside the SSL object and will be returned on further calls. So the next sysread
-might not even read from the underlying socket but just return buffered data.
+L<IO::Socket> objects, e.g. it returns at most LEN bytes of data. 
+But in reality it reads not only LEN bytes from the underlying socket, but at
+a single SSL frame. It then returns up to LEN bytes it decrypted from this SSL
+frame. If the frame contained more data than requested it will return only LEN
+data, buffer the rest and return it on futher read calls.
+This means, that it might be possible to read data, even if the underlying
+socket is not readable, so using poll or select might not be sufficient.
+
+sysread will only return data from a single SSL frame, e.g. either the pending
+data from the already buffered frame or it will read a frame from the underlying
+socket and return the decrypted data. It will not return data spanning several
+SSL frames in a single call.
 
 Also, calls to sysread might fail, because it must first finish an SSL
 handshake.
@@ -2505,8 +2512,15 @@ this documentation.
 =item B<syswrite( BUF, [ LEN, [ OFFSET ]] )>
 
 This functions behaves from the outside the same as B<syswrite> in other
-L<IO::Socket> objects. But SSL specific behavior applies if used with
-non-blocking sockets. Pease read the specific section in this documentation.
+L<IO::Socket> objects, e.g. it will write at most LEN bytes to the socket, but
+there is no guarantee, that all LEN bytes are written. It will return the number
+of bytes written. 
+syswrite will write all the data within a single SSL frame, which means, that
+no more than 16.384 bytes, which is the maximum size of an SSL frame, can be
+written at once.
+
+For non-blocking sockets SSL specific behavior applies. 
+Pease read the specific section in this documentation.
 
 =item B<peek( BUF, LEN, [ OFFSET ])>
 
@@ -2828,6 +2842,9 @@ Thus, in order to decide if you can read more data (e.g. if sysread will block)
 you must check, if there are still data in the current SSL frame by calling
 C<pending> and if there are no data pending you might check the underlying
 socket with select or poll.
+Another way might be if you try to sysread at least 16k all the time. 16k is the
+maximum size of an SSL frame and because sysread returns data from only a single
+SSL frame you guarantee this way, that there are no pending data.
 Please see the example on top of this documentation on how to use SSL within a
 select loop.
 
