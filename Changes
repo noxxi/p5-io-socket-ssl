@@ -1,3 +1,6 @@
+1.961 2013/11/26
+- IO::Socket::SSL::Utils::CERT_create can now create CA-certificates which
+  are not self-signed (by giving issuer_*)
 1.960 2013/11/12
 only documentation enhancements:
 - clarify with text and example code, that within event loops not only

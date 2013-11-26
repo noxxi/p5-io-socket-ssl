@@ -7,7 +7,7 @@ use Net::SSLeay;
 use Time::Local;
 use Exporter 'import';
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 our @EXPORT = qw(
     PEM_file2cert PEM_string2cert PEM_cert2file PEM_cert2string
     PEM_file2key PEM_string2key PEM_key2file PEM_key2string
@@ -208,31 +208,27 @@ sub CERT_create {
     my $key = delete $args{key} || KEY_create_rsa();
     Net::SSLeay::X509_set_pubkey($cert,$key);
 
+    my $issuer_cert = delete $args{issuer_cert};
+    my $issuer_key  = delete $args{issuer_key};
     if ( delete $args{CA} ) {
-	Net::SSLeay::X509_set_issuer_name($cert,
-	    Net::SSLeay::X509_get_subject_name($cert));
-	Net::SSLeay::P_X509_add_extensions($cert,$cert,
-	    @ext,
-	    &Net::SSLeay::NID_basic_constraints => 'CA:TRUE',
-	) or die "failed to set extensions";
-	Net::SSLeay::X509_sign($cert,$key,$sha1_digest);
+	$issuer_cert ||= $cert;
+	$issuer_key  ||= $key;
+	push @ext, &Net::SSLeay::NID_basic_constraints => 'CA:TRUE',
 
     } else {
-	my $issuer_cert = delete $args{issuer_cert}
-	    || croak "no issuer_cert given";
-	my $issuer_key  = delete $args{issuer_key}
-	    || croak "no issuer_key given";
-	Net::SSLeay::P_X509_add_extensions($cert, $issuer_cert,
-	    @ext,
+	$issuer_cert || croak "no issuer_cert given";
+	$issuer_key  || croak "no issuer_key given";
+	push @ext,
 	    &Net::SSLeay::NID_key_usage => 'digitalSignature,keyEncipherment',
 	    &Net::SSLeay::NID_basic_constraints => 'CA:FALSE',
 	    &Net::SSLeay::NID_ext_key_usage => 'serverAuth,clientAuth',
-	    &Net::SSLeay::NID_netscape_cert_type => 'server',
-	);
-	Net::SSLeay::X509_set_issuer_name($cert,
-	    Net::SSLeay::X509_get_subject_name($issuer_cert));
-	Net::SSLeay::X509_sign($cert,$issuer_key,$sha1_digest);
+	    &Net::SSLeay::NID_netscape_cert_type => 'server';
     }
+
+    Net::SSLeay::P_X509_add_extensions($cert, $issuer_cert, @ext);
+    Net::SSLeay::X509_set_issuer_name($cert,
+	Net::SSLeay::X509_get_subject_name($issuer_cert));
+    Net::SSLeay::X509_sign($cert,$issuer_key,$sha1_digest);
 
     return ($cert,$key);
 }
