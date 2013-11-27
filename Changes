@@ -1,3 +1,6 @@
+1.962 2013/11/27
+- work around problems with older F5 BIG-IP by offering fewer ciphers on the
+  client side by default, so that the client hello stays below 255 byte
 1.961 2013/11/26
 - IO::Socket::SSL::Utils::CERT_create can now create CA-certificates which
   are not self-signed (by giving issuer_*)

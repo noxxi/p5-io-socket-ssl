@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.961';
+our $VERSION = '1.962';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -58,7 +58,44 @@ my %DEFAULT_SSL_ARGS = (
 
 my %DEFAULT_SSL_CLIENT_ARGS = (
     %DEFAULT_SSL_ARGS,
-    SSL_verify_mode => SSL_VERIFY_PEER
+    SSL_verify_mode => SSL_VERIFY_PEER,
+
+    # older versions of F5 BIG-IP hang when getting SSL client hello >255 bytes
+    # http://support.f5.com/kb/en-us/solutions/public/13000/000/sol13037.html
+    # http://guest:guest@rt.openssl.org/Ticket/Display.html?id=2771
+    # Debian works around this by disabling TLSv12 on the client side
+    # Chrome and IE11 use TLSv12 but use only a few ciphers, so that packet
+    # stays small enough
+    # The following list is taken from IE11, except that we don't do RC4-MD5,
+    # RC4-SHA is already bad enough. Also, we have a different sort order
+    # compared to IE11, because we put ciphers supporting forward secrecy on top
+
+    SSL_cipher_list => join(" ", 
+	qw(
+	    ECDHE-ECDSA-AES128-GCM-SHA256
+	    ECDHE-ECDSA-AES128-SHA256
+	    ECDHE-ECDSA-AES256-GCM-SHA384
+	    ECDHE-ECDSA-AES256-SHA384
+	    ECDHE-ECDSA-AES128-SHA
+	    ECDHE-ECDSA-AES256-SHA
+	    ECDHE-RSA-AES128-SHA256
+	    ECDHE-RSA-AES128-SHA
+	    ECDHE-RSA-AES256-SHA
+	    DHE-DSS-AES128-SHA256
+	    DHE-DSS-AES128-SHA
+	    DHE-DSS-AES256-SHA256
+	    DHE-DSS-AES256-SHA
+	    AES128-SHA256
+	    AES128-SHA
+	    AES256-SHA256
+	    AES256-SHA
+	    EDH-DSS-DES-CBC3-SHA
+	    DES-CBC3-SHA
+	    RC4-SHA
+	),
+	# just to make sure, that we don't accidentely add bad ciphers above
+	"!EXP !LOW !eNULL !aNULL !DES !MD5 !PSK !SRP"
+    )
 );
 
 my %DEFAULT_SSL_SERVER_ARGS = (
