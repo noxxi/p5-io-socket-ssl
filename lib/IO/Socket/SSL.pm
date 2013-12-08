@@ -2119,14 +2119,47 @@ full-featured SSL client or server application: multiple SSL contexts, cipher
 selection, certificate verification, Server Name Indication (SNI), Next
 Protocol Negotiation (NPN), SSL version selection and more.
 
-If you have never used SSL before, you should read the appendix labelled 'Using SSL'
+If you have never used SSL before, you should read the section 'Using SSL'
 before attempting to use this module.
+
+If you used IO::Socket before you should read the following section
+'Differences to IO::Socket'.
 
 If you want to use SSL with non-blocking sockets and/or within an event loop
 please read very carefully the sections about non-blocking I/O and polling of SSL
 sockets.
 
 If you are trying to use it with threads see the BUGS section.
+
+=head2 Differences to IO::Socket
+
+Although L<IO::Socket::SSL> tries to behave similar to L<IO::Socket> there are
+some important differences due to the way SSL works:
+
+=over 4
+
+=item * buffered input
+
+Data are transmitted inside the SSL protocol using encrypted frames, which can
+only be decrypted once the full frame is received. So if you use C<read> or
+C<sysread> to receive less data than the SSL frame contains, it will read the
+whole frame, return part of it and buffer the rest for later reads. 
+This does not make a difference for simple programs, but if you use
+select-loops or polling or non-blocking I/O please read the related sections.
+
+=item * SSL handshakes
+
+Before any encryption can be done the peers have to agree to common algorithms,
+verify certificates etc. So a handshake needs to be done before any payload is
+send or received and might additionally happen later in the connection again.
+
+This has important implications when doing non-blocking or event-based I/O
+(please read the related sections), but means also, that connect and accept
+calls include the SSL handshake and thus might block or fail, if the peer does
+not behave like expected. For instance accept will wait infinitly if a TCP
+client connects to the socket but does not initiate an SSL handshake.
+
+=back
 
 =head1 METHODS
 
@@ -2172,7 +2205,10 @@ section about SSL specific error handling.
 =item B<new(...)>
 
 Creates a new IO::Socket::SSL object.  You may use all the friendly options
-that came bundled with IO::Socket::INET, plus (optionally) the ones that follow:
+that came bundled with the super class (e.g. IO::Socket::IP,
+IO::Socket::INET, ...) plus (optionally) the ones described below.
+If you don't specify any SSL related options it will do it's best in using
+secure defaults, e.g. chosing good ciphers, enabling proper verification etc.
 
 =over 2
 
@@ -2488,6 +2524,23 @@ If you use this option with an unsupported Net::SSLeay/OpenSSL it will
 throw an error.
 
 =back
+
+=item B<accept>
+
+This behaves similar to the accept function of the underlying socket class, but
+additionally does the initial SSL handshake. But because the underlying socket
+class does return a blocking file handle even when accept is called on a
+non-blocking socket, the SSL handshake on the new file object will be done in a
+blocking way. Please see the section about non-blocking I/O for details.
+If you don't like this behavior you should do accept on the TCP socket and then
+upgrade it with C<start_SSL> later. 
+
+=item B<connect(...)>
+
+This behaves similar to the connnect function but also does an SSL handshake.
+Because you cannot give SSL specific arguments to this function, you should
+better either use C<new> to create a connect SSL socket or C<start_SSL> to
+upgrade an established TCP socket to SSL.
 
 =item B<close(...)>
 
@@ -2907,6 +2960,15 @@ And, while the behavior is not documented for other L<IO::Socket> classes, it
 will try to emulate the behavior seen there, e.g. to return the received data
 instead of blocking, even if the line is not complete. If an unrecoverable error
 occurs it will return nothing, even if it already received some data.
+
+Also, I would advise against using C<accept> with a non-blocking SSL object,
+because it might block and this is not what most would expect. The reason for
+this is that accept on a non-blocking TCP socket (e.g. IO::Socket::IP,
+IO::Socket::INET..) results in a new TCP socket, which does not inherit the
+non-blocking behavior of the master socket. And thus the initial SSL handshake
+on the new socket inside C<IO::Socket::SSL::accept> will be done in a blocking
+way. To work around it you should better do an TCP accept and later upgrade the
+TCP socket in a non-blocking way with C<start_SSL> and C<accept_SSL>.
 
 =head1 SNI Support
 
