@@ -2008,7 +2008,7 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
     use IO::Socket::SSL;
 
     # simple HTTP client -----------------------------------------------
-    my $sock = IO::Socket::SSL->new(
+    my $client = IO::Socket::SSL->new(
 	# where to connect
 	PeerHost => "www.example.com",
 	PeerPort => "https",
