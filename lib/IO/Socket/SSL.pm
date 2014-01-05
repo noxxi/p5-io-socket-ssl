@@ -2797,13 +2797,19 @@ non-blocking sockets. In this case $! is set to EAGAIN and the ssl error to
 SSL_WANT_READ or SSL_WANT_WRITE. In this case the call should be retried again with
 the same arguments once the socket is ready is until it succeeds.
 
-=item B<< IO::Socket::SSL->new_from_fd($fd, ...) >>
+=item B<< IO::Socket::SSL->new_from_fd($fd, [mode], %sslargs) >>
 
 This will convert a socket identified via a file descriptor into an SSL socket.
 Note that the argument list does not include a "MODE" argument; if you supply one,
-it will be thoughtfully ignored (for compatibility with IO::Socket::INET).	Instead,
+it will be thoughtfully ignored (for compatibility with IO::Socket::INET). Instead,
 a mode of '+<' is assumed, and the file descriptor passed must be able to handle such
 I/O because the initial SSL handshake requires bidirectional communication.
+
+Internally the given $fd will be upgraded to a socket object using the
+C<new_from_fd> method of the super class (L<IO::Socket::INET> or similar) and then
+C<start_SSL> will be called using the given C<%sslargs>.
+If C<$fd> is already an IO::Socket object you should better call C<start_SSL>
+directly.
 
 =item B<IO::Socket::SSL::set_default_context(...)>
 

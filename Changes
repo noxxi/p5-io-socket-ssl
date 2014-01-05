@@ -1,6 +1,8 @@
 - documentation enhancements:
   - special section for differences to IO::Socket
   - describe problem with blocking accept on non-blocking socket
+  - describe arguments to new_from_fd and make clear, that for upgrading an
+    existing IO::Socket start_SSL should be used directly
 1.962 2013/11/27
 - work around problems with older F5 BIG-IP by offering fewer ciphers on the
   client side by default, so that the client hello stays below 255 byte
