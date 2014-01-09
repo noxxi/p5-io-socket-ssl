@@ -1070,7 +1070,7 @@ sub start_SSL {
 	my $result = ${*$socket}{'_SSL_arguments'}{SSL_server}
 	    ? $socket->accept_SSL(%to)
 	    : $socket->connect_SSL(%to);
-	$socket->blocking(0) if !$blocking;
+	$socket->blocking(0) if defined($result) && !$blocking;
 	return $result ? $socket : (bless($socket, $original_class) && ());
     } else {
 	$DEBUG>=2 && DEBUG( "dont start handshake: $socket" );
