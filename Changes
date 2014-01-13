@@ -1,3 +1,9 @@
+1.963 2014/01/13
+- fix behavior of stop_SSL: for blocking sockets it now enough to call it
+  once, for non-blocking it should be called again as long as EAGAIN and
+  SSL_ERROR is set to SSL_WANT_(READ|WRITE).
+- don't call blocking if start_SSL failed and downgraded socket has no 
+  blocking method, thanks to tokuhirom
 - documentation enhancements:
   - special section for differences to IO::Socket
   - describe problem with blocking accept on non-blocking socket
