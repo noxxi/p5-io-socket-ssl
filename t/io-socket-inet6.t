@@ -1,7 +1,13 @@
 #!perl
 
 # make sure IO::Socket::IP will not be used
-BEGIN { $INC{'IO/Socket/IP.pm'} = undef }
+BEGIN { 
+    if ( eval { require Acme::Override::INET }) {
+	print "1..0 # Skipped: will not work with Acme::Override::INET installed\n";
+	exit
+    }
+    $INC{'IO/Socket/IP.pm'} = undef 
+}
 
 use strict;
 use warnings;

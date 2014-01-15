@@ -1,3 +1,11 @@
+1.964 2014/01/15
+- Disabling TLSv1_1 did not work, because the constant was wrong. Now it gets
+  the constants from calling Net::SSLeay::SSL_OP_NO_TLSv1_1 etc
+- The new syntax for the protocols is TLSv1_1 instead of TLSv11. This matches
+  the syntax from OpenSSL. The old syntax continues to work in SSL_version.
+- New functions get_sslversion and get_sslversion_int which get the SSL version
+  of the establish session as string or int.
+- disable t/io-socket-inet6.t if Acme::Override::INET is installed
 1.963 2014/01/13
 - fix behavior of stop_SSL: for blocking sockets it now enough to call it
   once, for non-blocking it should be called again as long as EAGAIN and

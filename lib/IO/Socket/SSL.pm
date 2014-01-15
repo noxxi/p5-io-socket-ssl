@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.963';
+our $VERSION = '1.964';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -63,8 +63,8 @@ my %DEFAULT_SSL_CLIENT_ARGS = (
     # older versions of F5 BIG-IP hang when getting SSL client hello >255 bytes
     # http://support.f5.com/kb/en-us/solutions/public/13000/000/sol13037.html
     # http://guest:guest@rt.openssl.org/Ticket/Display.html?id=2771
-    # Debian works around this by disabling TLSv12 on the client side
-    # Chrome and IE11 use TLSv12 but use only a few ciphers, so that packet
+    # Debian works around this by disabling TLSv1_2 on the client side
+    # Chrome and IE11 use TLSv1_2 but use only a few ciphers, so that packet
     # stays small enough
     # The following list is taken from IE11, except that we don't do RC4-MD5,
     # RC4-SHA is already bad enough. Also, we have a different sort order
@@ -136,6 +136,15 @@ BEGIN{
     eval { use Scalar::Util 'dualvar'; dualvar(0,'') };
     die "You need the XS Version of Scalar::Util for dualvar() support"
 	if $@;
+}
+
+# get constants for SSL_OP_NO_* now, instead calling the releated functions
+# everytime we setup a connection
+my %SSL_OP_NO;
+for(qw( SSLv2 SSLv3 TLSv1 TLSv1_1 TLSv11:TLSv1_1 TLSv1_2 TLSv1_2:TLSv1_2 )) {
+    my ($k,$op) = m{:} ? split(m{:},$_,2) : ($_,$_);
+    my $sub = "Net::SSLeay::OP_NO_$op";
+    $SSL_OP_NO{$k} = eval { no strict 'refs'; &$sub } || 0;
 }
 
 our $DEBUG;
@@ -1318,6 +1327,25 @@ sub get_cipher {
     return Net::SSLeay::get_cipher($ssl);
 }
 
+sub get_sslversion {
+    my $ssl = shift()->_get_ssl_object || return;
+    my $version = Net::SSLeay::version($ssl) or return;
+    return
+	$version == 0x0303 ? 'TLSv1_2' :
+	$version == 0x0302 ? 'TLSv1_1' :
+	$version == 0x0301 ? 'TLSv1'   :
+	$version == 0x0300 ? 'SSLv3'   :
+	$version == 0x0002 ? 'SSLv2'   :
+	$version == 0xfeff ? 'DTLS1'   :
+	undef;
+}
+
+sub get_sslversion_int {
+    my $ssl = shift()->_get_ssl_object || return;
+    return Net::SSLeay::version($ssl);
+}
+
+
 sub errstr {
     my $self = shift;
     return (ref($self) ? ${*$self}{'_SSL_last_err'} : $SSL_ERROR) || '';
@@ -1653,32 +1681,27 @@ sub new {
 
     my $ver;
     for (split(/\s*:\s*/,$arg_hash->{SSL_version})) {
-	m{^(!?)(?:(SSL(?:v2|v3|v23|v2/3))|(TLSv1[12]?))$}i
+	m{^(!?)(?:(SSL(?:v2|v3|v23|v2/3))|(TLSv1(?:_?[12])?))$}i
 	or croak("invalid SSL_version specified");
 	my $not = $1;
 	( my $v = lc($2||$3) ) =~s{^(...)}{\U$1};
-	$v =~s{/}{}; # interpret SSLv2/3 as SSLv23
 	if ( $not ) {
-	    $ssl_op |=
-		$v eq 'SSLv2'  ? 0x01000000 : # SSL_OP_NO_SSLv2
-		$v eq 'SSLv3'  ? 0x02000000 : # SSL_OP_NO_SSLv3
-		$v eq 'TLSv1'  ? 0x04000000 : # SSL_OP_NO_TLSv1
-		$v eq 'TLSv11' ? 0x00000400 : # SSL_OP_NO_TLSv1_1
-		$v eq 'TLSv12' ? 0x08000000 : # SSL_OP_NO_TLSv1_2
-		croak("cannot disable version $_");
+	    $ssl_op |= $SSL_OP_NO{$v};
 	} else {
 	    croak("cannot set multiple SSL protocols in SSL_version")
 		if $ver && $v ne $ver;
 	    $ver = $v;
+	    $ver =~s{/}{}; # interpret SSLv2/3 as SSLv23
+	    $ver =~s{(TLSv1)(\d)}{$1\_$2}; # TLSv1_1
 	}
     }
 
     my $ctx_new_sub =  UNIVERSAL::can( 'Net::SSLeay',
-	$ver eq 'SSLv2'  ? 'CTX_v2_new' :
-	$ver eq 'SSLv3'  ? 'CTX_v3_new' :
-	$ver eq 'TLSv1'  ? 'CTX_tlsv1_new' :
-	$ver eq 'TLSv11' ? 'CTX_tlsv1_1_new' :
-	$ver eq 'TLSv12' ? 'CTX_tlsv1_2_new' :
+	$ver eq 'SSLv2'   ? 'CTX_v2_new' :
+	$ver eq 'SSLv3'   ? 'CTX_v3_new' :
+	$ver eq 'TLSv1'   ? 'CTX_tlsv1_new' :
+	$ver eq 'TLSv1_1' ? 'CTX_tlsv1_1_new' :
+	$ver eq 'TLSv1_2' ? 'CTX_tlsv1_2_new' :
 	'CTX_new'
     ) or return IO::Socket::SSL->error("SSL Version $ver not supported");
     my $ctx = $ctx_new_sub->() or return
@@ -2223,23 +2246,25 @@ See section "SNI Support" for details of SNI the support.
 
 =item SSL_version
 
-Sets the version of the SSL protocol used to transmit data. 'SSLv23' auto-negotiates
-between SSLv2 and SSLv3, while 'SSLv2', 'SSLv3', 'TLSv1', 'TLSv11' or 'TLSv12'
-restrict the protocol to the specified version. All values are case-insensitive.
-Support for 'TLSv11' and 'TLSv12' requires recent versions of Net::SSLeay
-and openssl.
+Sets the version of the SSL protocol used to transmit data. 
+'SSLv23' auto-negotiates between SSLv2 and SSLv3, while 'SSLv2', 'SSLv3',
+'TLSv1', 'TLSv1_1' or 'TLSv1_2' restrict the protocol to the specified version.
+All values are case-insensitive.  Instead of 'TLSv1_1' and 'TLSv1_2' one can
+also use 'TLSv11' and 'TLSv12'.  Support for 'TLSv1_1' and 'TLSv1_2' requires
+recent versions of Net::SSLeay and openssl.
 
 You can limit to set of supported protocols by adding !version separated by ':'.
 
-The default SSL_version is 'SSLv23:!SSLv2' which means, that SSLv2, SSLv3 and TLSv1
-are supported for initial protocol handshakes, but SSLv2 will not be accepted, leaving
-only SSLv3 and TLSv1. You can also use !TLSv11 and !TLSv12 to disable TLS versions
-1.1 and 1.2 while allowing TLS version 1.0.
+The default SSL_version is 'SSLv23:!SSLv2' which means, that SSLv2, SSLv3 and
+TLSv1 are supported for initial protocol handshakes, but SSLv2 will not be
+accepted, leaving only SSLv3 and TLSv1. You can also use !TLSv1_1 and !TLSv1_2
+to disable TLS versions 1.1 and 1.2 while allowing TLS version 1.0.
 
-Setting the version instead to 'TLSv1' will probably break interaction with lots of
-clients which start with SSLv2 and then upgrade to TLSv1. On the other side some
-clients just close the connection when they receive a TLS version 1.1 request. In this
-case setting the version to 'SSLv23:!SSLv2:!TLSv11:!TLSv12' might help.
+Setting the version instead to 'TLSv1' will probably break interaction with
+lots of clients which start with SSLv2 and then upgrade to TLSv1. On the other
+side some clients just close the connection when they receive a TLS version 1.1
+request. In this case setting the version to 'SSLv23:!SSLv2:!TLSv1_1:!TLSv1_2'
+might help.
 
 =item SSL_cipher_list
 
@@ -2627,6 +2652,16 @@ loops, please see the section about polling SSL sockets.
 =item B<get_cipher()>
 
 Returns the string form of the cipher that the IO::Socket::SSL object is using.
+
+=item B<get_sslversion()>
+
+Returns the string representation of the SSL version of an established
+connection.
+
+=item B<get_sslversion_int()>
+
+Returns the integer representation of the SSL version of an established
+connection.
 
 =item B<dump_peer_certificate()>
 
