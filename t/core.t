@@ -19,10 +19,12 @@ foreach ($^O) {
 
 my $CAN_NONBLOCK = $^O =~m{mswin32}i ? 0 : eval "use 5.006; use IO::Select; 1";
 my $CAN_PEEK = &Net::SSLeay::OPENSSL_VERSION_NUMBER >= 0x0090601f;
+my $JAILED = ( $^O eq 'freebsd' && `sysctl -n security.jail.jailed` == 1 );
 
 my $numtests = 40;
 $numtests+=5 if $CAN_NONBLOCK;
 $numtests+=3 if $CAN_PEEK;
+$numtests-- if $JAILED;
 
 print "1..$numtests\n";
 
@@ -289,8 +291,10 @@ close $client;
 
 ($client, $peer) = $server->accept;
 &bail unless $client;
-print "not " unless (inet_ntoa((unpack_sockaddr_in($peer))[1]) eq "127.0.0.1");
-&ok("Peer address check");
+unless ($JAILED) {
+    print "not " unless (inet_ntoa((unpack_sockaddr_in($peer))[1]) eq "127.0.0.1");
+    &ok("Peer address check");
+}
 
 if ($CAN_NONBLOCK) {
     $client->blocking(0);
