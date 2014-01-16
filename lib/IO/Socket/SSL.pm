@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.964';
+our $VERSION = '1.965';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -462,7 +462,10 @@ sub connect_SSL {
 	}
 
 	$arg_hash->{PeerAddr} || $self->_update_peer;
-	my $session = $ctx->session_cache( $arg_hash->{PeerAddr}, $arg_hash->{PeerPort} );
+	my $session = $ctx->session_cache( $arg_hash->{SSL_session_key} ?
+	    ( $arg_hash->{SSL_session_key},1 ) :
+	    ( $arg_hash->{PeerAddr}, $arg_hash->{PeerPort} )
+	);
 	Net::SSLeay::set_session($ssl, $session) if ($session);
     }
 
@@ -547,12 +550,15 @@ sub connect_SSL {
     $self->blocking(1) if defined($timeout); # was blocking before
 
     $ctx ||= ${*$self}{'_SSL_ctx'};
-    if ( $ctx->has_session_cache ) {
+    if ( $ctx->has_session_cache
+	and my $session = Net::SSLeay::get1_session($ssl)) {
 	my $arg_hash = ${*$self}{'_SSL_arguments'};
 	$arg_hash->{PeerAddr} || $self->_update_peer;
-	my ($addr,$port) = ( $arg_hash->{PeerAddr}, $arg_hash->{PeerPort} );
-	my $session = $ctx->session_cache( $addr,$port );
-	$ctx->session_cache( $addr,$port, Net::SSLeay::get1_session($ssl) ) if !$session;
+	$ctx->session_cache( $arg_hash->{SSL_session_key} ?
+	    ( $arg_hash->{SSL_session_key},1 ) :
+	    ( $arg_hash->{PeerAddr},$arg_hash->{PeerPort} ),
+	    $session
+	);
     }
 
     tie *{$self}, "IO::Socket::SSL::SSL_HANDLE", $self;
@@ -1981,15 +1987,20 @@ sub add_session {
     my ($self, $key, $val) = @_;
     return if ($key eq '_maxsize' or $key eq '_head');
 
-    if ((keys %$self) > $self->{'_maxsize'} + 1) {
+    if ( $self->{$key} ) {
+	$self->{$key}{session} = $val;
+	return get_session($self,$key); # will put key on front
+    }
+
+    my $session = $self->{$key} = { session => $val, key => $key };
+
+    if ( keys(%$self) > $self->{_maxsize}+2) {
 	my $last = $self->{'_head'}->{prev};
 	Net::SSLeay::SESSION_free($last->{session});
 	delete($self->{$last->{key}});
 	$self->{'_head'}->{prev} = $self->{'_head'}->{prev}->{prev};
 	delete($self->{'_head'}) if ($self->{'_maxsize'} == 1);
     }
-
-    my $session = $self->{$key} = { session => $val, key => $key };
 
     if ($self->{'_head'}) {
 	$session->{next} = $self->{'_head'};
@@ -2513,6 +2524,12 @@ A session cache object can be created using
 C<< IO::Socket::SSL::Session_Cache->new( cachesize ) >>.
 
 Use set_default_session_cache() to set a global cache object.
+
+=item SSL_session_key
+
+Specifies a key to use for lookups and inserts into client-side session cache.
+Per default ip:port of destination will be used, but sometimes you want to
+share the same session over multiple ports on the same server (like with FTPS).
 
 =item SSL_session_id_context
 

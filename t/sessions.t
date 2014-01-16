@@ -123,6 +123,7 @@ unless (fork) {
 
     # Make sure that first 'bogus' entry has been removed
     if (keys(%$cache) != 6) {
+	warn Dumper($cache); use Data::Dumper;
 	print "not ";
     }
     &ok("Cache Keys Check 3");

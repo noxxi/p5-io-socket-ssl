@@ -24,7 +24,21 @@ my $numtests = 40;
 $numtests+=5 if $CAN_NONBLOCK;
 $numtests+=3 if $CAN_PEEK;
 
+my $expected_peer = do {
+    my $us = IO::Socket::INET->new( LocalAddr => '127.0.0.1', Proto => 'udp' );
+    my $uc = IO::Socket::INET->new( 
+	PeerAddr => $us->sockhost,
+	PeerPort => $us->sockport,
+	Proto => 'udp'
+    ) or do {
+	print "1..0 # Skipped: cannot determine default peer IP\n";
+	exit
+    };
+    $uc->sockhost,
+};
+
 print "1..$numtests\n";
+
 
 my $error_trapped = 0;
 my $server = IO::Socket::SSL->new(
@@ -289,7 +303,7 @@ close $client;
 
 ($client, $peer) = $server->accept;
 &bail unless $client;
-print "not " unless (inet_ntoa((unpack_sockaddr_in($peer))[1]) eq "127.0.0.1");
+print "not " unless (inet_ntoa((unpack_sockaddr_in($peer))[1]) eq $expected_peer);
 &ok("Peer address check");
 
 if ($CAN_NONBLOCK) {
