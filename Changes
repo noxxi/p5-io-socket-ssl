@@ -1,3 +1,8 @@
+1.966 2014/01/21
+- fixed bug introduced in 1.964 - disabling TLSv1_2 worked no longer with
+  specifying !TLSv12, only !TLSv1_2 worked
+- fixed leak of session objects in SessionCache, if another session 
+  replaced an existing session (introduced in 1.965)
 1.965 2014/01/16
 - new key SSL_session_key to influence how sessions are inserted and looked
   up in the clients session cache. This makes it possible to share sessions

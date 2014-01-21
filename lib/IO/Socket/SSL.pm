@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.965';
+our $VERSION = '1.966';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -141,7 +141,7 @@ BEGIN{
 # get constants for SSL_OP_NO_* now, instead calling the releated functions
 # everytime we setup a connection
 my %SSL_OP_NO;
-for(qw( SSLv2 SSLv3 TLSv1 TLSv1_1 TLSv11:TLSv1_1 TLSv1_2 TLSv1_2:TLSv1_2 )) {
+for(qw( SSLv2 SSLv3 TLSv1 TLSv1_1 TLSv11:TLSv1_1 TLSv1_2 TLSv12:TLSv1_2 )) {
     my ($k,$op) = m{:} ? split(m{:},$_,2) : ($_,$_);
     my $sub = "Net::SSLeay::OP_NO_$op";
     $SSL_OP_NO{$k} = eval { no strict 'refs'; &$sub } || 0;
@@ -1987,8 +1987,9 @@ sub add_session {
     my ($self, $key, $val) = @_;
     return if ($key eq '_maxsize' or $key eq '_head');
 
-    if ( $self->{$key} ) {
-	$self->{$key}{session} = $val;
+    if ( my $have = $self->{$key} ) {
+	Net::SSLeay::SESSION_free( $have->{session} );
+	$have->{session} = $val;
 	return get_session($self,$key); # will put key on front
     }
 
