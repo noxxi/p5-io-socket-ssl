@@ -73,10 +73,10 @@ lots of behavior changes for more secure defaults:
   - prefer ECDHE/DHE ciphers and add necessary ECDH curve and DH keys, so that
     it uses by default forward secrecy, if underlying Net::SSLeay/openssl
     supports it
-  - move RC4 at the end, e.g. 3DES is prefered (BEAST attack should hopefully
+  - move RC4 at the end, e.g. 3DES is preferred (BEAST attack should hopefully
     been fixed and now RC4 is considered less safe than 3DES)
   - default SSL_honor_cipher_order to 1, e.g. when used as server it tries to
-    get the best cipher even if client preferes other ciphers
+    get the best cipher even if client prefers other ciphers
   PLEASE NOTE that this might break connections with older, less secure
   implementations. In this case revert to 'ALL:!LOW:!EXP:!aNULL' or so.
 - BEHAVIOR CHANGE: SSL_cipher_list now gets set on context not SSL object and
@@ -165,14 +165,14 @@ v1.86 2013.04.17
 v1.85 2013.04.14
 - probe for available modules with local __DIE__ and __WARN__handlers.
   fixes RT#84574, thanks to FRAZER
-- fix warning, when IO::Socket::IP is installed and inet6 support gets explictly
+- fix warning, when IO::Socket::IP is installed and inet6 support gets explicitly
   requested. RT#84619, thanks to Prashant[DOT]Tekriwal[AT]netapp[DOT]com
 v1.84 2013.02.15
 - disabled client side SNI for openssl version < 1.0.0 because of RT#83289
-- added functions can_client_sni, can_server_sni, can_npn to check avaibility
+- added functions can_client_sni, can_server_sni, can_npn to check availability
   of SNI and NPN features. Added more documentation for SNI and NPN.
 v1.83_1 2013.02.14
-- seperated documention of non-blocking I/O from error handling
+- separated documentation of non-blocking I/O from error handling
 - changed and documented behavior of readline to return the read
   data on EAGAIN/EWOULDBLOCK in case of non-blocking socket.
   See https://github.com/noxxi/p5-io-socket-ssl/issues/1, thanks to
@@ -270,7 +270,7 @@ v1.65 2012.04.16
 - added NPN (Next Protocol Negotiation) support based on patch from kmx
   https://rt.cpan.org/Ticket/Display.html?id=76223
 v1.64 2012.04.06
-- clarify some behavior regarding hostname verfication.
+- clarify some behavior regarding hostname verification.
   Thanks to DOHERTY for reporting.
 v1.63 2012.04.06
 - applied patch of DOUGDUDE to ignore die from within eval to make tests 
@@ -657,7 +657,7 @@ v0.997
   regarding $/ like written in the $/ dokumentation.
 
 v0.996
-- removed links and comments to inofficial release of
+- removed links and comments to unofficial release of
   Net::SSLeay, because there is a newer version already
 
 v0.995
@@ -908,7 +908,7 @@ v0.90   2002.08.13
 - All other known bugs have been fixed.
 
 
-v0.81a (Not publically released)
+v0.81a (Not publicly released)
 - Added support for SSL_passwd_cb.
 - Added accept() server socket support to socketToSSL().
 
@@ -973,4 +973,4 @@ v0.74	2000.07.05
 - libwww-perl and IO::Socket::SSL UML models added in docs
 - URL changes in test scripts
 - preliminary support for startTLS in IO::Socket::SSL::socketToSSL()
-- miscellanous patches for Net::SSLeay added in diffs
+- miscellaneous patches for Net::SSLeay added in diffs

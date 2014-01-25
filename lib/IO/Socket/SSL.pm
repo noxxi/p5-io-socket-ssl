@@ -139,7 +139,7 @@ BEGIN{
 }
 
 # get constants for SSL_OP_NO_* now, instead calling the releated functions
-# everytime we setup a connection
+# every time we setup a connection
 my %SSL_OP_NO;
 for(qw( SSLv2 SSLv3 TLSv1 TLSv1_1 TLSv11:TLSv1_1 TLSv1_2 TLSv12:TLSv1_2 )) {
     my ($k,$op) = m{:} ? split(m{:},$_,2) : ($_,$_);
@@ -216,7 +216,7 @@ BEGIN {
     #Make $DEBUG another name for $Net::SSLeay::trace
     *DEBUG = \$Net::SSLeay::trace;
 
-    #Compability
+    #Compatibility
     *ERROR = \$SSL_ERROR;
 
     # Do Net::SSLeay initialization
@@ -1150,7 +1150,7 @@ sub dump_peer_certificate {
     #  - wildcards_in_alt (0, 'leftmost', 'anywhere')
     #  - wildcards_in_cn (0, 'leftmost', 'anywhere')
     #  - check_cn (0, 'always', 'when_only')
-    # unfortunatly there are a lot of different schemes used, see RFC 6125 for a
+    # unfortunately there are a lot of different schemes used, see RFC 6125 for a
     # summary, which references all of the following except RFC4217/ftp
 
     my %scheme = (
@@ -1635,18 +1635,18 @@ sub new {
 		defined( my $file = $arg_hash->{$_} ) or next;
 		for my $f (ref($file) eq 'HASH' ? values(%$file):$file ) {
 		    die "$_ $f does not exist" if ! -f $f;
-		    die "$_ $f is not accessable" if ! -r _;
+		    die "$_ $f is not accessible" if ! -r _;
 		}
 	    }
 	    if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
 		die "SSL_ca_file $f does not exist" if ! -f $f;
-		die "SSL_ca_file $f is not accessable" if ! -r _;
+		die "SSL_ca_file $f is not accessible" if ! -r _;
 	    }
 	    if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
 		die "only SSL_ca_path or SSL_ca_file should be given"
 		    if defined $arg_hash->{SSL_ca_file};
 		die "SSL_ca_path $d does not exist" if ! -d $d;
-		die "SSL_ca_path $d is not accessable" if ! -r _;
+		die "SSL_ca_path $d is not accessible" if ! -r _;
 	    }
 	}
     }
@@ -2391,9 +2391,9 @@ Usually you want to verify that the peer certificate has been signed by a
 trusted certificate authority. In this case you should use this option to
 specify the file (SSL_ca_file) or directory (SSL_ca_path) containing the
 certificateZ<>(s) of the trusted certificate authorities.
-If both SSL_ca_file and SSL_ca_path are undefined and not builtin defaults (see
-"Defaults for Cert, Key and CA".) can be used, it will try to use the system
-defaults used built into the OpenSSL library.
+If both SSL_ca_file and SSL_ca_path are undefined and builtin defaults (see
+"Defaults for Cert, Key and CA".) can not be used, the system
+defaults built into the OpenSSL library will be tried.
 If you really don't want to set a CA set this key to C<''>.
 
 =item SSL_verify_mode
@@ -2625,7 +2625,7 @@ L<IO::Socket> objects, e.g. it returns at most LEN bytes of data.
 But in reality it reads not only LEN bytes from the underlying socket, but at
 a single SSL frame. It then returns up to LEN bytes it decrypted from this SSL
 frame. If the frame contained more data than requested it will return only LEN
-data, buffer the rest and return it on futher read calls.
+data, buffer the rest and return it on further read calls.
 This means, that it might be possible to read data, even if the underlying
 socket is not readable, so using poll or select might not be sufficient.
 
@@ -2958,8 +2958,8 @@ or C<certs/client-key.pem>.
 
 =item SSL_ca_file | SSL_ca_path
 
-It will set SSL_ca_file to C<certs/my-ca.pem> if it exist.
-Otherwise it will set SSL_ca_path to C<ca/> if it exist.
+SSL_ca_file will be set to C<certs/my-ca.pem> if it exists.
+Otherwise SSL_ca_path will be set to C<ca/> if it exists.
 
 =back
 
