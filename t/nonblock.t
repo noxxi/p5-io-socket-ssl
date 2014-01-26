@@ -55,7 +55,7 @@ if ( $pid == 0 ) {
     close($server);
     $ID = 'client';
 
-    # fast: try connect_SSL immediatly after sending plain text
+    # fast: try connect_SSL immediately after sending plain text
     #	connect_SSL should fail on the first attempt because server
     #	is not ready yet
     # slow: wait before calling connect_SSL
@@ -175,7 +175,7 @@ if ( $pid == 0 ) {
 	$attempts = 0;
 	my $bytes_send = 0;
 
-	# set send buffer to 8192 so it will definitly fail writing all 500000 bytes in it
+	# set send buffer to 8192 so it will definitely fail writing all 500000 bytes in it
 	# beware that linux allocates twice as much (see tcp(7))
 	# AIX seems to get very slow if you set the sndbuf on localhost, so don't to it
 	# https://rt.cpan.org/Public/Bug/Display.html?id=72305

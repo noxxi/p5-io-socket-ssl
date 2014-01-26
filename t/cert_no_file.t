@@ -78,7 +78,7 @@ foreach my $test ( 1,2,3 ) {
 	    SSL_verify_mode => 0x00,
 	);
 	if ( $test == 3 ) {
-	    notok( "$spec: connect suceeded" ) if $to_server;
+	    notok( "$spec: connect succeeded" ) if $to_server;
 	    ok( "$spec: connect failed" );
 	    exit;
 	} elsif ( ! $to_server ) {
@@ -92,7 +92,7 @@ foreach my $test ( 1,2,3 ) {
 
     my $to_client = $server->accept;
     if ( $test == 3 ) {
-	notok( "$spec: accept suceeded" ) if $to_client;
+	notok( "$spec: accept succeeded" ) if $to_client;
 	ok( "$spec: accept failed" );
     } elsif ( ! $to_client ) {
 	notok( "$spec: accept failed: $!" );
