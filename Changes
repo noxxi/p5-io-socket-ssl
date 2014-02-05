@@ -1,3 +1,14 @@
+- verify the hostname inside a certificate by default with a superset of
+  common verification schemes instead of not verifying identity at all.
+  For now it will only complain if name verification failed, in the future
+  it will fail certificate verification, forcing you to set the expected
+  SSL_verifycn_name if you want to accept the certificate.
+- new option SSL_fingerprint and new methods get_fingerprint and
+  get_fingerprint_bin. Together they can be used to selectively accept
+  specific certificates which would otherwise fail verification, like
+  self-signed, outdated or from unknown CAs.
+  This makes another reason to disable verification obsolete.
+- spelling fixes, thanks to ville[dot]skytta[at]iki[dot]fi
 1.966 2014/01/21
 - fixed bug introduced in 1.964 - disabling TLSv1_2 worked no longer with
   specifying !TLSv12, only !TLSv1_2 worked

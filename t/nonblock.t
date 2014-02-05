@@ -245,9 +245,9 @@ if ( $pid == 0 ) {
 	ok( "syswrite" );
 
 	if ( ! $attempts && $test_might_fail ) {
-		ok( " write attempts failed, but OK nevertheless because setsockopt failed" );
+	    ok( " write attempts failed, but OK nevertheless because setsockopt failed" );
 	} else {
-		print "not " if !$attempts;
+	    print "not " if !$attempts;
 	    ok( "multiple write attempts" );
 	}
 
