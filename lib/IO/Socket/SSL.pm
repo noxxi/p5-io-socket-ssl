@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.966';
+our $VERSION = '1.967';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -1607,7 +1607,9 @@ sub new {
     # or no defaults
     {
 	my $use_default = 1;
-	for (qw( SSL_cert SSL_cert_file SSL_key SSL_key_file SSL_ca_file SSL_ca_path )) {
+	for (qw( SSL_cert SSL_cert_file SSL_key SSL_key_file
+	    SSL_ca_file SSL_ca_path
+	    SSL_fingerprint )) {
 	    next if ! defined $arg_hash->{$_};
 	    # some apps set keys '' to signal that it is not set, replace with undef
 	    if ( $arg_hash->{$_} eq '' ) {
@@ -1683,25 +1685,30 @@ sub new {
 	    }
 	}
 	$host ||= ref($vcn_scheme) && $vcn_scheme->{callback} && 'unknown';
-	$host or return IO::Socket::SSL->error(
-	    "Cannot determine peer hostname for verification" );
+	if ( ! $host ) {
+	    return IO::Socket::SSL->error(
+		"Cannot determine peer hostname for verification" )
+		if $vcn_scheme;
+	} elsif ( ! $vcn_scheme && $host =~m{^[\d.]+$|:} ) {
+	    # don't try to verify IP by default
+	} else {
+	    my $vcb = $arg_hash->{SSL_verify_callback};
+	    $arg_hash->{SSL_verify_callback} = sub {
+		my ($ok,$ctx_store,$certname,$error,$cert) = @_;
+		$ok = $vcb->($ok,$ctx_store,$certname,$error,$cert) if $vcb;
+		$ok or return 0;
+		return $ok if
+		    Net::SSLeay::X509_STORE_CTX_get_error_depth($ctx_store) !=0;
 
-	my $vcb = $arg_hash->{SSL_verify_callback};
-	$arg_hash->{SSL_verify_callback} = sub {
-	    my ($ok,$ctx_store,$certname,$error,$cert) = @_;
-	    $ok = $vcb->($ok,$ctx_store,$certname,$error,$cert) if $vcb;
-	    $ok or return 0;
-	    my $depth = Net::SSLeay::X509_STORE_CTX_get_error_depth($ctx_store);
-	    return $ok if $depth != 0;
-
-	    # verify name
-	    my $rv = IO::Socket::SSL::verify_hostname_of_cert( $host,$cert,$vcn_scheme );
-	    if ( ! $rv && ! $vcn_scheme ) {
-		# For now we use the default hostname verification if none was
-		# specified and complain loudly but return ok if it does not
-		# match. In the future we will enforce checks and users should
-		# better specify and explicite verification scheme
-		warn <<WARN
+		# verify name
+		my $rv = IO::Socket::SSL::verify_hostname_of_cert(
+		    $host,$cert,$vcn_scheme );
+		if ( ! $rv && ! $vcn_scheme ) {
+		    # For now we use the default hostname verification if none
+		    # was specified and complain loudly but return ok if it does
+		    # not match. In the future we will enforce checks and users
+		    # should better specify and explicite verification scheme.
+		    warn <<WARN;
 
 The verification of cert '$certname'
 failed against the host '$host' with the default verification scheme.
@@ -1712,10 +1719,11 @@ To stop this warning you might need to set SSL_verifycn_name to
 the name of the host you expect in the certificate.
 
 WARN
-		return 1;
-	    }
-	    return $rv;
-	};
+		    return 1;
+		}
+		return $rv;
+	    };
+	}
     }
 
     my $ssl_op = Net::SSLeay::OP_ALL();
@@ -1921,8 +1929,8 @@ WARN
     my $verify_cb = $arg_hash->{SSL_verify_callback};
     my @accept_fp;
     if ( my $fp = $arg_hash->{SSL_fingerprint} ) {
-	for( ref($fp) ? @$fp : [$fp ]) {
-	    my ($algo,$digest) = m{^([\w-]+)\$[a-f\d:]+$}i;
+	for( ref($fp) ? @$fp : $fp) {
+	    my ($algo,$digest) = m{^([\w-]+)\$([a-f\d:]+)$}i;
 	    return IO::Socket::SSL->error("invalid fingerprint '$_'")
 		if ! $algo;
 	    $algo = lc($algo);
@@ -1930,7 +1938,7 @@ WARN
 	    push @accept_fp,[ $algo, pack('H*',$digest) ]
 	}
     }
-    my $verify_callback = $verify_cb && sub {
+    my $verify_callback = ( $verify_cb || @accept_fp) && sub {
 	my ($ok, $ctx_store) = @_;
 	my ($certname,$cert,$error);
 	if ($ctx_store) {
@@ -1945,10 +1953,11 @@ WARN
 	    my %fp;
 	    for(@accept_fp) {
 		my $fp = $fp{$_->[0]} ||= 
-		    Net::SSLeay::X509_get_fingerprint($cert,$algo);
+		    Net::SSLeay::X509_get_fingerprint($cert,$_->[0]);
 		return 1 if $fp eq $_->[1];
 	    }
 	}
+	return $ok if ! $verify_cb;
 	return $verify_cb->($ok,$ctx_store,$certname,$error,$cert);
     };
 

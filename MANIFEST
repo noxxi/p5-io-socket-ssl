@@ -50,4 +50,5 @@ t/verify_hostname.t
 t/sni.t
 t/mitm.t
 t/ecdhe.t
+t/verify_fingerprint.t
 util/export_certs.pl

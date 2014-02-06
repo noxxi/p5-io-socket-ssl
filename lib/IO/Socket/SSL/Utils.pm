@@ -98,9 +98,9 @@ sub KEY_free {
 }
 
 sub KEY_create_rsa {
-    my $bits = shift || 1024;
+    my $bits = shift || 2048;
     my $key = Net::SSLeay::EVP_PKEY_new();
-    my $rsa = Net::SSLeay::RSA_generate_key(1024, 0x10001); # 0x10001 = RSA_F4
+    my $rsa = Net::SSLeay::RSA_generate_key($bits, 0x10001); # 0x10001 = RSA_F4
     Net::SSLeay::EVP_PKEY_assign_RSA($key,$rsa);
     return $key;
 }
@@ -148,15 +148,16 @@ sub CERT_asHash {
     return \%hash;
 }
 
-my $sha1_digest;
+my %digest;
 sub CERT_create {
     my %args = @_%2 ? %{ shift() } :  @_;
 
     my $cert = Net::SSLeay::X509_new();
-    $sha1_digest ||= do {
+    my $digest_name = delete $args{digest} || 'sha256';
+    my $digest = $digest{$digest_name} ||= do {
 	Net::SSLeay::SSLeay_add_ssl_algorithms();
-	Net::SSLeay::EVP_get_digestbyname("sha1")
-	    or die "SHA1 not available";
+	Net::SSLeay::EVP_get_digestbyname($digest_name)
+	    or die "Digest algorithm $digest_name is not available";
     };
 
     Net::SSLeay::ASN1_INTEGER_set(
@@ -208,18 +209,16 @@ sub CERT_create {
     my $key = delete $args{key} || KEY_create_rsa();
     Net::SSLeay::X509_set_pubkey($cert,$key);
 
-    my $issuer_cert = delete $args{issuer_cert};
-    my $issuer_key  = delete $args{issuer_key};
+    my $issuer_cert = delete $args{issuer_cert} || $cert;
+    my $issuer_key  = delete $args{issuer_key} || $key;
     if ( delete $args{CA} ) {
-	$issuer_cert ||= $cert;
-	$issuer_key  ||= $key;
-	push @ext, &Net::SSLeay::NID_basic_constraints => 'CA:TRUE',
-
-    } else {
-	$issuer_cert || croak "no issuer_cert given";
-	$issuer_key  || croak "no issuer_key given";
 	push @ext,
-	    &Net::SSLeay::NID_key_usage => 'digitalSignature,keyEncipherment',
+	    &Net::SSLeay::NID_basic_constraints => 'critical,CA:TRUE',
+	    &Net::SSLeay::NID_key_usage => 'critical,digitalSignature,keyCertSign',
+	    &Net::SSLeay::NID_netscape_cert_type => 'sslCA,emailCA,objCA';
+    } else {
+	push @ext,
+	    &Net::SSLeay::NID_key_usage => 'critical,digitalSignature,keyEncipherment',
 	    &Net::SSLeay::NID_basic_constraints => 'CA:FALSE',
 	    &Net::SSLeay::NID_ext_key_usage => 'serverAuth,clientAuth',
 	    &Net::SSLeay::NID_netscape_cert_type => 'server';
@@ -228,7 +227,7 @@ sub CERT_create {
     Net::SSLeay::P_X509_add_extensions($cert, $issuer_cert, @ext);
     Net::SSLeay::X509_set_issuer_name($cert,
 	Net::SSLeay::X509_get_subject_name($issuer_cert));
-    Net::SSLeay::X509_sign($cert,$issuer_key,$sha1_digest);
+    Net::SSLeay::X509_sign($cert,$issuer_key,$digest);
 
     return ($cert,$key);
 }
@@ -324,7 +323,7 @@ Each loaded or created cert and key must be freed to not leak memory.
 
 =item * KEY_create_rsa(bits) -> key
 
-Creates an RSA key pair, bits defaults to 1024.
+Creates an RSA key pair, bits defaults to 2048.
 
 =item * CERT_asHash(cert) -> hash
 
@@ -361,6 +360,7 @@ with localtime or similar functions.
 =item * CERT_create(hash) -> (cert,key)
 
 Creates a certificate based on the given hash.
+If the issuer is not specified the certificate will be self-signed.
 Additionally to the information described in C<CERT_asHash> the following keys
 can be given:
 
@@ -382,6 +382,10 @@ set issuer for new certificate
 =item issuer_key key
 
 sign new certificate with given key
+
+=item digest algorithm
+
+specify the algorithm used to sign the certificate, default SHA-256.
 
 =back
 

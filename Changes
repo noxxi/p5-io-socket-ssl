@@ -1,3 +1,4 @@
+1.967 2014/02/06
 - verify the hostname inside a certificate by default with a superset of
   common verification schemes instead of not verifying identity at all.
   For now it will only complain if name verification failed, in the future
@@ -8,6 +9,12 @@
   specific certificates which would otherwise fail verification, like
   self-signed, outdated or from unknown CAs.
   This makes another reason to disable verification obsolete.
+- Utils:
+  - default RSA key length 2048
+  - digest algorithm to sign certificate in CERT_create can be given,
+    defaults to SHA-256
+  - CERT_create can now issue non-CA selfsigned certificate
+  - CERT_create add some more useful constraints to certificate
 - spelling fixes, thanks to ville[dot]skytta[at]iki[dot]fi
 1.966 2014/01/21
 - fixed bug introduced in 1.964 - disabling TLSv1_2 worked no longer with
