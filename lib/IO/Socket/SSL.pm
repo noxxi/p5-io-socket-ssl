@@ -197,9 +197,8 @@ BEGIN {
 
 	# if we have IO::Socket::INET6 we will use this not IO::Socket::INET
 	# because it can handle both IPv4 and IPv6
-	# require at least 2.55 because of
-	# https://rt.cpan.org/Ticket/Display.html?id=39550
-	} elsif( eval { require IO::Socket::INET6; IO::Socket::INET6->VERSION(2.55) } ) {
+	# require at least 2.62 because of several problems before that version
+	} elsif( eval { require IO::Socket::INET6; IO::Socket::INET6->VERSION(2.62) } ) {
 	    @ISA = qw(IO::Socket::INET6);
 	    constant->import( CAN_IPV6 => "IO::Socket::INET6" );
 	} else {
