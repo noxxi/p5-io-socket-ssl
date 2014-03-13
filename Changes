@@ -1,3 +1,16 @@
+1.968 2014/03/13
+- BEHAVIOR CHANGE: removed implicit defaults of certs/server-{cert,key}.pem
+  for SSL_{cert,key}_file and ca/,certs/my-ca.pem for SSL_ca_file.
+  These defaults were depreceated since 1.951 (2013/7/3).
+- Usable CA verification path on Windows etc:
+  Do not use Net::SSLeay::CTX_set_default_verify_paths any longer to set
+  system/build dependended default verification path, because there was no
+  way to retrieve these default values and check if they contained usable
+  CA. Instead re-implement the same algorithm and export the results with
+  public function default_ca() and make it possible to overwrite it.
+  Also check for usable verification path during build.
+  If no usable path are detected require Mozilla::CA at build and try to
+  use it at runtime.
 1.967 2014/02/06
 - verify the hostname inside a certificate by default with a superset of
   common verification schemes instead of not verifying identity at all.

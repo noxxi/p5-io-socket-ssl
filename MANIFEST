@@ -51,4 +51,5 @@ t/sni.t
 t/mitm.t
 t/ecdhe.t
 t/verify_fingerprint.t
+t/external/usable_ca.t
 util/export_certs.pl

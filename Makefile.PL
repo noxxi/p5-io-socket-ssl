@@ -76,21 +76,60 @@ It's recommended to install either Net::IDN::Encode, Net::LibIDN or URI version>
 EOM
 }
 
+# check if we have usable CA store
+# on windows we might need to install Mozilla::CA
+# settings for default path from openssl crypto/cryptlib.h
+my %usable_ca;
+{
+    my $openssldir = eval { 
+	require Net::SSLeay;
+	Net::SSLeay::SSLeay_version(5) =~m{^OPENSSLDIR: "(.+)"$} && $1 || '';
+    };
+    my $dir = $ENV{SSL_CERT_DIR} 
+	|| ( $^O =~m{vms}i ? "SSLCERTS:":"$openssldir/certs" );
+    if ( opendir(my $dh,$dir)) {
+	FILES: for my $f (  grep { m{^[a-f\d]{8}(\.\d+)?$} } readdir($dh) ) {
+	    open( my $fh,'<',"$dir/$f") or next;
+	    while (<$fh>) {
+		m{^-+BEGIN CERTIFICATE-} or next;
+		$usable_ca{SSL_ca_path} = $dir;
+		last FILES;
+	    }
+	}
+    }
+    my $file = $ENV{SSL_CERT_FILE} 
+	|| ( $^O =~m{vms}i ? "SSLCERTS:cert.pem":"$openssldir/cert.pem" );
+    if ( open(my $fh,'<',$file)) {
+	while (<$fh>) {
+	    m{^-+BEGIN CERTIFICATE-} or next;
+	    $usable_ca{SSL_ca_file} = $file;
+	    last;
+	}
+    }
+}
+
+my $xt = prompt( "Should I do external tests?\n".
+    "These tests will fail if there is no internet connection or if a firewall\n".
+    "blocks some traffic, does SSL interception or if a HTTP proxy is needed.\n".
+    "[y/N]", 'n' );
+
 
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
 WriteMakefile(
     'NAME' => 'IO::Socket::SSL',
     'ABSTRACT' => 'Nearly transparent SSL encapsulation for IO::Socket::INET.',
-    'AUTHOR' => "Steffen Ullrich <sullr@cpan.org>, Peter Behroozi, Marko Asplund",
+    'AUTHOR' => 'Steffen Ullrich <sullr@cpan.org>, Peter Behroozi, Marko Asplund',
     'LICENSE' => 'perl',
     'DISTNAME' => 'IO-Socket-SSL',
     'VERSION_FROM' => 'lib/IO/Socket/SSL.pm',
     'PREREQ_PM' => {
 	'Net::SSLeay' => 1.46,
 	'Scalar::Util' => 0,
+	! %usable_ca ? ( 'Mozilla::CA' => 0 ):(),
     },
     'dist' => { COMPRESS => 'gzip', SUFFIX => 'gz', },
+    $xt =~m{^y}i ? ( test => { TESTS => 't/*.t t/external/*.t' }):(),
     $ExtUtils::MakeMaker::VERSION >= 6.46 ? (
 	'META_MERGE' => {
 	    resources => {

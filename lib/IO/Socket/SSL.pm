@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.967';
+our $VERSION = '1.968';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -148,7 +148,7 @@ for(qw( SSLv2 SSLv3 TLSv1 TLSv1_1 TLSv11:TLSv1_1 TLSv1_2 TLSv12:TLSv1_2 )) {
 }
 
 our $DEBUG;
-use vars qw(@ISA $SSL_ERROR @EXPORT );
+use vars qw(@ISA $SSL_ERROR @EXPORT);
 
 {
     # These constants will be used in $! at return from SSL_connect,
@@ -264,6 +264,63 @@ BEGIN {
 	}
     }
 }
+
+{
+    my $openssldir = eval { 
+	require Net::SSLeay;
+	Net::SSLeay::SSLeay_version(5) =~m{^OPENSSLDIR: "(.+)"$} && $1 || '';
+    };
+    my %default_ca;
+    my $ca_detected; # 0: never detect, undef: need to (re)detect
+    sub default_ca {
+	if (@_) {
+	    # user defined default CA or reset
+	    if ( @_ > 1 ) {
+		%default_ca = @_;
+		$ca_detected  = 0;
+	    } elsif ( my $path = shift ) {
+		%default_ca = 
+		    -d $path ? ( SSL_ca_path => $path ) :
+		    -f $path ? ( SSL_ca_file => $path ) :
+		    die "no such file or directory $path";
+		$ca_detected  = 0;
+	    } else {
+		$ca_detected = undef;
+	    }
+	}
+	return %default_ca if defined $ca_detected;
+
+	# (re)detect according to openssl crypto/cryptlib.h 
+	my $dir = $ENV{SSL_CERT_DIR} 
+	    || ( $^O =~m{vms}i ? "SSLCERTS:":"$openssldir/certs" );
+	if ( opendir(my $dh,$dir)) {
+	    FILES: for my $f (  grep { m{^[a-f\d]{8}(\.\d+)?$} } readdir($dh) ) {
+		open( my $fh,'<',"$dir/$f") or next;
+		while (<$fh>) {
+		    m{^-+BEGIN CERTIFICATE-} or next;
+		    $default_ca{SSL_ca_path} = $dir;
+		    last FILES;
+		}
+	    }
+	}
+	my $file = $ENV{SSL_CERT_FILE} 
+	    || ( $^O =~m{vms}i ? "SSLCERTS:cert.pem":"$openssldir/cert.pem" );
+	if ( open(my $fh,'<',$file)) {
+	    while (<$fh>) {
+		m{^-+BEGIN CERTIFICATE-} or next;
+		$default_ca{SSL_ca_file} = $file;
+		last;
+	    }
+	}
+
+	$default_ca{SSL_ca_file} = Mozilla::CA::SSL_ca_file()
+	    if ! %default_ca && eval { require Mozilla::CA };
+
+	$ca_detected = 1;
+	return %default_ca;
+    }
+}
+
 
 # Export some stuff
 # inet4|inet6|debug will be handled by myself, everything
@@ -1601,74 +1658,32 @@ sub new {
     # Avoid passing undef arguments to Net::SSLeay
     defined($arg_hash->{$_}) or delete($arg_hash->{$_}) for(keys %$arg_hash);
 
-    # use default path to certs and ca unless another one was given
-    # don't mix default path with user specified path, either we use all
-    # or no defaults
-    {
-	my $use_default = 1;
-	for (qw( SSL_cert SSL_cert_file SSL_key SSL_key_file
-	    SSL_ca_file SSL_ca_path
-	    SSL_fingerprint )) {
-	    next if ! defined $arg_hash->{$_};
-	    # some apps set keys '' to signal that it is not set, replace with undef
-	    if ( $arg_hash->{$_} eq '' ) {
-		$arg_hash->{$_} = undef;
-		next;
-	    }
-	    $use_default = 0;
+    # check SSL CA, cert etc arguments
+    # some apps set keys '' to signal that it is not set, replace with undef
+    for (qw( SSL_cert SSL_cert_file SSL_key SSL_key_file
+	SSL_ca_file SSL_ca_path
+	SSL_fingerprint )) {
+	$arg_hash->{$_} = undef if defined $arg_hash->{$_} 
+	    and $arg_hash->{$_} eq '';
+    }
+    for(qw(SSL_cert_file SSL_key_file)) {
+	 defined( my $file = $arg_hash->{$_} ) or next;
+	for my $f (ref($file) eq 'HASH' ? values(%$file):$file ) {
+	    die "$_ $f does not exist" if ! -f $f;
+	    die "$_ $f is not accessible" if ! -r _;
 	}
-
-	$use_default = 0 if $use_default
-	    and ! $is_server
-	    and ! $arg_hash->{SSL_verify_mode};
-
-	if ( $use_default ) {
-
-	    my %ca =
-		-f 'certs/my-ca.pem' ? ( SSL_ca_file => 'certs/my-ca.pem' ) :
-		-d 'ca/' ? ( SSL_ca_path => 'ca/' ) :
-		();
-	    my %certs = $is_server ? (
-		SSL_key_file => 'certs/server-key.pem',
-		SSL_cert_file => 'certs/server-cert.pem',
-	    ) : $arg_hash->{SSL_use_cert} ? (
-		SSL_key_file => 'certs/client-key.pem',
-		SSL_cert_file => 'certs/client-cert.pem',
-	    ) :();
-	    %$arg_hash = ( %$arg_hash, %ca, %certs );
-
-	    carp(
-		"*******************************************************************\n".
-		" The implicite use of IO::Socket::SSL specific default settings for \n".
-		" CA, cert and key is depreceated.\n".
-		" Please explicitly specify your own CA, cert and key using:\n".
-		"    - SSL_ca_file or SSL_ca_path for the CA\n".
-		"    - SSL_cert_file and SSL_key_file for cert and key\n".
-		" To specify your own system wide defaults you can use \n".
-		" set_defaults, set_client_defaults and set_server_defaults.\n".
-		"*******************************************************************\n".
-		" "
-	    ) if %ca or %certs;
-
-	} else {
-	    for(qw(SSL_cert_file SSL_key_file)) {
-		defined( my $file = $arg_hash->{$_} ) or next;
-		for my $f (ref($file) eq 'HASH' ? values(%$file):$file ) {
-		    die "$_ $f does not exist" if ! -f $f;
-		    die "$_ $f is not accessible" if ! -r _;
-		}
-	    }
-	    if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
-		die "SSL_ca_file $f does not exist" if ! -f $f;
-		die "SSL_ca_file $f is not accessible" if ! -r _;
-	    }
-	    if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
-		die "only SSL_ca_path or SSL_ca_file should be given"
-		    if defined $arg_hash->{SSL_ca_file};
-		die "SSL_ca_path $d does not exist" if ! -d $d;
-		die "SSL_ca_path $d is not accessible" if ! -r _;
-	    }
-	}
+    }
+    if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
+	ref($f) and ! $$f and next; # explicitly ignore
+	die "SSL_ca_file $f does not exist" if ! -f $f;
+	die "SSL_ca_file $f is not accessible" if ! -r _;
+    }
+    if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
+	ref($d) and ! $$d and next; # explicitly ignore
+	die "only SSL_ca_path or SSL_ca_file should be given"
+	    if defined $arg_hash->{SSL_ca_file};
+	die "SSL_ca_path $d does not exist" if ! -d $d;
+	die "SSL_ca_path $d is not accessible" if ! -r _;
     }
 
     my $vcn_scheme = delete $arg_hash->{SSL_verifycn_scheme};
@@ -1792,12 +1807,21 @@ WARN
     my $verify_mode = $arg_hash->{SSL_verify_mode};
     if ( $verify_mode != Net::SSLeay::VERIFY_NONE()) {
 	if ( defined $arg_hash->{SSL_ca_file} || defined $arg_hash->{SSL_ca_path} ) {
-	    return IO::Socket::SSL->error("Invalid certificate authority locations")
-		if ! Net::SSLeay::CTX_load_verify_locations( $ctx,
-		    $arg_hash->{SSL_ca_file} || '',$arg_hash->{SSL_ca_path} || '');
-	} else {
+	    my $file = $arg_hash->{SSL_ca_file};
+	    $file = undef if ref($file) && ! $$file;
+	    my $dir = $arg_hash->{SSL_ca_path};
+	    $dir = undef if ref($dir) && ! $$dir;
+	    if ( $file || $dir and ! Net::SSLeay::CTX_load_verify_locations(
+		$ctx, $file || '', $dir || '')) {
+		return IO::Socket::SSL->error(
+		    "Invalid certificate authority locations")
+	    }
+	} elsif ( my %ca = IO::Socket::SSL::default_ca()) {
 	    # no CA path given, continue with system defaults
-	    Net::SSLeay::CTX_set_default_verify_paths($ctx);
+	    return IO::Socket::SSL->error(
+		"Invalid default certificate authority locations")
+		if ! Net::SSLeay::CTX_load_verify_locations( $ctx,
+		    $ca{SSL_ca_file} || '',$ca{SSL_ca_path} || '');
 	}
     }
 
@@ -2107,8 +2131,13 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
 
 	# certificate verification
 	SSL_verify_mode => SSL_VERIFY_PEER,
+
+	# location of CA store
 	SSL_ca_path => '/etc/ssl/certs', # typical CA path on Linux
-	# on OpenBSD instead: SSL_ca_file => '/etc/ssl/cert.pem'
+	SSL_ca_file => '/etc/ssl/cert.pem', # typical CA file on BSD
+	# or just use default path on system:
+	IO::Socket::SSL::default_ca(), # either explicitly
+	# or implicitly by not giving SSL_ca_*
 
 	# easy hostname verification
 	SSL_verifycn_name => 'foo.bar', # defaults to PeerHost
@@ -2453,10 +2482,11 @@ Usually you want to verify that the peer certificate has been signed by a
 trusted certificate authority. In this case you should use this option to
 specify the file (SSL_ca_file) or directory (SSL_ca_path) containing the
 certificateZ<>(s) of the trusted certificate authorities.
-If both SSL_ca_file and SSL_ca_path are undefined and builtin defaults (see
-"Defaults for Cert, Key and CA".) can not be used, the system
-defaults built into the OpenSSL library will be tried.
-If you really don't want to set a CA set this key to C<''>.
+If both SSL_ca_file and SSL_ca_path are unset it will use C<default_ca()>
+to determine the user-set or system defaults.
+If you really don't want to set a CA set this key to C<\undef> (unfortunatly
+C<''> is used by some modules using IO::Socket::SSL when CA is not exlicitly
+given).
 
 =item SSL_fingerprint
 
@@ -2967,6 +2997,29 @@ C<new_from_fd> method of the super class (L<IO::Socket::INET> or similar) and th
 C<start_SSL> will be called using the given C<%sslargs>.
 If C<$fd> is already an IO::Socket object you should better call C<start_SSL>
 directly.
+
+=item B<IO::Socket::SSL::default_ca([ path|dir| SSL_ca_file => ..., SSL_ca_path => ... ])>
+
+Determines or sets the default CA path.
+If existing path or dir or a hash is given it will set the default CA path to
+this value and never try to detect it automatically.
+If C<undef> is given it will forget any stored defaults and continue with
+detection of system defaults.
+If no arguments are given it will start detection of system defaults, unless it
+has already stored user-set or previously detected values.
+
+The detection of system defaults works similar to OpenSSL, e.g. it will check
+the directory specified in enviroment variable SSL_CERT_DIR or the path
+OPENSSLDIR/certs (SSLCERTS: on VMS) and the file specified in environment
+variable SSL_CERT_FILE or the path OPENSSLDIR/cert.pem (SSLCERTS:cert.pem on
+VMS). Contrary to OpenSSL it will check if the SSL_ca_path contains PEM files
+with the hash as file name and if the SSL_ca_file looks like PEM.
+If no usable system default can be found it will try to load and use
+L<Mozilla::CA> and if not available give up detection.
+The result of the detection will be saved to speed up future calls.
+
+The function returns the saved default CA as hash with SSL_ca_file and
+SSL_ca_path.
 
 =item B<IO::Socket::SSL::set_default_context(...)>
 
