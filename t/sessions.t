@@ -51,7 +51,7 @@ unless (fork) {
 	 SSL_ca_path => '',
 	 SSL_version => 'TLSv1',
 	 SSL_cipher_list => 'HIGH',
-	 SSL_session_cache_size => 4
+	 SSL_session_cache_size => 4,
     );
 
 
@@ -104,19 +104,13 @@ unless (fork) {
 
     my $sock3 = IO::Socket::INET->new($saddr[2]);
     my @clients = (
-	IO::Socket::SSL->new(
-	    PeerAddr => $saddr[0],
-	    SSL_verify_mode => 0
-	),
-	IO::Socket::SSL->new(
-	    PeerAddr => $saddr[1],
-	    SSL_verify_mode => 0
-	),
-	IO::Socket::SSL->start_SSL( $sock3 , SSL_verify_mode => 0),
+	IO::Socket::SSL->new($saddr[0]),
+	IO::Socket::SSL->new($saddr[1]),
+	IO::Socket::SSL->start_SSL( $sock3 ),
     );
 
     if ( grep { !$_ } @clients >0 ) {
-	print "not ok \# Client init\n";
+	print "not ok \# Client init $SSL_ERROR\n";
 	exit;
     }
     &ok("Client init");
@@ -153,10 +147,7 @@ unless (fork) {
     }
 
     @clients = map {
-	IO::Socket::SSL->new(
-	    PeerAddr => $_,
-	    SSL_verify_mode => 0,
-	)
+	IO::Socket::SSL->new($_)
     } @saddr;
 
     if (keys(%$cache) != 6) {

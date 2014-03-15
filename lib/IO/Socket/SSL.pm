@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.968';
+our $VERSION = '1.969';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -48,8 +48,8 @@ my %DEFAULT_SSL_ARGS = (
     SSL_check_crl => 0,
     SSL_version => 'SSLv23:!SSLv2',
     SSL_verify_callback => undef,
-    SSL_verifycn_scheme => undef,  # don't verify cn
-    SSL_verifycn_name => undef,    # use from PeerAddr/PeerHost
+    SSL_verifycn_scheme => undef,  # fallback cn verification
+    #SSL_verifycn_name => undef,   # use from PeerAddr/PeerHost - do not override in set_filter_args_hack 'use_defaults'
     SSL_npn_protocols => undef,    # meaning depends whether on server or client side
     SSL_cipher_list =>
 	'EECDH+AESGCM+ECDSA EECDH+AESGCM EECDH+ECDSA +AES256 EECDH EDH+AESGCM '.
@@ -59,6 +59,10 @@ my %DEFAULT_SSL_ARGS = (
 my %DEFAULT_SSL_CLIENT_ARGS = (
     %DEFAULT_SSL_ARGS,
     SSL_verify_mode => SSL_VERIFY_PEER,
+
+    SSL_ca_file => undef,
+    SSL_ca_path => undef,
+    default_ca(),
 
     # older versions of F5 BIG-IP hang when getting SSL client hello >255 bytes
     # http://support.f5.com/kb/en-us/solutions/public/13000/000/sol13037.html
@@ -70,7 +74,7 @@ my %DEFAULT_SSL_CLIENT_ARGS = (
     # RC4-SHA is already bad enough. Also, we have a different sort order
     # compared to IE11, because we put ciphers supporting forward secrecy on top
 
-    SSL_cipher_list => join(" ", 
+    SSL_cipher_list => join(" ",
 	qw(
 	    ECDHE-ECDSA-AES128-GCM-SHA256
 	    ECDHE-ECDSA-AES128-SHA256
@@ -129,6 +133,9 @@ DH
 my $GLOBAL_SSL_ARGS = {};
 my $GLOBAL_SSL_CLIENT_ARGS = {};
 my $GLOBAL_SSL_SERVER_ARGS = {};
+
+# hack which is used to filter bad settings from used modules
+my $FILTER_SSL_ARGS = undef;
 
 # non-XS Versions of Scalar::Util will fail
 BEGIN{
@@ -266,12 +273,9 @@ BEGIN {
 }
 
 {
-    my $openssldir = eval { 
-	require Net::SSLeay;
-	Net::SSLeay::SSLeay_version(5) =~m{^OPENSSLDIR: "(.+)"$} && $1 || '';
-    };
     my %default_ca;
     my $ca_detected; # 0: never detect, undef: need to (re)detect
+    my $openssldir;
     sub default_ca {
 	if (@_) {
 	    # user defined default CA or reset
@@ -279,7 +283,7 @@ BEGIN {
 		%default_ca = @_;
 		$ca_detected  = 0;
 	    } elsif ( my $path = shift ) {
-		%default_ca = 
+		%default_ca =
 		    -d $path ? ( SSL_ca_path => $path ) :
 		    -f $path ? ( SSL_ca_file => $path ) :
 		    die "no such file or directory $path";
@@ -290,8 +294,13 @@ BEGIN {
 	}
 	return %default_ca if defined $ca_detected;
 
-	# (re)detect according to openssl crypto/cryptlib.h 
-	my $dir = $ENV{SSL_CERT_DIR} 
+	$openssldir ||= eval {
+	    require Net::SSLeay;
+	    Net::SSLeay::SSLeay_version(5) =~m{^OPENSSLDIR: "(.+)"$} && $1 || '';
+	};
+
+	# (re)detect according to openssl crypto/cryptlib.h
+	my $dir = $ENV{SSL_CERT_DIR}
 	    || ( $^O =~m{vms}i ? "SSLCERTS:":"$openssldir/certs" );
 	if ( opendir(my $dh,$dir)) {
 	    FILES: for my $f (  grep { m{^[a-f\d]{8}(\.\d+)?$} } readdir($dh) ) {
@@ -303,7 +312,7 @@ BEGIN {
 		}
 	    }
 	}
-	my $file = $ENV{SSL_CERT_FILE} 
+	my $file = $ENV{SSL_CERT_FILE}
 	    || ( $^O =~m{vms}i ? "SSLCERTS:cert.pem":"$openssldir/cert.pem" );
 	if ( open(my $fh,'<',$file)) {
 	    while (<$fh>) {
@@ -402,12 +411,18 @@ sub configure_SSL {
 	$is_server = $arg_hash->{SSL_server} = $arg_hash->{Listen} || 0;
     }
 
-    # add user defined defaults
-    %$arg_hash = (
+    # add user defined defaults, maybe after filtering
+    $FILTER_SSL_ARGS->($is_server,$arg_hash) if $FILTER_SSL_ARGS;
+    my %defaults = (
 	%$GLOBAL_SSL_ARGS,
 	$is_server ? %$GLOBAL_SSL_SERVER_ARGS : %$GLOBAL_SSL_CLIENT_ARGS,
-	%$arg_hash
     );
+    if ( $defaults{SSL_reuse_ctx} ) {
+	# ignore default context if there are args to override it
+	delete $defaults{SSL_reuse_ctx} 
+	    if grep { m{^SSL_(?!verifycn_name)$} } keys %$arg_hash;
+    }
+    %$arg_hash = ( %defaults, %$arg_hash ) if %defaults;
 
     my $ctx = $arg_hash->{'SSL_reuse_ctx'};
     if ($ctx) {
@@ -518,6 +533,17 @@ sub connect_SSL {
 	}
 
 	$arg_hash->{PeerAddr} || $self->_update_peer;
+	if ( $ctx->{verify_name_ref} ) {
+	    # need target name for update
+	    my $host = $arg_hash->{SSL_verifycn_name};
+	    if ( ! defined $host ) {
+		if ( $host = $arg_hash->{PeerHost} || $arg_hash->{PeerAddr} ) {
+		    $host =~s{:[a-zA-Z0-9_\-]+$}{};
+		}
+	    }
+	    ${$ctx->{verify_name_ref}} = $host;
+	}
+
 	my $session = $ctx->session_cache( $arg_hash->{SSL_session_key} ?
 	    ( $arg_hash->{SSL_session_key},1 ) :
 	    ( $arg_hash->{PeerAddr}, $arg_hash->{PeerPort} )
@@ -1014,7 +1040,7 @@ sub stop_SSL {
 	    while (1) {
 		if ( $status & SSL_SENT_SHUTDOWN and
 		    # don't care for received if fast shutdown
-		    $status & SSL_RECEIVED_SHUTDOWN 
+		    $status & SSL_RECEIVED_SHUTDOWN
 			|| $stop_args->{SSL_fast_shutdown}) {
 		    # shutdown complete
 		    last;
@@ -1133,7 +1159,7 @@ sub start_SSL {
 	    # upgrade to SSL failed, downgrade socket to original class
 	    if ( $original_class ) {
 		bless($socket,$original_class);
-		$socket->blocking(0) if ! $was_blocking 
+		$socket->blocking(0) if ! $was_blocking
 		    && $socket->can('blocking');
 	    }
 	    return;
@@ -1511,29 +1537,58 @@ sub set_default_session_cache {
     $GLOBAL_SSL_ARGS->{SSL_session_cache} = shift;
 }
 
-sub set_defaults {
-    my %args = @_;
-    while ( my ($k,$v) = each %args ) {
-	$k =~s{^(SSL_)?}{SSL_};
-	$GLOBAL_SSL_ARGS->{$k} = $v;
+
+{
+    my $set_defaults = sub {
+	my $args = shift;
+	for(my $i=0;$i<@$args;$i+=2 ) {
+	    my ($k,$v) = @{$args}[$i,$i+1];
+	    if ( $k =~m{^SSL_} ) {
+		$_->{$k} = $v for(@_);
+	    } elsif ( $k =~m{^(name|scheme)$} ) {
+		$_->{"SSL_verifycn_$k"} = $v for (@_);
+	    } elsif ( $k =~m{^(callback|mode)$} ) {
+		$_->{"SSL_verify_$k"} = $v for(@_);
+	    } else {
+		$_->{"SSL_$k"} = $v for(@_);
+	    }
+	}
+    };
+    sub set_defaults {
+	my %args = @_;
+	$set_defaults->(\@_,
+	    $GLOBAL_SSL_ARGS,
+	    $GLOBAL_SSL_CLIENT_ARGS,
+	    $GLOBAL_SSL_SERVER_ARGS
+	);
+    }
+    { # deprecated API
+	no warnings;
+	*set_ctx_defaults = \&set_defaults;
+    }
+    sub set_client_defaults {
+	my %args = @_;
+	$set_defaults->(\@_, $GLOBAL_SSL_CLIENT_ARGS );
+    }
+    sub set_server_defaults {
+	my %args = @_;
+	$set_defaults->(\@_, $GLOBAL_SSL_SERVER_ARGS );
     }
 }
-{ # deprecated API
-    no warnings;
-    *set_ctx_defaults = \&set_defaults;
-}
-sub set_client_defaults {
-    my %args = @_;
-    while ( my ($k,$v) = each %args ) {
-	$k =~s{^(SSL_)?}{SSL_};
-	$GLOBAL_SSL_CLIENT_ARGS->{$k} = $v;
-    }
-}
-sub set_server_defaults {
-    my %args = @_;
-    while ( my ($k,$v) = each %args ) {
-	$k =~s{^(SSL_)?}{SSL_};
-	$GLOBAL_SSL_SERVER_ARGS->{$k} = $v;
+
+sub set_args_filter_hack {
+    my $sub = shift;
+    if ( ref $sub ) {
+	$FILTER_SSL_ARGS = shift;
+    } elsif ( $sub eq 'use_defaults' ) {
+	# override args with defaults
+	$FILTER_SSL_ARGS = sub {
+	    my ($is_server,$args) = @_;
+	    %$args = ( %$args, $is_server
+		? ( %DEFAULT_SSL_SERVER_ARGS, %$GLOBAL_SSL_SERVER_ARGS )
+		: ( %DEFAULT_SSL_CLIENT_ARGS, %$GLOBAL_SSL_CLIENT_ARGS )
+	    );
+	}
     }
 }
 
@@ -1648,6 +1703,14 @@ sub new {
 	$arg_hash->{SSL_use_cert} = 1
     }
 
+    # if any of SSL_ca_path or SSL_ca_file is set don't set the other SSL_ca_*
+    # from defaults
+    if ( $arg_hash->{SSL_ca_path} ) {
+	$arg_hash->{SSL_ca_file} ||= undef
+    } elsif ( $arg_hash->{SSL_ca_file} ) {
+	$arg_hash->{SSL_ca_path} ||= undef;
+    }
+
     # add library defaults
     %$arg_hash = (
 	SSL_use_cert => $is_server,
@@ -1663,7 +1726,7 @@ sub new {
     for (qw( SSL_cert SSL_cert_file SSL_key SSL_key_file
 	SSL_ca_file SSL_ca_path
 	SSL_fingerprint )) {
-	$arg_hash->{$_} = undef if defined $arg_hash->{$_} 
+	$arg_hash->{$_} = undef if defined $arg_hash->{$_}
 	    and $arg_hash->{$_} eq '';
     }
     for(qw(SSL_cert_file SSL_key_file)) {
@@ -1673,56 +1736,68 @@ sub new {
 	    die "$_ $f is not accessible" if ! -r _;
 	}
     }
-    if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
-	ref($f) and ! $$f and next; # explicitly ignore
-	die "SSL_ca_file $f does not exist" if ! -f $f;
-	die "SSL_ca_file $f is not accessible" if ! -r _;
+
+    my $verify_mode = $arg_hash->{SSL_verify_mode};
+    if ( $verify_mode != Net::SSLeay::VERIFY_NONE()) {
+	if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
+	    ref($f) and ! $$f and next; # explicitly ignore
+	    die "SSL_ca_file $f does not exist" if ! -f $f;
+	    die "SSL_ca_file $f is not accessible" if ! -r _;
+	}
+	if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
+	    ref($d) and ! $$d and next; # explicitly ignore
+	    die "only SSL_ca_path or SSL_ca_file should be given"
+		if defined $arg_hash->{SSL_ca_file};
+	    die "SSL_ca_path $d does not exist" if ! -d $d;
+	    die "SSL_ca_path $d is not accessible" if ! -r _;
+	}
     }
-    if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
-	ref($d) and ! $$d and next; # explicitly ignore
-	die "only SSL_ca_path or SSL_ca_file should be given"
-	    if defined $arg_hash->{SSL_ca_file};
-	die "SSL_ca_path $d does not exist" if ! -d $d;
-	die "SSL_ca_path $d is not accessible" if ! -r _;
-    }
+
+    my $self = bless {},$class;
 
     my $vcn_scheme = delete $arg_hash->{SSL_verifycn_scheme};
-    if ( ! $vcn_scheme or $vcn_scheme ne 'none' ) {
-	# don't access ${*self} inside callback - this seems to create
-	# circular references from the ssl object to the context and back
+    if ( ! $is_server and $verify_mode & 0x01 and
+	! $vcn_scheme || $vcn_scheme ne 'none' ) {
 
-	# use SSL_verifycn_name or determine from PeerAddr
-	my $host = $arg_hash->{SSL_verifycn_name};
-	if (not defined($host)) {
-	    if ( $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} ) {
-		$host =~s{:[a-zA-Z0-9_\-]+$}{};
+	# gets updated during configure_SSL
+	my $verify_name;
+	$self->{verify_name_ref} = \$verify_name;
+
+	my $vcb = $arg_hash->{SSL_verify_callback};
+	$arg_hash->{SSL_verify_callback} = sub {
+	    my ($ok,$ctx_store,$certname,$error,$cert) = @_;
+	    $ok = $vcb->($ok,$ctx_store,$certname,$error,$cert) if $vcb;
+	    $ok or return 0;
+
+	    return $ok if
+		Net::SSLeay::X509_STORE_CTX_get_error_depth($ctx_store) !=0;
+
+	    my $host = $verify_name || ref($vcn_scheme) && $vcn_scheme->{callback} && 'unknown';
+	    if ( ! $host ) {
+		if ( $vcn_scheme ) {
+		    IO::Socket::SSL->error(
+			"Cannot determine peer hostname for verification" );
+		    return 0;
+		}
+		warn "Cannot determine hostname if peer for verification. ".
+		    "Disabling default hostname verification for now. ".
+		    "Please specify hostname with SSL_verifycn_name and better set SSL_verifycn_scheme too.\n";
+		return $ok;
+	    } elsif ( ! $vcn_scheme && $host =~m{^[\d.]+$|:} ) {
+		# don't try to verify IP by default
+		return $ok;
 	    }
-	}
-	$host ||= ref($vcn_scheme) && $vcn_scheme->{callback} && 'unknown';
-	if ( ! $host ) {
-	    return IO::Socket::SSL->error(
-		"Cannot determine peer hostname for verification" )
-		if $vcn_scheme;
-	} elsif ( ! $vcn_scheme && $host =~m{^[\d.]+$|:} ) {
-	    # don't try to verify IP by default
-	} else {
-	    my $vcb = $arg_hash->{SSL_verify_callback};
-	    $arg_hash->{SSL_verify_callback} = sub {
-		my ($ok,$ctx_store,$certname,$error,$cert) = @_;
-		$ok = $vcb->($ok,$ctx_store,$certname,$error,$cert) if $vcb;
-		$ok or return 0;
-		return $ok if
-		    Net::SSLeay::X509_STORE_CTX_get_error_depth($ctx_store) !=0;
 
-		# verify name
-		my $rv = IO::Socket::SSL::verify_hostname_of_cert(
-		    $host,$cert,$vcn_scheme );
-		if ( ! $rv && ! $vcn_scheme ) {
-		    # For now we use the default hostname verification if none
-		    # was specified and complain loudly but return ok if it does
-		    # not match. In the future we will enforce checks and users
-		    # should better specify and explicite verification scheme.
-		    warn <<WARN;
+
+	    # verify name
+	    my $rv = IO::Socket::SSL::verify_hostname_of_cert(
+		$host,$cert,$vcn_scheme );
+	    if ( ! $rv && ! $vcn_scheme ) {
+		# For now we use the default hostname verification if none
+		# was specified and complain loudly but return ok if it does
+		# not match. In the future we will enforce checks and users
+		# should better specify and explicite verification scheme.
+		warn <<WARN;
 
 The verification of cert '$certname'
 failed against the host '$host' with the default verification scheme.
@@ -1733,11 +1808,14 @@ To stop this warning you might need to set SSL_verifycn_name to
 the name of the host you expect in the certificate.
 
 WARN
-		    return 1;
-		}
-		return $rv;
-	    };
-	}
+		return $ok;
+	    }
+	    if ( ! $rv ) {
+		IO::Socket::SSL->error(
+		    "hostname verification failed" );
+	    }
+	    return $rv;
+	};
     }
 
     my $ssl_op = Net::SSLeay::OP_ALL();
@@ -1804,7 +1882,6 @@ WARN
 	}
     }
 
-    my $verify_mode = $arg_hash->{SSL_verify_mode};
     if ( $verify_mode != Net::SSLeay::VERIFY_NONE()) {
 	if ( defined $arg_hash->{SSL_ca_file} || defined $arg_hash->{SSL_ca_path} ) {
 	    my $file = $arg_hash->{SSL_ca_file};
@@ -1975,7 +2052,7 @@ WARN
 	if ( $cert && @accept_fp ) {
 	    my %fp;
 	    for(@accept_fp) {
-		my $fp = $fp{$_->[0]} ||= 
+		my $fp = $fp{$_->[0]} ||=
 		    Net::SSLeay::X509_get_fingerprint($cert,$_->[0]);
 		return 1 if $fp eq $_->[1];
 	    }
@@ -1995,7 +2072,7 @@ WARN
 	$cb->($ctx);
     }
 
-    my $self = bless { context => $ctx },$class;
+    $self->{context} = $ctx;
     $self->{has_verifycb} = 1 if $verify_callback;
     $DEBUG>=3 && DEBUG( "new ctx $ctx" );
     $CTX_CREATED_IN_THIS_THREAD{$ctx} = 1;
@@ -2264,7 +2341,7 @@ some important differences due to the way SSL works:
 Data are transmitted inside the SSL protocol using encrypted frames, which can
 only be decrypted once the full frame is received. So if you use C<read> or
 C<sysread> to receive less data than the SSL frame contains, it will read the
-whole frame, return part of it and buffer the rest for later reads. 
+whole frame, return part of it and buffer the rest for later reads.
 This does not make a difference for simple programs, but if you use
 select-loops or polling or non-blocking I/O please read the related sections.
 
@@ -2349,7 +2426,7 @@ See section "SNI Support" for details of SNI the support.
 
 =item SSL_version
 
-Sets the version of the SSL protocol used to transmit data. 
+Sets the version of the SSL protocol used to transmit data.
 'SSLv23' auto-negotiates between SSLv2 and SSLv3, while 'SSLv2', 'SSLv3',
 'TLSv1', 'TLSv1_1' or 'TLSv1_2' restrict the protocol to the specified version.
 All values are case-insensitive.  Instead of 'TLSv1_1' and 'TLSv1_2' one can
@@ -2495,7 +2572,7 @@ unknown CA and you really want to accept it, but don't want to disable
 verification at all. In this case you can specify the fingerprint of the
 certificate as C<'algo$hex_fingerprint'>. C<algo> is a fingerprint algorithm
 supported by OpenSSL, e.g. 'sha1','sha256'... and C<hex_fingerprint> is the
-hexadecimal representation of the binary fingerprint. 
+hexadecimal representation of the binary fingerprint.
 To get the fingerprint of an established connection you can use
 C<get_fingerprint>.
 
@@ -2692,7 +2769,7 @@ class does return a blocking file handle even when accept is called on a
 non-blocking socket, the SSL handshake on the new file object will be done in a
 blocking way. Please see the section about non-blocking I/O for details.
 If you don't like this behavior you should do accept on the TCP socket and then
-upgrade it with C<start_SSL> later. 
+upgrade it with C<start_SSL> later.
 
 =item B<connect(...)>
 
@@ -2742,7 +2819,7 @@ you close it, set this option to a true value.
 =item B<sysread( BUF, LEN, [ OFFSET ] )>
 
 This function behaves from the outside the same as B<sysread> in other
-L<IO::Socket> objects, e.g. it returns at most LEN bytes of data. 
+L<IO::Socket> objects, e.g. it returns at most LEN bytes of data.
 But in reality it reads not only LEN bytes from the underlying socket, but at
 a single SSL frame. It then returns up to LEN bytes it decrypted from this SSL
 frame. If the frame contained more data than requested it will return only LEN
@@ -2767,12 +2844,12 @@ this documentation.
 This functions behaves from the outside the same as B<syswrite> in other
 L<IO::Socket> objects, e.g. it will write at most LEN bytes to the socket, but
 there is no guarantee, that all LEN bytes are written. It will return the number
-of bytes written. 
+of bytes written.
 syswrite will write all the data within a single SSL frame, which means, that
 no more than 16.384 bytes, which is the maximum size of an SSL frame, can be
 written at once.
 
-For non-blocking sockets SSL specific behavior applies. 
+For non-blocking sockets SSL specific behavior applies.
 Pease read the specific section in this documentation.
 
 =item B<peek( BUF, LEN, [ OFFSET ])>
@@ -3009,7 +3086,7 @@ If no arguments are given it will start detection of system defaults, unless it
 has already stored user-set or previously detected values.
 
 The detection of system defaults works similar to OpenSSL, e.g. it will check
-the directory specified in enviroment variable SSL_CERT_DIR or the path
+the directory specified in environment variable SSL_CERT_DIR or the path
 OPENSSLDIR/certs (SSLCERTS: on VMS) and the file specified in environment
 variable SSL_CERT_FILE or the path OPENSSLDIR/cert.pem (SSLCERTS:cert.pem on
 VMS). Contrary to OpenSSL it will check if the SSL_ca_path contains PEM files
@@ -3041,19 +3118,18 @@ cache globally, so use with caution.
 =item B<IO::Socket::SSL::set_defaults(%args)>
 
 With this function one can set defaults for all SSL_* parameter used for creation of
-the context, like the SSL_verify* parameter.
+the context, like the SSL_verify* parameter. Any SSL_* parameter can be given
+or the following short versions:
 
 =over 8
 
-=item mode - set default SSL_verify_mode
+=item mode - SSL_verify_mode
 
-=item callback - set default SSL_verify_callback
+=item callback - SSL_verify_callback
 
-=item scheme - set default SSL_verifycn_scheme
+=item scheme - SSL_verifycn_scheme
 
-=item name - set default SSL_verifycn_name
-
-If not given and scheme is hash reference with key callback it will be set to 'unknown'
+=item name - SSL_verifycn_name
 
 =back
 
@@ -3064,6 +3140,35 @@ Similar to C<set_defaults>, but only sets the defaults for client mode.
 =item B<IO::Socket::SSL::set_server_defaults(%args)>
 
 Similar to C<set_defaults>, but only sets the defaults for server mode.
+
+=item B<IO::Socket::SSL::set_args_filter_hack(\&code|'use_defaults')
+
+Sometimes one has to use code which uses unwanted or invalid arguments for SSL,
+typically disabling SSL verification or setting wrong ciphers or SSL versions.
+With this hack it is possible to override these settings and restore sanity.
+Example:
+
+    IO::Socket::SSL::set_args_filter_hack( sub {
+	my ($is_server,$args) = @_;
+	if ( ! $is_server ) {
+	    # client settings - enable verification with default CA
+	    # and fallback hostname verification etc
+	    delete @{$args}{qw(
+		SSL_verify_mode
+		SSL_ca_file
+		SSL_ca_path
+		SSL_verifycn_scheme
+		SSL_version
+	    )};
+	    # and add some fingerprints for known certs which are signed by
+	    # unknown CAs or are self-signed
+	    $args->{SSL_fingerprint} = ...
+	}
+    });
+
+With the short setting C<set_args_filter_hack('use_defaults')> it will prefer
+the default settings in all cases. These default settings can be modified with
+C<set_defaults>, C<set_client_defaults> and C<set_server_defaults>.
 
 =back
 

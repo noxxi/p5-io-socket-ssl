@@ -1,3 +1,10 @@
+1.969 2014/03/13
+- fix set_defaults to match documentation regarding short names
+- new function set_args_filter_hack to make it possible to override bad SSL
+  settings from other code at the last moment.
+- determine default_ca on module load (and not on first use in each thread)
+- don't try default hostname verification if verify_mode 0
+- fix hostname verification when reusing context
 1.968 2014/03/13
 - BEHAVIOR CHANGE: removed implicit defaults of certs/server-{cert,key}.pem
   for SSL_{cert,key}_file and ca/,certs/my-ca.pem for SSL_ca_file.
