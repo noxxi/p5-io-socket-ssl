@@ -3141,7 +3141,7 @@ Similar to C<set_defaults>, but only sets the defaults for client mode.
 
 Similar to C<set_defaults>, but only sets the defaults for server mode.
 
-=item B<IO::Socket::SSL::set_args_filter_hack(\&code|'use_defaults')
+=item B<IO::Socket::SSL::set_args_filter_hack(\&code|'use_defaults')>
 
 Sometimes one has to use code which uses unwanted or invalid arguments for SSL,
 typically disabling SSL verification or setting wrong ciphers or SSL versions.
