@@ -1,3 +1,8 @@
+1.971 2014/03/22
+- try to use SSL_hostname for hostname verification if no SSL_verifycn_name
+  is given. This way hostname for SNI and verification can be specified in
+  one step.
+- new test program example/simulate_proxy.pl
 1.970 2014/03/19
 - fix rt#93987 by making sure sub default_ca does use a local $_ and not a
   version of an outer scope which might be read-only.  Thanks to gshank
