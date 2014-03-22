@@ -19,11 +19,12 @@ example/simulate_proxy.pl
 example/ssl_client.pl
 example/ssl_mitm.pl
 example/ssl_server.pl
-lib/IO/Socket/SSL/Intercept.pm
 lib/IO/Socket/SSL.pm
+lib/IO/Socket/SSL/Intercept.pm
+lib/IO/Socket/SSL/PublicSuffix.pm
 lib/IO/Socket/SSL/Utils.pm
 Makefile.PL
-MANIFEST
+MANIFEST			This list of files
 README
 README.Win32
 t/01loadmodule.t
@@ -42,13 +43,15 @@ t/memleak_bad_handshake.t
 t/mitm.t
 t/nonblock.t
 t/npn.t
+t/public_suffix_lib.t
+t/public_suffix_ssl.t
 t/readline.t
 t/sessions.t
 t/signal-readline.t
 t/sni.t
+t/start-stopssl.t
 t/startssl-failed.t
 t/startssl.t
-t/start-stopssl.t
 t/sysread_write.t
 t/testlib.pl
 t/verify_fingerprint.t

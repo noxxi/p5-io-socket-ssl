@@ -1,0 +1,8 @@
+^blib/
+^Makefile$
+stuff
+\.git.*
+\.(old|bak|orig)$
+\.tar.gz$
+^MYMETA\.
+^MANIFEST\.

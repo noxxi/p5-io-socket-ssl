@@ -15,12 +15,13 @@ package IO::Socket::SSL;
 
 use IO::Socket;
 use Net::SSLeay 1.46;
+use IO::Socket::SSL::PublicSuffix;
 use Exporter ();
 use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.975';
+our $VERSION = '1.976';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -49,6 +50,7 @@ my %DEFAULT_SSL_ARGS = (
     SSL_version => 'SSLv23:!SSLv2',
     SSL_verify_callback => undef,
     SSL_verifycn_scheme => undef,  # fallback cn verification
+    SSL_verifycn_publicsuffix => undef,  # fallback default list verification
     #SSL_verifycn_name => undef,   # use from PeerAddr/PeerHost - do not override in set_args_filter_hack 'use_defaults'
     SSL_npn_protocols => undef,    # meaning depends whether on server or client side
     SSL_cipher_list =>
@@ -256,12 +258,12 @@ BEGIN {
 
     # check if we have something to handle IDN
     local $SIG{__DIE__}; local $SIG{__WARN__}; # be silent
-    if ( eval { require Net::IDN::Encode }) {
+    if ( eval { require URI; require URI::_idna; defined(&URI::_idna::encode) }) {
+	*{idn_to_ascii} = sub { URI->new("http://" . shift)->host }
+    } elsif ( eval { require Net::IDN::Encode }) {
 	*{idn_to_ascii} = \&Net::IDN::Encode::domain_to_ascii;
     } elsif ( eval { require Net::LibIDN }) {
 	*{idn_to_ascii} = \&Net::LibIDN::idn_to_ascii;
-    } elsif ( eval { require URI; URI->VERSION(1.50) }) {
-	    *{idn_to_ascii} = sub { URI->new("http://" . shift)->host }
     } else {
 	# default: croak if we really got an unencoded international domain
 	*{idn_to_ascii} = sub {
@@ -1194,11 +1196,11 @@ sub dump_peer_certificate {
     return Net::SSLeay::dump_peer_certificate($ssl);
 }
 
-if ( defined &Net::SSLeay::get_peer_cert_chain 
+if ( defined &Net::SSLeay::get_peer_cert_chain
     && $Net::SSLeay::VERSION >= 1.58 ) {
     *peer_certificates = sub {
 	my $ssl = shift()->_get_ssl_object || return;
-	return ( 
+	return (
 	    Net::SSLeay::get_peer_certificate($ssl),
 	    Net::SSLeay::get_peer_cert_chain($ssl)
 	);
@@ -1329,6 +1331,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	my $identity = shift;
 	my $cert = shift;
 	my $scheme = shift || 'default';
+	my $publicsuffix = shift;
 	if ( ! ref($scheme) ) {
 	    $DEBUG>=3 && DEBUG( "scheme=$scheme cert=$cert" );
 	    $scheme = $scheme{$scheme} or croak "scheme $scheme not defined";
@@ -1367,7 +1370,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 
 	# do the actual verification
 	my $check_name = sub {
-	    my ($name,$identity,$wtyp) = @_;
+	    my ($name,$identity,$wtyp,$publicsuffix) = @_;
 	    $wtyp ||= '';
 	    my $pattern;
 	    ### IMPORTANT!
@@ -1385,10 +1388,19 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	    } elsif ( $wtyp eq 'leftmost' and $name =~m{^\*(\..+)$} ) {
 		$pattern = qr{^[a-zA-Z0-9_\-]+\Q$1\E$}i;
 	    } else {
-		$pattern = qr{^\Q$name\E$}i;
+		return lc($identity) eq lc($name);
 	    }
-	    return $identity =~ $pattern;
+	    if ( $identity =~ $pattern ) {
+		$publicsuffix = IO::Socket::SSL::PublicSuffix->default
+		    if ! defined $publicsuffix;
+		return 1 if $publicsuffix eq '';
+		my @labels = split( m{\.+}, $identity );
+		my $tld = $publicsuffix->public_suffix(\@labels,+1);
+		return 1 if @labels > ( $tld ? 0+@$tld : 1 );
+	    }
+	    return;
 	};
+
 
 	my $alt_dnsNames = 0;
 	while (@altNames) {
@@ -1401,7 +1413,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	    } elsif ( ! $ipn and $type == GEN_DNS ) {
 		$name =~s/\s+$//; $name =~s/^\s+//;
 		$alt_dnsNames++;
-		$check_name->($name,$identity,$scheme->{wildcards_in_alt})
+		$check_name->($name,$identity,$scheme->{wildcards_in_alt},$publicsuffix)
 		    and return 1;
 	    }
 	}
@@ -1409,7 +1421,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	if ( ! $ipn and (
 	    $scheme->{check_cn} eq 'always' or
 	    $scheme->{check_cn} eq 'when_only' and !$alt_dnsNames)) {
-	    $check_name->($commonName,$identity,$scheme->{wildcards_in_cn})
+	    $check_name->($commonName,$identity,$scheme->{wildcards_in_cn},$publicsuffix)
 		and return 1;
 	}
 
@@ -1775,6 +1787,7 @@ sub new {
     my $self = bless {},$class;
 
     my $vcn_scheme = delete $arg_hash->{SSL_verifycn_scheme};
+    my $vcn_publicsuffix = delete $arg_hash->{SSL_verifycn_publicsuffix};
     if ( ! $is_server and $verify_mode & 0x01 and
 	! $vcn_scheme || $vcn_scheme ne 'none' ) {
 
@@ -1810,7 +1823,7 @@ sub new {
 
 	    # verify name
 	    my $rv = IO::Socket::SSL::verify_hostname_of_cert(
-		$host,$cert,$vcn_scheme );
+		$host,$cert,$vcn_scheme,$vcn_publicsuffix );
 	    if ( ! $rv && ! $vcn_scheme ) {
 		# For now we use the default hostname verification if none
 		# was specified and complain loudly but return ok if it does
@@ -2692,6 +2705,18 @@ hostname  you can use 'none' as a scheme. In this case you'd better have
 alternative forms of verification, like a certificate fingerprint or do a manual
 verification later by calling B<verify_hostname> yourself.
 
+=item SSL_verifycn_publicsuffix
+
+This option is used to specify the behavior when checking wildcards certificates
+for public suffixes, e.g. no wildcard certificates for *.com or *.co.uk should
+be accepted, while *.example.com or *.example.co.uk is ok.
+
+If not specified it will simply use the builtin default of
+L<IO::Socket::SSL::PublicSuffix>, you can create another object with
+from_string or from_file of this module.
+
+To disable verification of public suffix set this option to C<''>.
+
 =item SSL_verifycn_name
 
 Set the name which is used in verification of hostname. If SSL_verifycn_scheme
@@ -2987,10 +3012,12 @@ This function depends on a version of Net::SSLeay >= 1.58 .
 This gives the name requested by the client if Server Name Indication
 (SNI) was used.
 
-=item B<verify_hostname($hostname,$scheme)>
+=item B<verify_hostname($hostname,$scheme,$publicsuffix)>
 
 This verifies the given hostname against the peer certificate using the
 given scheme. Hostname is usually what you specify within the PeerAddr.
+See the C<SSL_verifycn_publicsuffix> parameter for an explanation of suffix
+checking and for the possible values.
 
 Verification of hostname against a certificate is different between various
 applications and RFCs. Some scheme allow wildcards for hostnames, some only

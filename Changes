@@ -1,3 +1,9 @@
+1.976 2014/04/03
+- added public prefix checking to verification of wildcard certificates,
+  e.g. accept *.foo.com but not *.co.uk.
+  See documentation of SSL_verifycn_publicsuffix and
+  IO::Socket::SSL::PublicSuffix
+  Thanks to noloader for pointing out the problem.
 1.975 2014/04/02
 - BEHAVIOR CHANGE: work around TEA misfeature on OS X builtin openssl, e.g.
   guarantee that only the explicitly given CA or the openssl default CA will

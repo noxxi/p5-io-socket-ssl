@@ -57,7 +57,7 @@ while ( my ($host,$fp) = each %hosts ) {
 		}
 	    }
 		
-	    skip "cannot connect to $host:443 with $ipclass: $!",0+@cap 
+	    skip "cannot connect to $host:443 with $ipclass: $!",1+@cap 
 		if ! $cl;
 	    push @cl,$cl;
 	}
