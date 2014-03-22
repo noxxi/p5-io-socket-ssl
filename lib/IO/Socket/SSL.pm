@@ -15,6 +15,7 @@ package IO::Socket::SSL;
 
 use IO::Socket;
 use Net::SSLeay 1.46;
+use IO::Socket::SSL::PublicDNSSuffix;
 use Exporter ();
 use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
@@ -49,6 +50,7 @@ my %DEFAULT_SSL_ARGS = (
     SSL_version => 'SSLv23:!SSLv2',
     SSL_verify_callback => undef,
     SSL_verifycn_scheme => undef,  # fallback cn verification
+    SSL_verifycn_publicsuffix => undef,  # fallback default list verification
     #SSL_verifycn_name => undef,   # use from PeerAddr/PeerHost - do not override in set_filter_args_hack 'use_defaults'
     SSL_npn_protocols => undef,    # meaning depends whether on server or client side
     SSL_cipher_list =>
@@ -256,12 +258,12 @@ BEGIN {
 
     # check if we have something to handle IDN
     local $SIG{__DIE__}; local $SIG{__WARN__}; # be silent
-    if ( eval { require Net::IDN::Encode }) {
+    if ( eval { require URI::_idna; defined(&URI::_idna::encode) }) {
+	*{idn_to_ascii} = sub { URI->new("http://" . shift)->host }
+    } elsif ( eval { require Net::IDN::Encode }) {
 	*{idn_to_ascii} = \&Net::IDN::Encode::domain_to_ascii;
     } elsif ( eval { require Net::LibIDN }) {
 	*{idn_to_ascii} = \&Net::LibIDN::idn_to_ascii;
-    } elsif ( eval { require URI; URI->VERSION(1.50) }) {
-	    *{idn_to_ascii} = sub { URI->new("http://" . shift)->host }
     } else {
 	# default: croak if we really got an unencoded international domain
 	*{idn_to_ascii} = sub {
@@ -1313,6 +1315,7 @@ sub dump_peer_certificate {
 	my $identity = shift;
 	my $cert = shift;
 	my $scheme = shift || 'default';
+	my $publicsuffix = shift;
 	if ( ! ref($scheme) ) {
 	    $DEBUG>=3 && DEBUG( "scheme=$scheme cert=$cert" );
 	    $scheme = $scheme{$scheme} or croak "scheme $scheme not defined";
@@ -1367,11 +1370,18 @@ sub dump_peer_certificate {
 		return if $1 ne '' and substr($identity,0,4) eq 'xn--'; # IDNA
 		$pattern = qr{^\Q$1\E[a-zA-Z0-9_\-]+\Q$2\E$}i;
 	    } elsif ( $wtyp eq 'leftmost' and $name =~m{^\*(\..+)$} ) {
-		$pattern = qr{^[a-zA-Z0-9_\-]+\Q$1\E$}i;
+		return $identity =~ 
+		$pattern = m{^[a-zA-Z0-9_\-]+\Q$1\E$}i;
 	    } else {
-		$pattern = qr{^\Q$name\E$}i;
+		return lc($identity) eq lc($name);
 	    }
-	    return $identity =~ $pattern;
+	    if ( $identity =~ $pattern ) {
+		return 1 if defined $suffixdata && $suffixdata eq '';
+		my @labels = split( m{\.+}, $identity );
+		my $tld = public_suffix( \@labels,0,$suffixdata );
+		return 1 if @labels > $tld ? @$ltld : 1;
+	    } 
+	    return;
 	};
 
 	my $alt_dnsNames = 0;
@@ -1385,7 +1395,7 @@ sub dump_peer_certificate {
 	    } elsif ( ! $ipn and $type == GEN_DNS ) {
 		$name =~s/\s+$//; $name =~s/^\s+//;
 		$alt_dnsNames++;
-		$check_name->($name,$identity,$scheme->{wildcards_in_alt})
+		$check_name->($name,$identity,$scheme->{wildcards_in_alt},$suffixdata)
 		    and return 1;
 	    }
 	}
@@ -1756,6 +1766,7 @@ sub new {
     my $self = bless {},$class;
 
     my $vcn_scheme = delete $arg_hash->{SSL_verifycn_scheme};
+    my $vcn_publicsuffix = delete $arg_hash->{SSL_verifycn_publicsuffix};
     if ( ! $is_server and $verify_mode & 0x01 and
 	! $vcn_scheme || $vcn_scheme ne 'none' ) {
 
@@ -1791,7 +1802,7 @@ sub new {
 
 	    # verify name
 	    my $rv = IO::Socket::SSL::verify_hostname_of_cert(
-		$host,$cert,$vcn_scheme );
+		$host,$cert,$vcn_scheme,$vcn_publicsuffic );
 	    if ( ! $rv && ! $vcn_scheme ) {
 		# For now we use the default hostname verification if none
 		# was specified and complain loudly but return ok if it does
@@ -2646,6 +2657,20 @@ If you are really sure, that you don't want to verify the identity using the
 hostname  you can use 'none' as a scheme. In this case you'd better have
 alternative forms of verification, like a certificate fingerprint or do a manual
 verification later by calling B<verify_hostname> yourself.
+
+=item SSL_verify_publicsuffix 
+
+This option is used to specify the behavior when checking wildcards certificates
+for public suffixes, e.g. no wildcard certificates for *.com or *.co.uk should
+be accepted, while *.example.com or *.example.co.uk is ok.
+
+If not specified it will simply use the current default of
+L<IO::Socket::SSL::PublicDNSSuffix>, which can be changed with load_file or
+load_data of this module.
+
+To specify a file containing alternative definitions you can specify the file
+here, to get the specifications from a string use C<\$string>. To disable
+verification set it to C<''> (no file) or C<\''> (no data).
 
 =item SSL_verifycn_name
 
