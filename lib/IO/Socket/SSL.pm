@@ -21,7 +21,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.970';
+our $VERSION = '1.971';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -422,7 +422,7 @@ sub configure_SSL {
     if ( $defaults{SSL_reuse_ctx} ) {
 	# ignore default context if there are args to override it
 	delete $defaults{SSL_reuse_ctx} 
-	    if grep { m{^SSL_(?!verifycn_name)$} } keys %$arg_hash;
+	    if grep { m{^SSL_(?!verifycn_name|hostname)$} } keys %$arg_hash;
     }
     %$arg_hash = ( %defaults, %$arg_hash ) if %defaults;
 
@@ -537,7 +537,8 @@ sub connect_SSL {
 	$arg_hash->{PeerAddr} || $self->_update_peer;
 	if ( $ctx->{verify_name_ref} ) {
 	    # need target name for update
-	    my $host = $arg_hash->{SSL_verifycn_name};
+	    my $host = $arg_hash->{SSL_verifycn_name}
+		|| $arg_hash->{SSL_hostname};
 	    if ( ! defined $host ) {
 		if ( $host = $arg_hash->{PeerHost} || $arg_hash->{PeerAddr} ) {
 		    $host =~s{:[a-zA-Z0-9_\-]+$}{};
@@ -2675,12 +2676,15 @@ verification set it to C<''> (no file) or C<\''> (no data).
 =item SSL_verifycn_name
 
 Set the name which is used in verification of hostname. If SSL_verifycn_scheme
-is set and no SSL_verifycn_name is given it will try to use the PeerHost and
-PeerAddr settings and fail if no name can be determined.
+is set and no SSL_verifycn_name is given it will try to use SSL_hostname or
+PeerHost and PeerAddr settings and fail if no name can be determined.
+If SSL_verifycn_scheme is not set it will use a default scheme and warn if it
+cannot determine a hostname, but it will not fail.
 
 Using PeerHost or PeerAddr works only if you create the connection directly
 with C<< IO::Socket::SSL->new >>, if an IO::Socket::INET object is upgraded
-with B<start_SSL> the name has to be given in B<SSL_verifycn_name>.
+with B<start_SSL> the name has to be given in B<SSL_verifycn_name> or
+B<SSL_hostname>.
 
 =item SSL_check_crl
 
