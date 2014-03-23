@@ -49,7 +49,7 @@ my %DEFAULT_SSL_ARGS = (
     SSL_version => 'SSLv23:!SSLv2',
     SSL_verify_callback => undef,
     SSL_verifycn_scheme => undef,  # fallback cn verification
-    #SSL_verifycn_name => undef,   # use from PeerAddr/PeerHost - do not override in set_filter_args_hack 'use_defaults'
+    #SSL_verifycn_name => undef,   # use from PeerAddr/PeerHost - do not override in set_args_filter_hack 'use_defaults'
     SSL_npn_protocols => undef,    # meaning depends whether on server or client side
     SSL_cipher_list =>
 	'EECDH+AESGCM+ECDSA EECDH+AESGCM EECDH+ECDSA +AES256 EECDH EDH+AESGCM '.
@@ -2700,7 +2700,7 @@ Example for limiting the server session cache size:
 
   SSL_create_ctx_callback => sub {
       my $ctx = shift;
-	  Net::SSLeay::CTX_sess_set_cache_size($ctx,128);
+      Net::SSLeay::CTX_sess_set_cache_size($ctx,128);
   }
 
 =item SSL_session_cache_size
