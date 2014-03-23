@@ -1,3 +1,6 @@
+1.972 2014/03/23
+- make sure t/external/usable_ca.t works also with older openssl without
+  support for SNI. RT#94117. Thanks to paul[AT]city-fan[DOT]org
 1.971 2014/03/22
 - try to use SSL_hostname for hostname verification if no SSL_verifycn_name
   is given. This way hostname for SNI and verification can be specified in
