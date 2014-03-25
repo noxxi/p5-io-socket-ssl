@@ -209,8 +209,9 @@ sub CERT_create {
     my $key = delete $args{key} || KEY_create_rsa();
     Net::SSLeay::X509_set_pubkey($cert,$key);
 
-    my $issuer_cert = delete $args{issuer_cert} || $cert;
-    my $issuer_key  = delete $args{issuer_key} || $key;
+    my $is = delete $args{issuer};
+    my $issuer_cert = delete $args{issuer_cert} || $is && $is->[0] || $cert;
+    my $issuer_key  = delete $args{issuer_key}  || $is && $is->[1] || $key;
     if ( delete $args{CA} ) {
 	push @ext,
 	    &Net::SSLeay::NID_basic_constraints => 'critical,CA:TRUE',
@@ -382,6 +383,11 @@ set issuer for new certificate
 =item issuer_key key
 
 sign new certificate with given key
+
+=item issuer [ cert, key ]
+
+Instead of giving issuer_key and issuer_cert as seperate arguments they can be
+given both together.
 
 =item digest algorithm
 

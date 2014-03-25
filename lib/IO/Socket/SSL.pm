@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.972';
+our $VERSION = '1.973';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -419,7 +419,7 @@ sub configure_SSL {
     );
     if ( $defaults{SSL_reuse_ctx} ) {
 	# ignore default context if there are args to override it
-	delete $defaults{SSL_reuse_ctx} 
+	delete $defaults{SSL_reuse_ctx}
 	    if grep { m{^SSL_(?!verifycn_name|hostname)$} } keys %$arg_hash;
     }
     %$arg_hash = ( %defaults, %$arg_hash ) if %defaults;
@@ -1704,9 +1704,12 @@ sub new {
 	$arg_hash->{SSL_use_cert} = 1
     }
 
-    # if any of SSL_ca_path or SSL_ca_file is set don't set the other SSL_ca_*
+    # if any of SSL_ca* is set don't set the other SSL_ca*
     # from defaults
-    if ( $arg_hash->{SSL_ca_path} ) {
+    if ( $arg_hash->{SSL_ca} ) {
+	$arg_hash->{SSL_ca_file} ||= undef
+	$arg_hash->{SSL_ca_path} ||= undef
+    } elsif ( $arg_hash->{SSL_ca_path} ) {
 	$arg_hash->{SSL_ca_file} ||= undef
     } elsif ( $arg_hash->{SSL_ca_file} ) {
 	$arg_hash->{SSL_ca_path} ||= undef;
@@ -1725,7 +1728,7 @@ sub new {
     # check SSL CA, cert etc arguments
     # some apps set keys '' to signal that it is not set, replace with undef
     for (qw( SSL_cert SSL_cert_file SSL_key SSL_key_file
-	SSL_ca_file SSL_ca_path
+	SSL_ca SSL_ca_file SSL_ca_path
 	SSL_fingerprint )) {
 	$arg_hash->{$_} = undef if defined $arg_hash->{$_}
 	    and $arg_hash->{$_} eq '';
@@ -1747,8 +1750,6 @@ sub new {
 	}
 	if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
 	    ref($d) and ! $$d and next; # explicitly ignore
-	    die "only SSL_ca_path or SSL_ca_file should be given"
-		if defined $arg_hash->{SSL_ca_file};
 	    die "SSL_ca_path $d does not exist" if ! -d $d;
 	    die "SSL_ca_path $d is not accessible" if ! -r _;
 	}
@@ -1884,11 +1885,21 @@ WARN
     }
 
     if ( $verify_mode != Net::SSLeay::VERIFY_NONE()) {
-	if ( defined $arg_hash->{SSL_ca_file} || defined $arg_hash->{SSL_ca_path} ) {
+	if ( $arg_hash->{SSL_ca}
+	    || defined $arg_hash->{SSL_ca_file}
+	    || defined $arg_hash->{SSL_ca_path} ) {
 	    my $file = $arg_hash->{SSL_ca_file};
 	    $file = undef if ref($file) && ! $$file;
 	    my $dir = $arg_hash->{SSL_ca_path};
 	    $dir = undef if ref($dir) && ! $$dir;
+	    if ( $arg_hash->{SSL_ca} ) {
+		my $store = Net::SSLeay::CTX_get_cert_store($ctx);
+		for (@{$arg_hash->{SSL_ca}}) {
+		    Net::SSLeay::X509_STORE_add_cert($store,$_) or
+			return IO::Socket::SSL->error(
+			    "Failed to add certificate to CA store");
+		}
+	    }
 	    if ( $file || $dir and ! Net::SSLeay::CTX_load_verify_locations(
 		$ctx, $file || '', $dir || '')) {
 		return IO::Socket::SSL->error(
@@ -2554,17 +2565,20 @@ If your private key is encrypted, you might not want the default password prompt
 Net::SSLeay.  This option takes a reference to a subroutine that should return the
 password required to decrypt your private key.
 
-=item SSL_ca_file | SSL_ca_path
+=item SSL_ca | SSL_ca_file | SSL_ca_path
 
 Usually you want to verify that the peer certificate has been signed by a
 trusted certificate authority. In this case you should use this option to
-specify the file (SSL_ca_file) or directory (SSL_ca_path) containing the
+specify the file (C<SSL_ca_file>) or directory (C<SSL_ca_path>) containing the
 certificateZ<>(s) of the trusted certificate authorities.
-If both SSL_ca_file and SSL_ca_path are unset it will use C<default_ca()>
-to determine the user-set or system defaults.
-If you really don't want to set a CA set this key to C<\undef> (unfortunatly
-C<''> is used by some modules using IO::Socket::SSL when CA is not exlicitly
-given).
+Also you can give X509* certificate handles (from L<Net::SSLeay> or
+L<IO::Socket::SSL::Utils>) as a list with C<SSL_ca>. These will be added to the
+CA store before path and file and thus take precedence.
+If neither SSL_ca, nor SSL_ca_file or SSL_ca_path are set it will use
+C<default_ca()> to determine the user-set or system defaults.
+If you really don't want to set a CA set SSL_ca_file or SSL_ca_path to
+C<\undef> or SSL_ca to an empty list. (unfortunatly C<''> is used by some
+modules using IO::Socket::SSL when CA is not exlicitly given).
 
 =item SSL_fingerprint
 

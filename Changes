@@ -1,3 +1,9 @@
+1.973 2014/03/25
+- with SSL_ca certificate handles can now be used additionally to
+  SSL_ca_file and SSL_ca_path
+- do not complain longer if SSL_ca_file and SSL_ca_path are both given,
+  instead add both as options to the CA store
+- Shortcut 'issuer' to give both issuer_cert and issuer_key in CERT_create.
 1.972 2014/03/23
 - make sure t/external/usable_ca.t works also with older openssl without
   support for SNI. RT#94117. Thanks to paul[AT]city-fan[DOT]org
