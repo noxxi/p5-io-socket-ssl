@@ -386,7 +386,7 @@ sign new certificate with given key
 
 =item issuer [ cert, key ]
 
-Instead of giving issuer_key and issuer_cert as seperate arguments they can be
+Instead of giving issuer_key and issuer_cert as separate arguments they can be
 given both together.
 
 =item digest algorithm
