@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.974';
+our $VERSION = '1.975';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -1759,14 +1759,16 @@ sub new {
     my $verify_mode = $arg_hash->{SSL_verify_mode};
     if ( $verify_mode != Net::SSLeay::VERIFY_NONE()) {
 	if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
-	    ref($f) and ! $$f and next; # explicitly ignore
-	    die "SSL_ca_file $f does not exist" if ! -f $f;
-	    die "SSL_ca_file $f is not accessible" if ! -r _;
+	    if ( ! ref($f) || $$f ) {
+		die "SSL_ca_file $f does not exist" if ! -f $f;
+		die "SSL_ca_file $f is not accessible" if ! -r _;
+	    }
 	}
 	if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
-	    ref($d) and ! $$d and next; # explicitly ignore
-	    die "SSL_ca_path $d does not exist" if ! -d $d;
-	    die "SSL_ca_path $d is not accessible" if ! -r _;
+	    if ( ! ref($d) || $$d ) {
+		die "SSL_ca_path $d does not exist" if ! -d $d;
+		die "SSL_ca_path $d is not accessible" if ! -r _;
+	    }
 	}
     }
 
@@ -2088,6 +2090,19 @@ WARN
 	return $verify_cb->($ok,$ctx_store,$certname,$error,$cert);
     };
 
+    if ( $^O eq 'darwin' ) {
+	# explicitely set error code to disable use of apples TEA patch
+	# https://hynek.me/articles/apple-openssl-verification-surprises/
+	my $vcb = $verify_callback;
+	$verify_callback = sub {
+	    my $rv = $vcb ? &$vcb : $_[0];
+	    if ( $rv != 1 ) {
+		# 50 - X509_V_ERR_APPLICATION_VERIFICATION: application verification failure
+		Net::SSLeay::X509_STORE_CTX_set_error($_[1], 50);
+	    }
+	    return $rv;
+	};
+    }
     Net::SSLeay::CTX_set_verify($ctx, $verify_mode, $verify_callback);
 
     if ( my $cl = $arg_hash->{SSL_cipher_list} ) {

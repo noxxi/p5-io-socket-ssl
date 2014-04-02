@@ -1,3 +1,12 @@
+1.975 2014/04/02
+- BEHAVIOR CHANGE: work around TEA misfeature on OS X builtin openssl, e.g.
+  guarantee that only the explicitly given CA or the openssl default CA will
+  be used. This means that certificates inside the OS X keyring will no
+  longer be used, because there is no way to control the use by openssl
+  (e.g. certificate pinning etc)
+- make external tests run by default to make sure default CA works on all
+  platforms, it skips automatically on network problems like timeouts or ssl
+  interception, can also use http(s)_proxy environment variables
 1.974 2014/04/02
 - new function peer_certificates to get the whole certificate chain, needs
   Net::SSLeay>=1.58

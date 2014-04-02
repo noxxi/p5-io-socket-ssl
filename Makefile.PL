@@ -109,9 +109,10 @@ my %usable_ca;
 }
 
 my $xt = prompt( "Should I do external tests?\n".
-    "These tests will fail if there is no internet connection or if a firewall\n".
-    "blocks some traffic, does SSL interception or if a HTTP proxy is needed.\n".
-    "[y/N]", 'n' );
+    "These test will detect if there are network problems and fail soft,\n".
+    "so please disable them only if you definitely don't want to have any\n".
+    "network traffic to external sites.   ".
+    "[Y/n]", 'y' );
 
 
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
