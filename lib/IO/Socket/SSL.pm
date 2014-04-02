@@ -20,7 +20,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.973';
+our $VERSION = '1.974';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -1192,6 +1192,21 @@ sub new_from_fd {
 sub dump_peer_certificate {
     my $ssl = shift()->_get_ssl_object || return;
     return Net::SSLeay::dump_peer_certificate($ssl);
+}
+
+if ( defined &Net::SSLeay::get_peer_cert_chain 
+    && $Net::SSLeay::VERSION >= 1.58 ) {
+    *peer_certificates = sub {
+	my $ssl = shift()->_get_ssl_object || return;
+	return ( 
+	    Net::SSLeay::get_peer_certificate($ssl),
+	    Net::SSLeay::get_peer_cert_chain($ssl)
+	);
+    }
+} else {
+    *peer_certificates = sub {
+	die "peer_certificates needs Net::SSLeay>=1.58";
+    }
 }
 
 {
@@ -2943,6 +2958,14 @@ constants are exported from IO::Socket::SSL).
 See Net::SSLeay::X509_get_subjectAltNames.
 
 =back
+
+=item B<peer_certificates>
+
+This returns all the certificates send by the peer, e.g. first the peers own
+certificate and then the rest of the chain. You might use B<CERT_asHash> from
+L<IO::Socket::SSL::Utils> to inspect each of the certificates.
+
+This function depends on a version of Net::SSLeay >= 1.58 .
 
 =item B<get_servername>
 

@@ -1,3 +1,9 @@
+1.974 2014/04/02
+- new function peer_certificates to get the whole certificate chain, needs
+  Net::SSLeay>=1.58
+- extended IO::Socket::Utils::CERT_asHash to provide way more information,
+  like issuer information, cert and pubkey digests, all extensions, CRL
+  distributions points and OCSP uri
 1.973 2014/03/25
 - with SSL_ca certificate handles can now be used additionally to
   SSL_ca_file and SSL_ca_path

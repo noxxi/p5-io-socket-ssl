@@ -110,6 +110,7 @@ my %gen2i = qw( OTHERNAME 0 EMAIL 1 DNS 2 X400 3 DIRNAME 4 EDIPARTY 5 URI 6 IP 7
 my %i2gen = reverse %gen2i;
 sub CERT_asHash {
     my $cert = shift;
+    my $digest_name = shift || 'sha256';
 
     my %hash = (
 	version => Net::SSLeay::X509_get_version($cert),
@@ -117,6 +118,20 @@ sub CERT_asHash {
 	not_after => _asn1t2t(Net::SSLeay::X509_get_notAfter($cert)),
 	serial => Net::SSLeay::ASN1_INTEGER_get(
 	    Net::SSLeay::X509_get_serialNumber($cert)),
+	crl_uri  => [ Net::SSLeay::P_X509_get_crl_distribution_points($cert) ],
+	keyusage => [ Net::SSLeay::P_X509_get_key_usage($cert) ],
+	extkeyusage => {
+	    oid => [ Net::SSLeay::P_X509_get_ext_key_usage($cert,0) ],
+	    nid => [ Net::SSLeay::P_X509_get_ext_key_usage($cert,1) ],
+	    sn  => [ Net::SSLeay::P_X509_get_ext_key_usage($cert,2) ],
+	    ln  => [ Net::SSLeay::P_X509_get_ext_key_usage($cert,3) ],
+	},
+	"pubkey_digest_$digest_name" => Net::SSLeay::X509_pubkey_digest(
+	    $cert,_digest($digest_name)),
+	"x509_digest_$digest_name" => Net::SSLeay::X509_digest(
+	    $cert,_digest($digest_name)),
+	"fingerprint_$digest_name" => Net::SSLeay::X509_get_fingerprint(
+	    $cert,_digest($digest_name)),
     );
 
     my $subj = Net::SSLeay::X509_get_subject_name($cert);
@@ -145,20 +160,50 @@ sub CERT_asHash {
 	}
     }
 
+    my $issuer = Net::SSLeay::X509_get_issuer_name($cert);
+    my %issuer;
+    for ( 0..Net::SSLeay::X509_NAME_entry_count($issuer)-1 ) {
+	my $e = Net::SSLeay::X509_NAME_get_entry($issuer,$_);
+	my $o = Net::SSLeay::X509_NAME_ENTRY_get_object($e);
+	$issuer{ Net::SSLeay::OBJ_obj2txt($o) } =
+	    Net::SSLeay::P_ASN1_STRING_get(
+		Net::SSLeay::X509_NAME_ENTRY_get_data($e));
+    }
+    $hash{issuer} = \%issuer;
+
+    my @ext;
+    for( 0..Net::SSLeay::X509_get_ext_count($cert)-1 ) {
+	my $e = Net::SSLeay::X509_get_ext($cert,$_);
+	my $o = Net::SSLeay::X509_EXTENSION_get_object($e);
+	my $nid = Net::SSLeay::OBJ_obj2nid($o);
+	push @ext, {
+	    oid => Net::SSLeay::OBJ_obj2txt($o),
+	    nid => ( $nid > 0 ) ? $nid : undef,
+	    sn  => ( $nid > 0 ) ? Net::SSLeay::OBJ_nid2sn($nid) : undef,
+	    critical => Net::SSLeay::X509_EXTENSION_get_critical($e),
+	    data => Net::SSLeay::X509V3_EXT_print($e),
+	}
+    }
+    $hash{ext} = \@ext;
+
+    if ( defined(&Net::SSLeay::P_X509_get_ocsp_uri)) {
+	$hash{ocsp_uri} = [ Net::SSLeay::P_X509_get_ocsp_uri($cert) ];
+    } else {
+	$hash{ocsp_uri} = [];
+	for( @ext ) {
+	    $_->{sn} eq 'authorityInfoAccess' or next;
+	    push @{ $hash{ocsp_uri}}, $_->{data} =~m{\bOCSP - URI:(\S+)}g;
+	}
+    }
+
     return \%hash;
 }
 
-my %digest;
 sub CERT_create {
     my %args = @_%2 ? %{ shift() } :  @_;
 
     my $cert = Net::SSLeay::X509_new();
     my $digest_name = delete $args{digest} || 'sha256';
-    my $digest = $digest{$digest_name} ||= do {
-	Net::SSLeay::SSLeay_add_ssl_algorithms();
-	Net::SSLeay::EVP_get_digestbyname($digest_name)
-	    or die "Digest algorithm $digest_name is not available";
-    };
 
     Net::SSLeay::ASN1_INTEGER_set(
 	Net::SSLeay::X509_get_serialNumber($cert),
@@ -228,7 +273,7 @@ sub CERT_create {
     Net::SSLeay::P_X509_add_extensions($cert, $issuer_cert, @ext);
     Net::SSLeay::X509_set_issuer_name($cert,
 	Net::SSLeay::X509_get_subject_name($issuer_cert));
-    Net::SSLeay::X509_sign($cert,$issuer_key,$digest);
+    Net::SSLeay::X509_sign($cert,$issuer_key,_digest($digest_name));
 
     return ($cert,$key);
 }
@@ -250,6 +295,18 @@ sub _asn1t2t {
 	return timegm($s,$m,$h,$d,$mon,$y)
     } else {
 	die "unexpected TZ $tz from ASN1_TIME_print";
+    }
+}
+
+{
+    my %digest;
+    sub _digest {
+	my $digest_name = shift;
+	return $digest{$digest_name} ||= do {
+	    Net::SSLeay::SSLeay_add_ssl_algorithms();
+	    Net::SSLeay::EVP_get_digestbyname($digest_name)
+		or die "Digest algorithm $digest_name is not available";
+	};
     }
 }
 
@@ -326,19 +383,13 @@ Each loaded or created cert and key must be freed to not leak memory.
 
 Creates an RSA key pair, bits defaults to 2048.
 
-=item * CERT_asHash(cert) -> hash
+=item * CERT_asHash(cert,[digest_algo]) -> hash
 
-Extracts the information from the certificate into a hash:
+Extracts the information from the certificate into a hash and uses the given
+digest_algo (default: SHA-256) to determine digest of pubkey and cert.
+The resulting hash contains:
 
 =over 8
-
-=item serial
-
-The serial number
-
-=item version
-
-Certificate version, usually 2 (x509v3)
 
 =item subject
 
@@ -351,10 +402,63 @@ Array with list of alternative names. Each entry in the list is of
 C<[type,value]>, where C<type> can be OTHERNAME, EMAIL, DNS, X400, DIRNAME,
 EDIPARTY, URI, IP or RID.
 
+=item issuer
+
+Hash with the parts of the issuer, e.g. commonName, countryName,
+organizationName, stateOrProvinceName, localityName.
+
 =item not_before, not_after
 
 The time frame, where the certificate is valid, as time_t, e.g. can be converted
 with localtime or similar functions.
+
+=item serial
+
+The serial number
+
+=item crl_uri
+
+List if URIs for CRL distribution.
+
+=item ocsp_uri
+
+List if URIs for revocation checking using OCSP.
+
+=item keyusage
+
+List of keyUsage information in the certificate.
+
+=item extkeyusage
+
+List of extended key usage information from the certificate. Each entry in
+this list consists of a hash with oid, nid, ln and sn.
+
+=item pubkey_digest_xxx
+
+Binary digest of the pubkey using the given digest algorithm, e.g.
+pubkey_digest_sha256 if (the default) SHA-256 was used.
+
+=item cert_digest_xxx
+
+Binary digest of the certificate using the given digest algorithm, e.g.
+cert_digest_sha256 if (the default) SHA-256 was used.
+
+=item fingerprint_xxx
+
+Fingerprint of the certificate using the given digest algorithm, e.g.
+fingerprint_sha256 if (the default) SHA-256 was used. Contrary to digest_* this
+is an ASCII string with a list if hexadecimal numbers, e.g.
+"73:59:75:5C:6D...".
+
+=item ext
+
+List of extensions.
+Each entry in the list is a hash with oid, nid, sn, critical flag (boolean) and
+data (string representation given by X509V3_EXT_print).
+
+=item version
+
+Certificate version, usually 2 (x509v3)
 
 =back
 
@@ -362,10 +466,33 @@ with localtime or similar functions.
 
 Creates a certificate based on the given hash.
 If the issuer is not specified the certificate will be self-signed.
-Additionally to the information described in C<CERT_asHash> the following keys
-can be given:
+The following keys can be given:
 
 =over 8
+
+=item subject
+
+Hash with the parts of the subject, e.g. commonName, countryName, ... as
+described in C<CERT_asHash>.
+Default points to IO::Socket::SSL.
+
+=item not_before
+
+A time_t value when the certificate starts to be valid. Defaults to current
+time.
+
+=item not_after
+
+A time_t value when the certificate ends to be valid. Defaults to current
+time plus one 365 days.
+
+=item serial
+
+The serial number. If not given a random number will be used.
+
+=item version
+
+The version of the certificate, default 2 (x509v3).
 
 =item CA true|false
 
@@ -392,22 +519,6 @@ given both together.
 =item digest algorithm
 
 specify the algorithm used to sign the certificate, default SHA-256.
-
-=back
-
-If not all necessary information are given some will have usable defaults, e.g.
-
-=over 8
-
-=item not_before defaults to the current time
-
-=item not_after defaults to 365 days in the future
-
-=item subject has a default pointing to IO::Socket::SSL
-
-=item version defaults to 2 (x509v3)
-
-=item serial will be a random number
 
 =back
 
