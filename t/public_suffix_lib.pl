@@ -5,17 +5,19 @@ use utf8;
 
 my $ps;
 sub run_with_lib {
+    my @idnlib = @_;
     my %require = (
 	'URI::_idna' => 0,
 	'Net::LibIDN' => 0,
 	'Net::IDN::Encode' => 0,
-	map { $_ => 1 } @_,
+	map { $_ => 1 } @idnlib,
     );
 
     my %block;
+    my $can_idn;
     while ( my ($lib,$load) = each %require ) {
 	if ( $load ) {
-	    eval "require $lib" or plan skip_all => "cannot load $lib: $@";
+	    $can_idn = eval "require $lib";
 	} else {
 	    $lib =~s{::}{/}g;
 	    $block{"$lib.pm"} = 1;
@@ -27,6 +29,8 @@ sub run_with_lib {
     };
 
     require IO::Socket::SSL::PublicSuffix;
+
+    plan tests => 83;
 
 
     # all one-level, but co.uk two-level
@@ -172,12 +176,14 @@ sub run_with_lib {
     is public_suffix('www.test.k12.ak.us'), 'k12.ak.us';
 
     # Domains and gTLDs with characters outside the ASCII range:
-    if ( $ps->can_idn ) {
-	is public_suffix('test.敎育.hk'), '敎育.hk';
-	is public_suffix('ਭਾਰਤ.ਭਾਰਤ'), 'ਭਾਰਤ';
+    SKIP: {
+	if ( $can_idn ) {
+	    is public_suffix('test.敎育.hk'), '敎育.hk';
+	    is public_suffix('ਭਾਰਤ.ਭਾਰਤ'), 'ਭਾਰਤ';
+	} else {
+	    skip "no IDN support with @idnlib",2
+	}
     }
-
-    done_testing();
 }
 
 
