@@ -72,7 +72,7 @@ for my $test (@tests) {
     my $cl = IO::Socket::INET->new($saddr) or die "failed to connect: $!";
     print $cl "$cn\n";
     my $sslok = IO::Socket::SSL->start_SSL($cl,
-	SSL_hostname => $host,
+	SSL_verifycn_name => $host,
 	SSL_verifycn_scheme => 'http',
 	SSL_ca => [$cacert],
     );

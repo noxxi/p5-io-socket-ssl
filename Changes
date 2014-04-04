@@ -1,3 +1,5 @@
+1.978 2014/04/04
+- RT#94424 again, fix test on older openssl version with no SNI support
 1.977 2014/04/04
 - fix publicsuffix for IDNA, more tests with various IDNA libs
   RT#94424. Thanks to paul[AT]city-fan[DOT]org
