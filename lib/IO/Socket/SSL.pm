@@ -21,7 +21,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.976';
+our $VERSION = '1.977';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -256,22 +256,8 @@ BEGIN {
 	*{$name} = UNIVERSAL::can( 'Net::SSLeay', $name ) || sub { $value };
     }
 
-    # check if we have something to handle IDN
-    local $SIG{__DIE__}; local $SIG{__WARN__}; # be silent
-    if ( eval { require URI; require URI::_idna; defined(&URI::_idna::encode) }) {
-	*{idn_to_ascii} = sub { URI->new("http://" . shift)->host }
-    } elsif ( eval { require Net::IDN::Encode }) {
-	*{idn_to_ascii} = \&Net::IDN::Encode::domain_to_ascii;
-    } elsif ( eval { require Net::LibIDN }) {
-	*{idn_to_ascii} = \&Net::LibIDN::idn_to_ascii;
-    } else {
-	# default: croak if we really got an unencoded international domain
-	*{idn_to_ascii} = sub {
-	    my $domain = shift;
-	    return $domain if $domain =~m{^[a-zA-Z0-9-_\.]+$};
-	    croak "cannot handle international domains, please install Net::LibIDN, Net::IDN::Encode or URI"
-	}
-    }
+    *idn_to_ascii = \&IO::Socket::SSL::PublicSuffix::idn_to_ascii;
+    *idn_to_unicode = \&IO::Socket::SSL::PublicSuffix::idn_to_unicode;
 }
 
 {

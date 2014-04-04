@@ -42,7 +42,7 @@ IO::Socket::SSL::PublicSuffix - provide access to Mozillas list of effective TLD
  ----
 
     # To update this file with the current list:
-    perl -MIO::Socket::SSL::PublicDNS::Suffix -e 'IO::Socket::SSL::PublicDNS::Suffix::update_self_from_url()'
+    perl -MIO::Socket::SSL::PublicSuffix -e 'IO::Socket::SSL::PublicSuffix::update_self_from_url()'
 
 
 
@@ -131,9 +131,14 @@ BEGIN {
 	*idn_to_ascii   = \&Net::IDN::Encode::domain_to_ascii;
 	*idn_to_unicode = \&Net::IDN::Encode::domain_to_unicode;
 	*can_idn = sub { 1 };
-    } elsif ( eval { require Net::LibIDN } ) {
-	*idn_to_ascii   = \&Net::LibIDN::idn_to_ascii;
-	*idn_to_unicode = \&Net::LibIDN::idn_to_unicode;
+    } elsif ( eval { require Net::LibIDN; require Encode } ) {
+	# Net::LibIDN does not use utf-8 flag and expects raw data
+	*idn_to_ascii   = sub { 
+	    Net::LibIDN::idn_to_ascii(Encode::encode('utf-8',$_[0]),'utf-8');
+	},
+	*idn_to_unicode = sub { 
+	    Encode::decode('utf-8',Net::LibIDN::idn_to_unicode($_[0],'utf-8'));
+	},
 	*can_idn = sub { 1 };
     } else {
 	*idn_to_ascii   = sub { croak "idn_to_ascii(@_) - no IDNA library installed" };
@@ -292,7 +297,7 @@ sub public_suffix {
     }
 }
 
-sub _update_from_url {
+sub update_self_from_url {
     my $url = shift || URL();
     my $dst = __FILE__;
     -w $dst or die "cannot write $dst";
@@ -304,12 +309,14 @@ sub _update_from_url {
     }
     close($fh);
 
-    require LWP::Simple;
-    my $content = LWP::Simple::get($url)
-	or die "no content from $url";
-
-    open( $fh,'<',\$content );
-    while ( my $line = <$fh>) {
+    require LWP::UserAgent;
+    my $resp = LWP::UserAgent->new->get($url)
+	or die "no response from $url";
+    die "no success url=$url code=".$resp->code." ".$resp->message 
+	if ! $resp->is_success;
+    my $content = $resp->decoded_content;
+    while ( $content =~m{(.*\n)}g ) {
+	my $line = $1;
 	if ( $line =~m{\S} && $line !~m{\A\s*//} ) {
 	    $line =~s{//.*}{};
 	    $line =~s{\s+$}{};
@@ -319,11 +326,11 @@ sub _update_from_url {
 	    }
 	    $code .= "$line\n";
 	} else {
-	    $code .= $line;
+	    $code .= "$line";
 	}
     }
 
-    open( $fh,'>',$dst ) or die "open $dst: $!";
+    open( $fh,'>:utf8',$dst ) or die "open $dst: $!";
     print $fh $code;
 }
 
@@ -910,7 +917,7 @@ ac.ci
 net.ci
 go.ci
 asso.ci
-xn--aroport-oja7u.ci
+xn--aroport-bya.ci
 int.ci
 presse.ci
 md.ci
@@ -941,9 +948,9 @@ gov.cn
 net.cn
 org.cn
 mil.cn
-xn--fau0g2b0nc.cn
-xn--raw6gg3sc.cn
-xn--7a7ajc8vc.cn
+xn--55qx5d.cn
+xn--io0a7i.cn
+xn--od0alg.cn
 // cn geographic names
 ah.cn
 bj.cn
@@ -1324,21 +1331,21 @@ gov.hk
 idv.hk
 net.hk
 org.hk
-xn--fau0g2b0nc.hk
-xn--ca1bm5holoa.hk
-xn--caxu2j0koa.hk
-xn--uaq3gta4qd.hk
-xn--aw5la2sd.hk
-xn--hba1aha0sc.hk
-xn--ha1fqba2spa.hk
-xn--2a7blv1tc.hk
-xn--raw6gg3sc.hk
-xn--ea6a6gg3tc.hk
-xn--7a7ajc8vc.hk
-xn--ra6a7c4a7qc.hk
-xn--eag8mb1tc.hk
-xn--ea6a6fra1uc.hk
-xn--eag0lza1tc.hk
+xn--55qx5d.hk
+xn--wcvs22d.hk
+xn--lcvr32d.hk
+xn--mxtq1m.hk
+xn--gmqw5a.hk
+xn--ciqpn.hk
+xn--gmq050i.hk
+xn--zf0avx.hk
+xn--io0a7i.hk
+xn--mk0axi.hk
+xn--od0alg.hk
+xn--od0aq3b.hk
+xn--tn0ag.hk
+xn--uc0atv.hk
+xn--uc0ay4a.hk
 
 // hm : http://en.wikipedia.org/wiki/.hm
 hm
@@ -1500,9 +1507,9 @@ net.ir
 org.ir
 sch.ir
 // xn--mgba3a4f16a.ir (<iran>.ir, Persian YEH)
-xn--gal4fb3cvocbko.ir
+xn--mgba3a4f16a.ir
 // xn--mgba3a4fra.ir (<iran>.ir, Arabic YEH)
-xn--gah0gb3cvocbff.ir
+xn--mgba3a4fra.ir
 
 // is : http://www.isnic.is/domain/rules.php
 // Confirmed by registry <marius@isgate.is> 2008-12-06
@@ -1648,7 +1655,7 @@ barletta-trani-andria.it
 barlettatraniandria.it
 belluno.it
 benevento.it
-bergamo .it
+bergamo.it
 bg.it
 bi.it
 biella.it
@@ -1803,7 +1810,7 @@ pistoia.it
 pn.it
 po.it
 pordenone.it
-potenza .it
+potenza.it
 pr.it
 prato.it
 pt.it
@@ -4147,13 +4154,13 @@ communications.museum
 community.museum
 computer.museum
 computerhistory.museum
-xn--comunicaes-rma2o4gb.museum
+xn--comunicaes-v6a2o.museum
 contemporary.museum
 contemporaryart.museum
 convent.museum
 copenhagen.museum
 corporation.museum
-xn--correios-e-telecomunicaes-w3a29a4mb.museum
+xn--correios-e-telecomunicaes-ghc29a.museum
 corvette.museum
 costume.museum
 countryestate.museum
@@ -4302,7 +4309,7 @@ lajolla.museum
 lancashire.museum
 landes.museum
 lans.museum
-xn--lns-fea8m.museum
+xn--lns-qla.museum
 larsson.museum
 lewismiller.museum
 lincoln.museum
@@ -4564,8 +4571,8 @@ yosemite.museum
 youth.museum
 zoological.museum
 zoology.museum
-xn--vahblg6di87abbbbbb.museum
-xn--vbaegh1gbbb.museum
+xn--9dbhblg6di.museum
+xn--h1aegh.museum
 
 // mv : http://en.wikipedia.org/wiki/.mv
 // "mv" included because, contra Wikipedia, google.mv exists.
@@ -4759,161 +4766,161 @@ gs.va.no
 gs.vf.no
 // cities
 akrehamn.no
-xn--krehamn-qia3y.no
+xn--krehamn-dxa.no
 algard.no
-xn--lgrd-kfac0sd.no
+xn--lgrd-poac.no
 arna.no
 brumunddal.no
 bryne.no
 bronnoysund.no
-xn--brnnysund-cqac2kd.no
+xn--brnnysund-m8ac.no
 drobak.no
-xn--drbak-xja0f.no
+xn--drbak-wua.no
 egersund.no
 fetsund.no
 floro.no
-xn--flor-eia9d.no
+xn--flor-jra.no
 fredrikstad.no
 hokksund.no
 honefoss.no
-xn--hnefoss-3ma2h.no
+xn--hnefoss-q1a.no
 jessheim.no
 jorpeland.no
-xn--jrpeland-poa3i.no
+xn--jrpeland-54a.no
 kirkenes.no
 kopervik.no
 krokstadelva.no
 langevag.no
-xn--langevg-wia3y.no
+xn--langevg-jxa.no
 leirvik.no
 mjondalen.no
-xn--mjndalen-qoa3i.no
+xn--mjndalen-64a.no
 mo-i-rana.no
 mosjoen.no
-xn--mosjen-lla1g.no
+xn--mosjen-eya.no
 nesoddtangen.no
 orkanger.no
 osoyro.no
-xn--osyro-xja0f.no
+xn--osyro-wua.no
 raholt.no
-xn--rholt-nga3s.no
+xn--rholt-mra.no
 sandnessjoen.no
-xn--sandnessjen-qta6l.no
+xn--sandnessjen-ogb.no
 skedsmokorset.no
 slattum.no
 spjelkavik.no
 stathelle.no
 stavern.no
 stjordalshalsen.no
-xn--stjrdalshalsen-dya9o.no
+xn--stjrdalshalsen-sqb.no
 tananger.no
 tranby.no
 vossevangen.no
 // communities
 afjord.no
-xn--fjord-mga3s.no
+xn--fjord-lra.no
 agdenes.no
 al.no
-xn--l-eca3g.no
+xn--l-1fa.no
 alesund.no
-xn--lesund-oha3v.no
+xn--lesund-hua.no
 alstahaug.no
 alta.no
-xn--lt-3cac0od.no
+xn--lt-liac.no
 alaheadju.no
-xn--laheadju-ria35a.no
+xn--laheadju-7ya.no
 alvdal.no
 amli.no
-xn--mli-iea3m.no
+xn--mli-tla.no
 amot.no
-xn--mot-iea3m.no
+xn--mot-tla.no
 andebu.no
 andoy.no
-xn--andy-dia9d.no
+xn--andy-ira.no
 andasuolo.no
 ardal.no
-xn--rdal-kfa3p.no
+xn--rdal-poa.no
 aremark.no
 arendal.no
-xn--s-eca3g.no
+xn--s-1fa.no
 aseral.no
-xn--seral-mga3s.no
+xn--seral-lra.no
 asker.no
 askim.no
 askvoll.no
 askoy.no
-xn--asky-dia9d.no
+xn--asky-ira.no
 asnes.no
-xn--snes-kfa3p.no
+xn--snes-poa.no
 audnedaln.no
 aukra.no
 aure.no
 aurland.no
 aurskog-holand.no
-xn--aurskog-hland-xwa8n.no
+xn--aurskog-hland-jnb.no
 austevoll.no
 austrheim.no
 averoy.no
-xn--avery-zja0f.no
+xn--avery-yua.no
 balestrand.no
 ballangen.no
 balat.no
-xn--blt-2dab5rc.no
+xn--blt-elab.no
 balsfjord.no
 bahccavuotna.no
-xn--bhccavuotna-mla55b.no
+xn--bhccavuotna-k7a.no
 bamble.no
 bardu.no
 beardu.no
 beiarn.no
 bajddar.no
-xn--bjddar-wga5y.no
+xn--bjddar-pta.no
 baidar.no
-xn--bidr-0eac8ud.no
+xn--bidr-5nac.no
 berg.no
 bergen.no
 berlevag.no
-xn--berlevg-wia3y.no
+xn--berlevg-jxa.no
 bearalvahki.no
-xn--bearalvhki-uka12b.no
+xn--bearalvhki-y4a.no
 bindal.no
 birkenes.no
 bjarkoy.no
-xn--bjarky-mla1g.no
+xn--bjarky-fya.no
 bjerkreim.no
 bjugn.no
 bodo.no
-xn--bod-rga8c.no
+xn--bod-2na.no
 badaddja.no
-xn--bdddj-ngabd7xce.no
+xn--bdddj-mrabd.no
 budejju.no
 bokn.no
 bremanger.no
 bronnoy.no
-xn--brnny-xjac8fd.no
+xn--brnny-wuac.no
 bygland.no
 bykle.no
 barum.no
-xn--brum-qfa7o.no
+xn--brum-voa.no
 bo.telemark.no
-xn--b-ida6a.telemark.no
+xn--b-5ga.telemark.no
 bo.nordland.no
-xn--b-ida6a.nordland.no
+xn--b-5ga.nordland.no
 bievat.no
-xn--bievt-1fa1v.no
+xn--bievt-0qa.no
 bomlo.no
-xn--bmlo-bia9d.no
+xn--bmlo-gra.no
 batsfjord.no
-xn--btsfjord-tja31a.no
+xn--btsfjord-9za.no
 bahcavuotna.no
-xn--bhcavuotna-oka12b.no
+xn--bhcavuotna-s4a.no
 dovre.no
 drammen.no
 drangedal.no
 dyroy.no
-xn--dyry-dia9d.no
+xn--dyry-ira.no
 donna.no
-xn--dnna-bia9d.no
+xn--dnna-gra.no
 eid.no
 eidfjord.no
 eidsberg.no
@@ -4927,7 +4934,7 @@ etne.no
 etnedal.no
 evenes.no
 evenassi.no
-xn--eveni-1faaa71avab.no
+xn--eveni-0qa01ga.no
 evje-og-hornnes.no
 farsund.no
 fauske.no
@@ -4936,7 +4943,7 @@ fuoisku.no
 fedje.no
 fet.no
 finnoy.no
-xn--finny-zja0f.no
+xn--finny-yua.no
 fitjar.no
 fjaler.no
 fjell.no
@@ -4946,7 +4953,7 @@ flekkefjord.no
 flesberg.no
 flora.no
 fla.no
-xn--fl-ida3j.no
+xn--fl-zia.no
 folldal.no
 forsand.no
 fosnes.no
@@ -4955,27 +4962,27 @@ frogn.no
 froland.no
 frosta.no
 frana.no
-xn--frna-rfa7o.no
+xn--frna-woa.no
 froya.no
-xn--frya-cia9d.no
+xn--frya-hra.no
 fusa.no
 fyresdal.no
 forde.no
-xn--frde-bia9d.no
+xn--frde-gra.no
 gamvik.no
 gangaviika.no
-xn--ggaviika-4ca3twnza.no
+xn--ggaviika-8ya47h.no
 gaular.no
 gausdal.no
 gildeskal.no
-xn--gildeskl-zja31a.no
+xn--gildeskl-g0a.no
 giske.no
 gjemnes.no
 gjerdrum.no
 gjerstad.no
 gjesdal.no
 gjovik.no
-xn--gjvik-xja0f.no
+xn--gjvik-wua.no
 gloppen.no
 gol.no
 gran.no
@@ -4985,7 +4992,7 @@ gratangen.no
 grimstad.no
 grong.no
 kraanghke.no
-xn--kranghke-uja31a.no
+xn--kranghke-b0a.no
 grue.no
 gulen.no
 hadsel.no
@@ -4994,18 +5001,18 @@ halsa.no
 hamar.no
 hamaroy.no
 habmer.no
-xn--hbmer-yfa1v.no
+xn--hbmer-xqa.no
 hapmir.no
-xn--hpmir-yfa1v.no
+xn--hpmir-xqa.no
 hammerfest.no
 hammarfeasta.no
-xn--hmmrfeasta-okac25bd.no
+xn--hmmrfeasta-s4ac.no
 haram.no
 hareid.no
 harstad.no
 hasvik.no
 aknoluokta.no
-xn--koluokta-4ca2twn0a.no
+xn--koluokta-7ya57h.no
 hattfjelldal.no
 aarborte.no
 haugesund.no
@@ -5013,20 +5020,20 @@ hemne.no
 hemnes.no
 hemsedal.no
 heroy.more-og-romsdal.no
-xn--hery-dia9d.xn--mre-og-romsdal-bya9o.no
+xn--hery-ira.xn--mre-og-romsdal-qqb.no
 heroy.nordland.no
-xn--hery-dia9d.nordland.no
+xn--hery-ira.nordland.no
 hitra.no
 hjartdal.no
 hjelmeland.no
 hobol.no
-xn--hobl-dia9d.no
+xn--hobl-ira.no
 hof.no
 hol.no
 hole.no
 holmestrand.no
 holtalen.no
-xn--holtlen-uia3y.no
+xn--holtlen-hxa.no
 hornindal.no
 horten.no
 hurdal.no
@@ -5034,67 +5041,67 @@ hurum.no
 hvaler.no
 hyllestad.no
 hagebostad.no
-xn--hgebostad-5ka23a.no
+xn--hgebostad-g3a.no
 hoyanger.no
-xn--hyanger-3ma2h.no
+xn--hyanger-q1a.no
 hoylandet.no
-xn--hylandet-poa3i.no
+xn--hylandet-54a.no
 ha.no
-xn--h-fca3g.no
+xn--h-2fa.no
 ibestad.no
 inderoy.no
-xn--indery-mla1g.no
+xn--indery-fya.no
 iveland.no
 jevnaker.no
 jondal.no
 jolster.no
-xn--jlster-ila1g.no
+xn--jlster-bya.no
 karasjok.no
 karasjohka.no
-xn--krjohka-uhaba48ac1a.no
+xn--krjohka-hwab49j.no
 karlsoy.no
 galsa.no
-xn--gls-2dac4rd.no
+xn--gls-elac.no
 karmoy.no
-xn--karmy-zja0f.no
+xn--karmy-yua.no
 kautokeino.no
 guovdageaidnu.no
 klepp.no
 klabu.no
-xn--klbu-rfa7o.no
+xn--klbu-woa.no
 kongsberg.no
 kongsvinger.no
 kragero.no
-xn--krager-nla1g.no
+xn--krager-gya.no
 kristiansand.no
 kristiansund.no
 krodsherad.no
-xn--krdsherad-cqa4j.no
+xn--krdsherad-m8a.no
 kvalsund.no
 rahkkeravju.no
-xn--rhkkervju-qjaf51bga.no
+xn--rhkkervju-01af.no
 kvam.no
 kvinesdal.no
 kvinnherad.no
 kviteseid.no
 kvitsoy.no
-xn--kvitsy-mla1g.no
+xn--kvitsy-fya.no
 kvafjord.no
-xn--kvfjord-0ia4x.no
+xn--kvfjord-nxa.no
 giehtavuoatna.no
 kvanangen.no
-xn--kvnangen-3ja30a.no
+xn--kvnangen-k0a.no
 navuotna.no
-xn--nvuotna-uha91a.no
+xn--nvuotna-hwa.no
 kafjord.no
-xn--kfjord-pha3v.no
+xn--kfjord-iua.no
 gaivuotna.no
-xn--givuotna-sia35a.no
+xn--givuotna-8ya.no
 larvik.no
 lavangen.no
 lavagis.no
 loabat.no
-xn--loabt-1fa1v.no
+xn--loabt-0qa.no
 lebesby.no
 davvesiida.no
 leikanger.no
@@ -5103,7 +5110,7 @@ leka.no
 leksvik.no
 lenvik.no
 leangaviika.no
-xn--leagaviika-tda90e.no
+xn--leagaviika-52b.no
 lesja.no
 levanger.no
 lier.no
@@ -5112,33 +5119,33 @@ lillehammer.no
 lillesand.no
 lindesnes.no
 lindas.no
-xn--linds-qga3s.no
+xn--linds-pra.no
 lom.no
 loppa.no
 lahppi.no
-xn--lhppi-yfa1v.no
+xn--lhppi-xqa.no
 lund.no
 lunner.no
 luroy.no
-xn--lury-dia9d.no
+xn--lury-ira.no
 luster.no
 lyngdal.no
 lyngen.no
 ivgu.no
 lardal.no
 lerdal.no
-xn--lrdal-tga6r.no
+xn--lrdal-sra.no
 lodingen.no
-xn--ldingen-3ma2h.no
+xn--ldingen-q1a.no
 lorenskog.no
-xn--lrenskog-poa3i.no
+xn--lrenskog-54a.no
 loten.no
-xn--lten-bia9d.no
+xn--lten-gra.no
 malvik.no
 masoy.no
-xn--msy-jea0hvcc.no
+xn--msy-ula0h.no
 muosat.no
-xn--muost-1fa1v.no
+xn--muost-0qa.no
 mandal.no
 marker.no
 marnardal.no
@@ -5147,11 +5154,11 @@ meland.no
 meldal.no
 melhus.no
 meloy.no
-xn--mely-dia9d.no
+xn--mely-ira.no
 meraker.no
-xn--merker-rha3v.no
+xn--merker-kua.no
 moareke.no
-xn--moreke-qha3v.no
+xn--moreke-jua.no
 midsund.no
 midtre-gauldal.no
 modalen.no
@@ -5161,15 +5168,15 @@ moskenes.no
 moss.no
 mosvik.no
 malselv.no
-xn--mlselv-pha3v.no
+xn--mlselv-iua.no
 malatvuopmi.no
-xn--mlatvuopmi-oka12b.no
+xn--mlatvuopmi-s4a.no
 namdalseid.no
 aejrie.no
 namsos.no
 namsskogan.no
 naamesjevuemie.no
-xn--nmesjevuemie-1naa26bb.no
+xn--nmesjevuemie-tcba.no
 laakesvuemie.no
 nannestad.no
 narvik.no
@@ -5182,7 +5189,7 @@ nesna.no
 nesodden.no
 nesseby.no
 unjarga.no
-xn--unjrga-yga5y.no
+xn--unjrga-rta.no
 nesset.no
 nissedal.no
 nittedal.no
@@ -5192,52 +5199,52 @@ nord-odal.no
 norddal.no
 nordkapp.no
 davvenjarga.no
-xn--davvenjrga-uka12b.no
+xn--davvenjrga-y4a.no
 nordre-land.no
 nordreisa.no
 raisa.no
-xn--risa-0ea7r.no
+xn--risa-5na.no
 nore-og-uvdal.no
 notodden.no
 naroy.no
-xn--nry-nea5gvcc.no
+xn--nry-yla5g.no
 notteroy.no
-xn--nttery-ilae7gf.no
+xn--nttery-byae.no
 odda.no
 oksnes.no
-xn--ksnes-vja0f.no
+xn--ksnes-uua.no
 oppdal.no
 oppegard.no
-xn--oppegrd-via3y.no
+xn--oppegrd-ixa.no
 orkdal.no
 orland.no
-xn--rland-vja0f.no
+xn--rland-uua.no
 orskog.no
-xn--rskog-vja0f.no
+xn--rskog-uua.no
 orsta.no
-xn--rsta-9ha9d.no
+xn--rsta-fra.no
 os.hedmark.no
 os.hordaland.no
 osen.no
 osteroy.no
-xn--ostery-mla1g.no
+xn--ostery-fya.no
 ostre-toten.no
-xn--stre-toten-vra5k.no
+xn--stre-toten-zcb.no
 overhalla.no
 ovre-eiker.no
-xn--vre-eiker-9pa4j.no
+xn--vre-eiker-k8a.no
 oyer.no
-xn--yer-oga8c.no
+xn--yer-zna.no
 oygarden.no
-xn--ygarden-2ma2h.no
+xn--ygarden-p1a.no
 oystre-slidre.no
-xn--ystre-slidre-2ua7m.no
+xn--ystre-slidre-ujb.no
 porsanger.no
 porsangu.no
-xn--porsgu-lca9o4lva.no
+xn--porsgu-sta26f.no
 porsgrunn.no
 radoy.no
-xn--rady-dia9d.no
+xn--rady-ira.no
 rakkestad.no
 rana.no
 ruovat.no
@@ -5246,47 +5253,47 @@ rauma.no
 rendalen.no
 rennebu.no
 rennesoy.no
-xn--rennesy-8ma2h.no
+xn--rennesy-v1a.no
 rindal.no
 ringebu.no
 ringerike.no
 ringsaker.no
 rissa.no
 risor.no
-xn--risr-dia9d.no
+xn--risr-ira.no
 roan.no
 rollag.no
 rygge.no
 ralingen.no
-xn--rlingen-zia4x.no
+xn--rlingen-mxa.no
 rodoy.no
-xn--rdy-pgab7dc.no
+xn--rdy-0nab.no
 romskog.no
-xn--rmskog-ila1g.no
+xn--rmskog-bya.no
 roros.no
-xn--rros-bia9d.no
+xn--rros-gra.no
 rost.no
-xn--rst-pga8c.no
+xn--rst-0na.no
 royken.no
-xn--ryken-wja0f.no
+xn--ryken-vua.no
 royrvik.no
-xn--ryrvik-ila1g.no
+xn--ryrvik-bya.no
 rade.no
-xn--rde-jea3m.no
+xn--rde-ula.no
 salangen.no
 siellak.no
 saltdal.no
 salat.no
-xn--slt-2dab5rc.no
-xn--slat-0ea7r.no
+xn--slt-elab.no
+xn--slat-5na.no
 samnanger.no
 sande.more-og-romsdal.no
-sande.xn--mre-og-romsdal-bya9o.no
+sande.xn--mre-og-romsdal-qqb.no
 sande.vestfold.no
 sandefjord.no
 sandnes.no
 sandoy.no
-xn--sandy-zja0f.no
+xn--sandy-yua.no
 sarpsborg.no
 sauda.no
 sauherad.no
@@ -5303,24 +5310,24 @@ ski.no
 skien.no
 skiptvet.no
 skjervoy.no
-xn--skjervy-8ma2h.no
+xn--skjervy-v1a.no
 skierva.no
-xn--skierv-1ga5y.no
+xn--skierv-uta.no
 skjak.no
-xn--skjk-nfa3p.no
+xn--skjk-soa.no
 skodje.no
 skanland.no
-xn--sknland-sia3y.no
+xn--sknland-fxa.no
 skanit.no
-xn--sknit-zfa1v.no
+xn--sknit-yqa.no
 smola.no
-xn--smla-cia9d.no
+xn--smla-hra.no
 snillfjord.no
 snasa.no
-xn--snsa-mfa3p.no
+xn--snsa-roa.no
 snoasa.no
 snaase.no
-xn--snase-oga3s.no
+xn--snase-nra.no
 sogndal.no
 sokndal.no
 sola.no
@@ -5333,7 +5340,7 @@ stavanger.no
 steigen.no
 steinkjer.no
 stjordal.no
-xn--stjrdal-5ma2h.no
+xn--stjrdal-s1a.no
 stokke.no
 stor-elvdal.no
 stord.no
@@ -5352,27 +5359,27 @@ sveio.no
 svelvik.no
 sykkylven.no
 sogne.no
-xn--sgne-bia9d.no
+xn--sgne-gra.no
 somna.no
-xn--smna-bia9d.no
+xn--smna-gra.no
 sondre-land.no
-xn--sndre-land-wra5k.no
+xn--sndre-land-0cb.no
 sor-aurdal.no
-xn--sr-aurdal-bqa4j.no
+xn--sr-aurdal-l8a.no
 sor-fron.no
-xn--sr-fron-3ma2h.no
+xn--sr-fron-q1a.no
 sor-odal.no
-xn--sr-odal-3ma2h.no
+xn--sr-odal-q1a.no
 sor-varanger.no
-xn--sr-varanger-ita6l.no
+xn--sr-varanger-ggb.no
 matta-varjjat.no
-xn--mtta-vrjjat-mlaf38bga.no
+xn--mtta-vrjjat-k7af.no
 sorfold.no
-xn--srfold-ila1g.no
+xn--srfold-bya.no
 sorreisa.no
-xn--srreisa-3ma2h.no
+xn--srreisa-q1a.no
 sorum.no
-xn--srum-bia9d.no
+xn--srum-gra.no
 tana.no
 deatnu.no
 time.no
@@ -5381,23 +5388,23 @@ tinn.no
 tjeldsund.no
 dielddanuorri.no
 tjome.no
-xn--tjme-cia9d.no
+xn--tjme-hra.no
 tokke.no
 tolga.no
 torsken.no
 tranoy.no
-xn--trany-zja0f.no
+xn--trany-yua.no
 tromso.no
-xn--troms-0ja0f.no
+xn--troms-zua.no
 tromsa.no
 romsa.no
 trondheim.no
 troandin.no
 trysil.no
 trana.no
-xn--trna-rfa7o.no
+xn--trna-woa.no
 trogstad.no
-xn--trgstad-4ma2h.no
+xn--trgstad-r1a.no
 tvedestrand.no
 tydal.no
 tynset.no
@@ -5406,30 +5413,30 @@ divtasvuodna.no
 divttasvuotna.no
 tysnes.no
 tysvar.no
-xn--tysvr-wga6r.no
+xn--tysvr-vra.no
 tonsberg.no
-xn--tnsberg-3ma2h.no
+xn--tnsberg-q1a.no
 ullensaker.no
 ullensvang.no
 ulvik.no
 utsira.no
 vadso.no
-xn--vads-eia9d.no
+xn--vads-jra.no
 cahcesuolo.no
-xn--hcesuolo-mda4r9nka.no
+xn--hcesuolo-7ya35b.no
 vaksdal.no
 valle.no
 vang.no
 vanylven.no
 vardo.no
-xn--vard-eia9d.no
+xn--vard-jra.no
 varggat.no
-xn--vrggt-yfad1ye.no
+xn--vrggt-xqad.no
 vefsn.no
 vaapste.no
 vega.no
 vegarshei.no
-xn--vegrshei-vja31a.no
+xn--vegrshei-c0a.no
 vennesla.no
 verdal.no
 verran.no
@@ -5438,7 +5445,7 @@ vestnes.no
 vestre-slidre.no
 vestre-toten.no
 vestvagoy.no
-xn--vestvgy-via6o6dc.no
+xn--vestvgy-ixa6o.no
 vevelstad.no
 vik.no
 vikna.no
@@ -5446,18 +5453,18 @@ vindafjord.no
 volda.no
 voss.no
 varoy.no
-xn--vry-nea5gvcc.no
+xn--vry-yla5g.no
 vagan.no
-xn--vgan-lfa3p.no
+xn--vgan-qoa.no
 voagat.no
 vagsoy.no
-xn--vgsy-lfa0j3cd.no
+xn--vgsy-qoa0j.no
 vaga.no
-xn--vg-hdab1mc.no
+xn--vg-yiab.no
 valer.ostfold.no
-xn--vler-lfa3p.xn--stfold-hla1g.no
+xn--vler-qoa.xn--stfold-9xa.no
 valer.hedmark.no
-xn--vler-lfa3p.hedmark.no
+xn--vler-qoa.hedmark.no
 
 // np : http://www.mos.com.np/register.html
 *.np
@@ -6362,9 +6369,9 @@ idv.tw
 game.tw
 ebiz.tw
 club.tw
-xn--mbaflf1via.tw
-xn--ea6a6fra1uc.tw
-xn--ga3azc6ayvia.tw
+xn--zf0ao64a.tw
+xn--uc0atv.tw
+xn--czrw28b.tw
 
 // tz : http://www.tznic.or.tz/index.php/domains
 // Confirmed by registry <manager@tznic.or.tz> 2013-01-22
@@ -6840,165 +6847,165 @@ yt
 
 // xn--mgbaam7a8h ("Emerat" Arabic) : AE
 // http://nic.ae/english/arabicdomain/rules.jsp
-xn--fa1ebap4b9scbbbe
+xn--mgbaam7a8h
 
 // xn--54b7fta0cc ("Bangla" Bangla) : BD
-xn--ca5eaaba1b2c3ff87acccc
+xn--54b7fta0cc
 
 // xn--fiqs8s ("China" Chinese-Han-Simplified <.Zhongguo>) : CN
 // CNNIC
 // http://cnnic.cn/html/Dir/2005/10/11/3218.htm
-xn--1a9a6aw5qi
+xn--fiqs8s
 
 // xn--fiqz9s ("China" Chinese-Han-Traditional <.Zhongguo>) : CN
 // CNNIC
 // http://cnnic.cn/html/Dir/2005/10/11/3218.htm
-xn--la7ayc1bxoi
+xn--fiqz9s
 
 // xn--lgbbat1ad8j ("Algeria / Al Jazair" Arabic) : DZ
-xn--ea2ebby6ae41acbbbbe
+xn--lgbbat1ad8j
 
 // xn--wgbh1c ("Egypt" Arabic .masr) : EG
 // http://www.dotmasr.eg/
-xn--fa2gl3lbc
+xn--wgbh1c
 
 // xn--node ("ge" Georgian (Mkhedruli)) : GE
-xn--daa8bj59ac
+xn--node
 
 // xn--j6w193g ("Hong Kong" Chinese-Han) : HK
 // https://www2.hkirc.hk/register/rules.jsp
-xn--zaz2a9azrpa
+xn--j6w193g
 
 // xn--h2brj9c ("Bharat" Devanagari) : IN
 // India
-xn--bbaaaaa4cxa4iqnccc
+xn--h2brj9c
 
 // xn--mgbbh1a71e ("Bharat" Arabic) : IN
 // India
-xn--ebabh1a7d9hcbbo
+xn--mgbbh1a71e
 
 // xn--fpcrj9c3d ("Bharat" Telugu) : IN
 // India
-xn--na9b0albaaak9jzpcccc
+xn--fpcrj9c3d
 
 // xn--gecrj9c ("Bharat" Gujarati) : IN
 // India
-xn--bbalaaapx4iqnccc
+xn--gecrj9c
 
 // xn--s9brj9c ("Bharat" Gurmukhi) : IN
 // India
-xn--bbahaaa1ax4iqnccc
+xn--s9brj9c
 
 // xn--45brj9c ("Bharat" Bengali) : IN
 // India
-xn--bbadaaa3bxa4iqnccc
+xn--45brj9c
 
 // xn--xkc2dl3a5ee0h ("India" Tamil) : IN
 // India
-xn--ham3eo2abcbaaff0rka99bcccccc
+xn--xkc2dl3a5ee0h
 
 // xn--mgba3a4f16a ("Iran" Persian) : IR
-xn--gal4fb3cvocbko
+xn--mgba3a4f16a
 
 // xn--mgba3a4fra ("Iran" Arabic) : IR
-xn--gah0gb3cvocbff
+xn--mgba3a4fra
 
 // xn--mgbayh7gpa ("al-Ordon" Arabic) : JO
 // National Information Technology Center (NITC)
 // Royal Scientific Society, Al-Jubeiha
-xn--eae1hb4bl3ycbbfh
+xn--mgbayh7gpa
 
 // xn--3e0b707e ("Republic of Korea" Hangul) : KR
-xn--vao5c5a7vpa
+xn--3e0b707e
 
 // xn--80ao21a ("Kaz" Kazakh) : KZ
-xn--1a6bva2hbi
+xn--80ao21a
 
 // xn--fzc2c9e2c ("Lanka" Sinhalese-Sinhala) : LK
 // http://nic.lk
-xn--ca0a6a0habi7b1wccc
+xn--fzc2c9e2c
 
 // xn--xkc2al3hye2a ("Ilangai" Tamil) : LK
 // http://nic.lk
-xn--haco6as8jbacid3a80dccccc
+xn--xkc2al3hye2a
 
 // xn--mgbc0a9azcg ("Morocco / al-Maghrib" Arabic) : MA
-xn--eac4hg8bzc0mdbbeb
+xn--mgbc0a9azcg
 
 // xn--l1acc ("mon" Mongolian) : MN
-xn--zbacc4ebb
+xn--l1acc
 
 // xn--mgbx4cd0ab ("Malaysia" Malay) : MY
-xn--eabqa9lwcynccbbd
+xn--mgbx4cd0ab
 
 // xn--mgb9awbf ("Oman" Arabic) : OM
-xn--fac2h0cvhcfd
+xn--mgb9awbf
 
 // xn--ygbi2ammx ("Falasteen" Arabic) : PS
 // The Palestinian National Internet Naming Authority (PNINA)
 // http://www.pnina.ps
-xn--baggp8rya3ubebfb
+xn--ygbi2ammx
 
 // xn--90a3ac ("srb" Cyrillic) : RS
-xn--ab9lxecb
+xn--90a3ac
 
 // xn--p1ai ("rf" Russian-Cyrillic) : RU
 // http://www.cctld.ru/en/docs/rulesrf.php
-xn--ai3ub
+xn--p1ai
 
 // xn--wgbl6a ("Qatar" Arabic) : QA
 // http://www.ict.gov.qa/
-xn--ca8gra5kbc
+xn--wgbl6a
 
 // xn--mgberp4a5d4ar ("AlSaudiah" Arabic) : SA
 // http://www.nic.net.sa/
-xn--eaig7ina8a0a2cxscbccefd
+xn--mgberp4a5d4ar
 
 // xn--mgberp4a5d4a87g ("AlSaudiah" Arabic) variant : SA
-xn--eaim9hn8a0a2cxscbccef9a
+xn--mgberp4a5d4a87g
 
 // xn--mgbqly7c0a67fbc ("AlSaudiah" Arabic) variant : SA
-xn--dabmq6k0b0a2cxscbcgf7ab
+xn--mgbqly7c0a67fbc
 
 // xn--mgbqly7cvafr ("AlSaudiah" Arabic) variant : SA
-xn--eagci6l0b0a2cxscbcgfdb
+xn--mgbqly7cvafr
 
 // xn--ogbpf8fl ("Syria" Arabic) : SY
-xn--iae7g4ai5tcced
+xn--ogbpf8fl
 
 // xn--mgbtf8fl ("Syria" Arabic) variant : SY
-xn--iae1grbi5tcced
+xn--mgbtf8fl
 
 // xn--yfro4i67o Singapore ("Singapore" Chinese-Han) : SG
-xn--kaxwlg0g5rcd
+xn--yfro4i67o
 
 // xn--clchc0ea0b2g2a9gcd ("Singapore" Tamil) : SG
-xn--cavab1bwg5kb7abacbcchfdcu82a4zcccccccccc
+xn--clchc0ea0b2g2a9gcd
 
 // xn--o3cw4h ("Thai" Thai) : TH
 // http://www.thnic.co.th
-xn--ea2b7a0fbc6ycc
+xn--o3cw4h
 
 // xn--pgbs0dh ("Tunis") : TN
 // http://nic.tn
-xn--gad5hqbzmdeb
+xn--pgbs0dh
 
 // xn--kpry57d ("Taiwan" Chinese-Han-Traditional) : TW
 // http://www.twnic.net/english/dn/dn_07a.htm
-xn--ba1azd6bxpoa
+xn--kpry57d
 
 // xn--kprw13d ("Taiwan" Chinese-Han-Simplified) : TW
 // http://www.twnic.net/english/dn/dn_07a.htm
-xn--pa0e1au5qi
+xn--kprw13d
 
 // xn--nnx388a ("Taiwan") variant : TW
-xn--bal9f1dpkd
+xn--nnx388a
 
 // xn--j1amh ("ukr" Cyrillic) : UA
-xn--af9n9cdd
+xn--j1amh
 
 // xn--mgb2ddes ("AlYemen" Arabic) : YE
-xn--eacdo7l3liabbb
+xn--mgb2ddes
 
 // xxx : http://icmregistry.com
 xxx
@@ -7017,19 +7024,19 @@ xxx
 
 
 // xn--80asehdb : 2013-07-14 CORE Association
-xn--nbasehdb9jbbbbb
+xn--80asehdb
 
 // xn--80aswg : 2013-07-14 CORE Association
-xn--bac1llb9gbdf
+xn--80aswg
 
 // xn--ngbc5azd : 2013-07-14 International Domain Registry Pty. Ltd.
-xn--da7ee5bzlbcg
+xn--ngbc5azd
 
 // xn--unup4y : 2013-07-14 Spring Fields, LLC
-xn--iao5ja2uc
+xn--unup4y
 
 // xn--vhquv : 2013-08-28 Dash McCook, LLC
-xn--ba4cveo3rc
+xn--vhquv
 
 // camera : 2013-08-28 Atomic Maple, LLC
 camera
@@ -7068,10 +7075,10 @@ estate
 tattoo
 
 // xn--3ds443g : 2013-09-09 TLD Registry Limited
-xn--2ay6cua0qoa
+xn--3ds443g
 
 // xn--fiq228c5hs : 2013-09-09 TLD Registry Limited
-xn--haun5g7b7a0wsal
+xn--fiq228c5hs
 
 // land : 2013-09-10 Pine Moon, LLC
 land
@@ -7089,7 +7096,7 @@ sexy
 menu
 
 // xn--rhqv96g : 2013-09-11 Stable Tone Limited
-xn--marc9k1iua
+xn--rhqv96g
 
 // uno : 2013-09-11 Dot Latin, LLC
 uno
@@ -7101,7 +7108,7 @@ gallery
 technology
 
 // xn--3bst00m : 2013-09-13 Eagle Horizon Limited
-xn--ga5bb2az2ava
+xn--3bst00m
 
 // reviews : 2013-09-13 Extra Cover, LLC
 reviews
@@ -7110,7 +7117,7 @@ reviews
 guide
 
 // xn--6qq986b3x1 : 2013-09-13 Tycoon Treasure Limited
-xn--iaa0a2d7d6cuolal
+xn--6qq986b3xl
 
 // graphics : 2013-09-13 Over Madison, LLC
 graphics
@@ -7122,7 +7129,7 @@ construction
 onl
 
 // xn--q9jyb4c : 2013-09-17 Charleston Road Registry
-xn--baac2e0f4eukcc
+xn--q9jyb4c
 
 // diamonds : 2013-09-23 John Edge, LLC
 diamonds
@@ -7152,13 +7159,13 @@ directory
 kitchen
 
 // xn--6frz82g : 2013-09-24 Afilias Limited
-xn--ka1de8eukja
+xn--6frz82g
 
 // kim : 2013-09-24 Afilias Limited
 kim
 
 // xn--cg4bki : 2013-09-27 Samsung SDS Co., LTD
-xn--cae9krb2pc
+xn--cg4bki
 
 // monash : 2013-10-01 Monash University
 monash
@@ -7182,7 +7189,7 @@ careers
 shoes
 
 // xn--4gbrim : 2013-10-07 Suhub Electronic Establishment
-xn--cafj1rtfcbb
+xn--4gbrim
 
 // career : 2013-10-09 dotCareer, LLC
 career
@@ -7191,7 +7198,7 @@ career
 otsuka
 
 // xn--fiQ64b : 2013-10-14 CITIC Group Corporation
-xn--7ax6a3a2oc
+xn--fiq64b
 
 // gift : 2013-10-18 Uniregistry Corp.
 gift
@@ -7254,7 +7261,7 @@ codes
 email
 
 // xn--mgbab2bd : 2013-10-31 CORE Association
-xn--ebaab2bd9tbbbb
+xn--mgbab2bd
 
 // repair : 2013-11-07 Lone Sunset, LLC
 repair
@@ -7353,10 +7360,10 @@ kaufen
 farm
 
 // xn--55qw42g : 2013-11-08 China Organizational Name Administration Center
-xn--fak4c9c5ooa
+xn--55qw42g
 
 // xn--zfr164b : 2013-11-08 China Organizational Name Administration Center
-xn--kat4b8g3hd
+xn--zfr164b
 
 // club : 2013-11-08 .CLUB DOMAINS, LLC
 club
@@ -7377,7 +7384,7 @@ guitars
 bargains
 
 // xn--nqv7fs00ema : 2013-11-14 Public Interest Registry
-xn--eaai8fk1odb20bcdc
+xn--nqv7fs00ema
 
 // desi : 2013-11-14 Desi Networks LLC
 desi
@@ -7392,19 +7399,19 @@ boutique
 pics
 
 // xn--c1avg : 2013-11-14 Public Interest Registry
-xn--a6h5a9dce
+xn--c1avg
 
 // xn--55qx5d : 2013-11-14 Computer Network Information Center of Chinese Academy of Sciences （China Internet Network Information Center）
-xn--fau0g2b0nc
+xn--55qx5d
 
 // xn--io0a7i : 2013-11-14 Computer Network Information Center of Chinese Academy of Sciences （China Internet Network Information Center）
-xn--raw6gg3sc
+xn--io0a7i
 
 // cheap : 2013-11-14 Sand Cover, LLC
 cheap
 
 // xn--xhq521b : 2013-11-14 Guangzhou YU Wei Information Technology Co., Ltd.
-xn--2a9ccy9pd
+xn--xhq521b
 
 // photo : 2013-11-14 Uniregistry, Corp.
 photo
@@ -7416,7 +7423,7 @@ network
 zone
 
 // xn--nqv7f : 2013-11-14 Public Interest Registry
-xn--ea1cg5i8ic
+xn--nqv7f
 
 // link : 2013-11-14 Uniregistry, Corp.
 link
@@ -7425,7 +7432,7 @@ link
 qpon
 
 // xn--i1b6b1a6a2e : 2013-11-14 Public Interest Registry
-xn--ca6b1anabbb0b6k4rcccc
+xn--i1b6b1a6a2e
 
 // agency : 2013-11-14 Steel Falls, LLC
 agency
@@ -7449,7 +7456,7 @@ rocks
 shiksha
 
 // xn--d1acj3b : 2013-11-21 The Foundation for Network Initiatives “The Smart Internet”
-xn--ca3hdn0jbcg
+xn--d1acj3b
 
 // budapest : 2013-11-21 Top Level Domain Holdings Limited
 budapest
@@ -7476,7 +7483,7 @@ christmas
 cooking
 
 // xn--czru2d : 2013-11-21 Zodiac Capricorn Limited
-xn--gaqt5bzxc
+xn--czru2d
 
 // casa : 2013-11-21 Top Level Domain Holdings Limited
 casa
@@ -7491,7 +7498,7 @@ voto
 tools
 
 // xn--45q11c : 2013-11-21 Zodiac Scorpio Limited
-xn--faq9esa20ac
+xn--45q11c
 
 // praxi : 2013-12-05 Praxi S.p.A.
 praxi
@@ -7605,7 +7612,7 @@ yokohama
 pub
 
 // xn--p1acf : 2013-12-12 Rusnames Limited
-xn--acf42abb
+xn--p1acf
 
 // ren : 2013-12-12 Beijing Qianxiang Wangjing Technology Development Co., Ltd.
 ren
@@ -7644,10 +7651,10 @@ globo
 axa
 
 // xn--80adxhks : 2013-12-19 Foundation for Assistance for Internet Technologies and Infrastructure Development (FAITID)
-xn--ba8gf5aim8jbcbbg
+xn--80adxhks
 
 // xn--czrs0t : 2013-12-19 Wild Island, LLC
-xn--ga3ah3luic
+xn--czrs0t
 
 // vodka : 2013-12-19 Top Level Domain Holdings Limited
 vodka
@@ -7713,7 +7720,7 @@ ggee
 beer
 
 // xn--1qqw23a : 2014-01-13 Guangzhou YU Wei Information Technology Co., Ltd.
-xn--1a8ba9b0mi
+xn--1qqw23a
 
 // college : 2014-01-16 XYZ.COM LLC
 college
@@ -7725,7 +7732,7 @@ ovh
 meet
 
 // xn--ses554g : 2014-01-16 HU YI GLOBAL INFORMATION RESOURCES (HOLDING) COMPANY. HONGKONG LIMITED
-xn--a7axb9h7hja
+xn--ses554g
 
 // gop : 2014-01-16 Republican State Leadership Committee, Inc.
 gop
@@ -7737,7 +7744,7 @@ blackfriday
 lacaixa
 
 // xn--czr694b : 2014-01-16 HU YI GLOBAL INFORMATION RESOURCES(HOLDING) COMPANY.HONGKONG LIMITED
-xn--gac4b5b8wia
+xn--czr694b
 
 // vegas : 2014-01-16 Dot Vegas, Inc.
 vegas
@@ -7836,7 +7843,7 @@ vlaanderen
 cologne
 
 // xn--kput3i : 2014-02-13 Beijing RITT-Net Technology Development Co., Ltd
-xn--jae5cyg6ic
+xn--kput3i
 
 // wme : 2014-02-13 William Morris Endeavor Entertainment, LLC
 wme
@@ -7971,7 +7978,7 @@ engineering
 associates
 
 // xn--mxtq1m : 2014-03-07 Net-Chinese Co., Ltd.
-xn--uaq3gta4qd
+xn--mxtq1m
 
 // williamhill : 2014-03-13 William Hill Organization Limited
 williamhill
@@ -8054,12 +8061,12 @@ de.com
 eu.com
 gb.com
 gb.net
-gr.com
 hu.com
 hu.net
 jp.net
 jpn.com
 kr.com
+mex.com
 no.com
 qc.com
 ru.com
@@ -8069,9 +8076,29 @@ se.net
 uk.com
 uk.net
 us.com
-us.org
 uy.com
+za.bz
 za.com
+
+// Africa.com Web Solutions Ltd : https://registry.africa.com
+// Submitted by Gavin Brown <gavin.brown@centralnic.com> 2014-02-04
+africa.com
+
+// iDOT Services Limited : http://www.domain.gr.com
+// Submitted by Gavin Brown <gavin.brown@centralnic.com> 2014-02-04
+gr.com
+
+// Radix FZC : http://domains.in.net
+// Submitted by Gavin Brown <gavin.brown@centralnic.com> 2014-02-04
+in.net
+
+// US REGISTRY LLC : http://us.org
+// Submitted by Gavin Brown <gavin.brown@centralnic.com> 2014-02-04
+us.org
+
+// co.com Registry, LLC : https://registry.co.com
+// Submitted by Gavin Brown <gavin.brown@centralnic.com> 2014-02-04
+co.com
 
 // c.la : http://www.c.la/
 c.la

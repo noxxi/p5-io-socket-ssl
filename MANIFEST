@@ -43,7 +43,10 @@ t/memleak_bad_handshake.t
 t/mitm.t
 t/nonblock.t
 t/npn.t
-t/public_suffix_lib.t
+t/public_suffix_lib.pl
+t/public_suffix_lib_encode_idn.t
+t/public_suffix_lib_libidn.t
+t/public_suffix_lib_uri.t
 t/public_suffix_ssl.t
 t/readline.t
 t/sessions.t

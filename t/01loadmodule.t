@@ -1,30 +1,16 @@
 use strict;
 use warnings;
+no warnings 'once';
+use Test::More;
 
-my ($foo,$test,$loaded);
+plan tests => 3;
 
-BEGIN { $| = 1; print "1..4\n"; }
-END {print "Load failed ... not ok 1\n" unless $loaded;}
+ok( eval { require IO::Socket::SSL },"loaded");
 
-use Carp;
-BEGIN {
-    $foo = 0;
-    $SIG{__DIE__} = sub { $foo++ if defined $^S && !$^S } if $] > 5.006;
-}
-use IO::Socket::SSL qw(:debug1);
-$loaded = 1;
-$test=1;
-print "ok $test\n";
+diag( sprintf( "openssl version=0x%0x", Net::SSLeay::OPENSSL_VERSION_NUMBER()));
+diag( sprintf( "Net::SSLeay::VERSION=%s", $Net::SSLeay::VERSION));
 
-$test++;
-if ($foo) { print "not ";}
-print "ok $test\n";
-delete $SIG{__DIE__};
+IO::Socket::SSL->import(':debug1');
+is( $IO::Socket::SSL::DEBUG,1, "IO::Socket::SSL::DEBUG 1");
+is( $Net::SSLeay::trace,1, "Net::SSLeay::trace 1");
 
-$test++;
-if ($IO::Socket::SSL::DEBUG == 1) { print "ok $test\n"; }
-else { print "not ok $test\n"; }
-
-$test++;
-if ($Net::SSLeay::trace == 1) { print "ok $test\n"; }
-else { print "not ok $test\n"; }

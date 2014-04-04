@@ -42,8 +42,9 @@ my ($cacert,$cakey) = CERT_create( CA => 1 );
 
 defined( my $pid = fork() ) || die $!;
 if ( ! $pid ) {
-    while (1) {
+    while (@tests) {
 	my $cl = $server->accept or next;
+	shift(@tests); # only for counting
 	# client initially send line with expected CN
 	chop( my $cn = <$cl> ) or last;
 	my ($cert,$key) = CERT_create( 
@@ -63,7 +64,6 @@ if ( ! $pid ) {
 
 # if anything blocks - this will at least finish the test
 alarm(30);
-END{ kill 9,$pid }
 
 close($server);
 for my $test (@tests) {

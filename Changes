@@ -1,3 +1,10 @@
+1.977 2014/04/04
+- fix publicsuffix for IDNA, more tests with various IDNA libs
+  RT#94424. Thanks to paul[AT]city-fan[DOT]org
+- reuse result of IDN lib detection from PublicSuffix.pm in SSL.pm
+- add more checks to external/usable_ca.t. Now it is enough that at least
+  one of the hosts verifies against the builtin CA store
+- add openssl and Net::SSleay version to diagnostics in load test
 1.976 2014/04/03
 - added public prefix checking to verification of wildcard certificates,
   e.g. accept *.foo.com but not *.co.uk.
