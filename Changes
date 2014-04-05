@@ -1,3 +1,7 @@
+- hostname checking: 
+  - configuration of 'leftmost' is renamed to 'full_label', but the old
+    version is kept for compatibility reasons.
+  - documentation of predefined schemes fixed to match reality
 1.978 2014/04/04
 - RT#94424 again, fix test on older openssl version with no SNI support
 1.977 2014/04/04
