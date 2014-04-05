@@ -3008,27 +3008,47 @@ checking and for the possible values.
 Verification of hostname against a certificate is different between various
 applications and RFCs. Some scheme allow wildcards for hostnames, some only
 in subjectAltNames, and even their different wildcard schemes are possible.
+RFC 6125 provides a good overview.
 
-To ease the verification the following schemes are predefined:
+To ease the verification the following schemes are predefined (both protocol
+name and rfcXXXX name can be used):
 
 =over 8
 
-=item ldap (rfc4513), pop3,imap,acap (rfc2995), nntp (rfc4642)
-
-Simple wildcards in subjectAltNames are possible, e.g. *.example.org matches
-www.example.org but not lala.www.example.org. If nothing from subjectAltNames
-match it checks against the common name, but there are no wildcards allowed.
-
-=item http (rfc2818), alias is www
+=item http (alias www, rfc2818), xmpp (rfc3920), ftp (rfc4217)
 
 Extended wildcards in subjectAltNames and common name are possible, e.g.
 *.example.org or even www*.example.org. The common
-name will be only checked if no names are given in subjectAltNames.
+name will be only checked if no DNS names are given in subjectAltNames.
 
-=item smtp (rfc3207)
+=item smtp (rfc2595), imap, pop3, acap (rfc4642), netconf (rfc5538), syslog (rfc5425), snmp (rfc5953)
 
-This RFC doesn't say much useful about the verification so it just assumes
-that subjectAltNames are possible, but no wildcards are possible anywhere.
+Simple wildcards in subjectAltNames are possible, e.g. *.example.org matches
+www.example.org but not lala.www.example.org. If nothing from subjectAltNames
+match it checks against the common name, where wildcards are also allowed in the
+leftmost label.
+
+=item ldap (rfc4513)
+
+Simple wildcards are allowed in subjectAltNames, but not in common name.
+Common name will be checked even if subjectAltNames exist.
+
+=item sip (rfc5922)
+
+No wildcards are allowed and common name is checked even if subjectAltNames
+exist.
+
+=item gist (rfc5971)
+
+Simple wildcards are allowed in subjectAltNames and common name, but common name
+will only be checked if their are no DNS names in subjectAltNames.
+
+=item default
+
+This is a superset of all the rules and is automatically used if no scheme is
+given but a hostname (instead of IP) is known.
+Extended wildcards are allowed in subjectAltNames and common name and common
+name is checked always.
 
 =item none
 
