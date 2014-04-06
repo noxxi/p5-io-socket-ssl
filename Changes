@@ -1,3 +1,4 @@
+1.979 2014/04/06
 - hostname checking: 
   - configuration of 'leftmost' is renamed to 'full_label', but the old
     version is kept for compatibility reasons.

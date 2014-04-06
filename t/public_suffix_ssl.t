@@ -46,7 +46,7 @@ if ( ! $pid ) {
 	my $cl = $server->accept or next;
 	shift(@tests); # only for counting
 	# client initially sends line with expected CN
-	my $cn = <$cl> or do {
+	defined( my $cn = <$cl> ) or do {
 	    warn "failed to get expected name from client, remaining ".(0+@tests);
 	    next;
 	};
