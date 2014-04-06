@@ -93,8 +93,10 @@ while ( my ($host,$fp) = each %hosts ) {
 		$cap => $host,
 	    )) {
 		pass("SSL upgrade $host with default CA and $cap");
-	    } else {
+	    } elsif ( $SSL_ERROR =~m{verify failed} ) {
 		fail("SSL upgrade $host with default CA and $cap: $SSL_ERROR");
+	    } else {
+		pass("SSL upgrade $host with no CA failed but not because of verify problem: $SSL_ERROR");
 	    }
 	}
 
@@ -103,8 +105,10 @@ while ( my ($host,$fp) = each %hosts ) {
 	$cl = shift(@cl);
 	if ( IO::Socket::SSL->start_SSL($cl, SSL_ca_file => \'' )) {
 	    fail("SSL upgrade $host with no CA succeeded");
-	} else {
+	} elsif ( $SSL_ERROR =~m{verify failed} ) {
 	    pass("SSL upgrade $host with no CA failed");
+	} else {
+	    pass("SSL upgrade $host with no CA failed but not because of verify problem: $SSL_ERROR");
 	}
     }
 }

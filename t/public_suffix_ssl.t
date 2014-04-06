@@ -45,8 +45,13 @@ if ( ! $pid ) {
     while (@tests) {
 	my $cl = $server->accept or next;
 	shift(@tests); # only for counting
-	# client initially send line with expected CN
-	chop( my $cn = <$cl> ) or last;
+	# client initially sends line with expected CN
+	my $cn = <$cl> or do {
+	    warn "failed to get expected name from client, remaining ".(0+@tests);
+	    next;
+	};
+	chop($cn);
+	print $cl "ok\n";
 	my ($cert,$key) = CERT_create( 
 	    subject => { CN => $cn },
 	    issuer  => [ $cacert,$cakey ],
@@ -63,7 +68,8 @@ if ( ! $pid ) {
 }
 
 # if anything blocks - this will at least finish the test
-alarm(30);
+alarm(60);
+$SIG{ALRM} = sub { die "test takes too long" };
 
 close($server);
 for my $test (@tests) {
@@ -71,6 +77,7 @@ for my $test (@tests) {
     ( my $cn = $host ) =~s{[^.]+}{*}; # expect cn to have wildcard
     my $cl = IO::Socket::INET->new($saddr) or die "failed to connect: $!";
     print $cl "$cn\n";
+    <$cl>;
     my $sslok = IO::Socket::SSL->start_SSL($cl,
 	SSL_verifycn_name => $host,
 	SSL_verifycn_scheme => 'http',
