@@ -41,7 +41,11 @@ BEGIN {
     $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x01000000;
     $can_server_sni = defined &Net::SSLeay::get_servername;
     $can_npn        = defined &Net::SSLeay::P_next_proto_negotiated;
-    $can_ecdh       = defined &Net::SSLeay::CTX_set_tmp_ecdh;
+    $can_ecdh       = defined &Net::SSLeay::CTX_set_tmp_ecdh && 
+	# There is a regression with elliptic curves on 1.0.1d with 64bit
+	# http://rt.openssl.org/Ticket/Display.html?id=2975
+	( Net::SSLeay::OPENSSL_VERSION_NUMBER() != 0x1000105f
+	|| length(pack("P",0)) == 4 );
 }
 
 # global defaults
