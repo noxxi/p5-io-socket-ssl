@@ -1,3 +1,9 @@
+1.980 2014/04/08
+- fixed incorrect calculation of certificate fingerprint in get_fingerprint*
+  and comparison in SSL_fingerprint. Thanks to
+  david[DT]palmer[AT]gradwell[DOT]com for reporting.
+- disable elliptic curve support for openssl 1.0.1d on 64bit because of
+  openssl rt#2975
 1.979 2014/04/06
 - hostname checking: 
   - configuration of 'leftmost' is renamed to 'full_label', but the old
