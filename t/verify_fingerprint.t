@@ -61,7 +61,7 @@ sub _server {
 	push @child,$pid;
 	return (
 	    '127.0.0.1:'.$sock->sockport,
-	    'sha1$'.unpack('H*',Net::SSLeay::X509_get_fingerprint($cert,'sha1'))
+	    'sha1$'.Net::SSLeay::X509_get_fingerprint($cert,'sha1')
 	);
     }
 

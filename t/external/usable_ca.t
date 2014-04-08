@@ -11,12 +11,13 @@ for( qw( IO::Socket::IP IO::Socket::INET6  )) {
 }
 
 my %hosts = qw( 
-    www.google.com sha1$41373a43343a30323a41333a35443a36433a46423a43443a38343a33463a31383a35393a38463a37303a43313a32393a39463a44303a46333a3833
-    www.live.com sha1$31303a43353a36453a45393a45323a41433a41463a32453a37373a43413a45423a37303a37323a42463a36353a32323a44443a37343a32323a4238
-    www.yahoo.com sha1$37363a34413a31393a45313a45423a32363a39313a37453a46323a39383a43463a37383a35413a44373a37423a41463a43453a42453a45343a3435
-    meine.deutsche-bank.de sha1$42413a35343a43343a37443a44353a34393a33443a42353a34433a44303a46373a36413a31323a30433a41433a31313a43443a46423a37363a4638
-    www.twitter.com sha1$32353a36453a34303a32353a32333a43333a34313a38453a31453a39413a30313a38353a34343a38343a35383a41463a39363a43343a41313a4245
-    www.facebook.com sha1$31333a44303a33373a36433a32413a42323a31343a33363a34303a41363a32443a30383a42423a37313a46353a45393a45463a35373a31333a3631
+    www.google.com sha1$baa77df4ce1d50df3466f9258b2394f4c6c6c5b9
+    www.yahoo.com sha1$764a19e1eb26917ef298cf785ad77bafcebee445
+    www.comdirect.de sha1$0d9626705b9984b19bca19f8ceb18885b103d0e9
+    meine.deutsche-bank.de sha1$ba54c47dd5493db54cd0f76a120cac11cdfb76f8
+    www.twitter.com sha1$256e402523c3418e1e9a0185448458af96c4a1be
+    www.facebook.com sha1$13d0376c2ab2143640a62d08bb71f5e9ef571361
+    www.live.com sha1$10c56ee9e2acaf2e77caeb7072bf6522dd7422b8
 );
 
 my $proxy = ( $ENV{https_proxy} || $ENV{http_proxy} || '' )
@@ -27,6 +28,7 @@ push @cap, 'SSL_hostname' if IO::Socket::SSL->can_client_sni();
 plan tests => 1 + (1+@cap)*keys(%hosts);
 
 my $builtin_ca_ok = 0;
+my $builtin_ca_fail = 0;
 while ( my ($host,$fp) = each %hosts ) {
     SKIP: {
 	# first check if we can connect at all
@@ -79,8 +81,10 @@ while ( my ($host,$fp) = each %hosts ) {
 
 	# check if it can verify against builtin CA store
 	$cl = shift(@cl);
-	skip "ssl upgrade failed with builtin CA store",1+@cap
-	    if ! IO::Socket::SSL->start_SSL($cl);
+	if ( ! IO::Socket::SSL->start_SSL($cl)) {
+	    $builtin_ca_fail++;
+	    skip "ssl upgrade failed with builtin CA store",1+@cap;
+	}
 	diag("check $host against builtin CA store ok");
 	$builtin_ca_ok++;
 
@@ -113,5 +117,9 @@ while ( my ($host,$fp) = each %hosts ) {
     }
 }
 
-ok( $builtin_ca_ok,
-    "verification against builtin CA store:  $builtin_ca_ok/".(0+keys %hosts));
+if ( $builtin_ca_ok + $builtin_ca_fail == 0 ) {
+    pass("no successful connects, not checking CA usage");
+} else {
+    ok( $builtin_ca_ok,
+	"verification against builtin CA store:  $builtin_ca_ok/".(0+keys %hosts));
+}
