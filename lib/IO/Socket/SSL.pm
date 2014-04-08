@@ -21,7 +21,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.980';
+our $VERSION = '1.981';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -44,7 +44,7 @@ BEGIN {
     $can_ecdh       = defined &Net::SSLeay::CTX_set_tmp_ecdh && 
 	# There is a regression with elliptic curves on 1.0.1d with 64bit
 	# http://rt.openssl.org/Ticket/Display.html?id=2975
-	( Net::SSLeay::OPENSSL_VERSION_NUMBER() != 0x1000105f
+	( Net::SSLeay::OPENSSL_VERSION_NUMBER() != 0x1000104f
 	|| length(pack("P",0)) == 4 );
 }
 
@@ -1536,6 +1536,7 @@ sub error {
 sub can_client_sni { return $can_client_sni }
 sub can_server_sni { return $can_server_sni }
 sub can_npn        { return $can_npn }
+sub can_ecdh       { return $can_ecdh }
 
 sub DESTROY {
     my $self = shift or return;
@@ -2605,6 +2606,8 @@ parameters or (better, because faster) the ECDH curve.
 
 This parameter defaults to 'prime256v1' (builtin of OpenSSL) to offer ECDH key
 exchange by default. If you don't want this explicitly set it to undef.
+
+You can check if ECDH support is available by calling C<IO::Socket::SSL->can_ecdh>.
 
 =item SSL_passwd_cb
 
