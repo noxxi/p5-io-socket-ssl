@@ -21,7 +21,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.981';
+our $VERSION = '1.982';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -1612,7 +1612,7 @@ sub set_default_session_cache {
 sub set_args_filter_hack {
     my $sub = shift;
     if ( ref $sub ) {
-	$FILTER_SSL_ARGS = shift;
+	$FILTER_SSL_ARGS = $sub;
     } elsif ( $sub eq 'use_defaults' ) {
 	# override args with defaults
 	$FILTER_SSL_ARGS = sub {

@@ -1,3 +1,5 @@
+1.982 2014/04/24
+- fix for using subroutine as argument to set_args_filter_hack
 1.981 2014/04/08
 - #95432 fix ecdhe Test for openssl1.0.1d, thanks to  paul[AT]city-fan[DOT]org
 - fix detection of openssl1.0.1d (detected 1.0.1e instead)
