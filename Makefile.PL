@@ -91,7 +91,7 @@ my %usable_ca;
 	FILES: for my $f (  grep { m{^[a-f\d]{8}(\.\d+)?$} } readdir($dh) ) {
 	    open( my $fh,'<',"$dir/$f") or next;
 	    while (<$fh>) {
-		m{^-+BEGIN CERTIFICATE-} or next;
+		m{^-+BEGIN (X509 |TRUSTED |)CERTIFICATE-} or next;
 		$usable_ca{SSL_ca_path} = $dir;
 		last FILES;
 	    }
@@ -101,7 +101,7 @@ my %usable_ca;
 	|| ( $^O =~m{vms}i ? "SSLCERTS:cert.pem":"$openssldir/cert.pem" );
     if ( open(my $fh,'<',$file)) {
 	while (<$fh>) {
-	    m{^-+BEGIN CERTIFICATE-} or next;
+	    m{^-+BEGIN (X509 |TRUSTED |)CERTIFICATE-} or next;
 	    $usable_ca{SSL_ca_file} = $file;
 	    last;
 	}
