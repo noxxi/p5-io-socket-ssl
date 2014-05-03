@@ -4,7 +4,6 @@ use strict;
 use warnings;
 use Carp 'croak';
 use Net::SSLeay;
-use Time::Local;
 use Exporter 'import';
 
 our $VERSION = '0.02';
@@ -280,21 +279,26 @@ sub CERT_create {
 
 
 
-my %mon2i = qw(
-    Jan 0 Feb 1 Mar 2 Apr 3 May 4 Jun 5
-    Jul 6 Aug 7 Sep 8 Oct 9 Nov 10 Dec 11
-);
-sub _asn1t2t {
-    my $t = Net::SSLeay::P_ASN1_TIME_put2string( shift );
-    my ($mon,$d,$h,$m,$s,$y) = split(/[\s:]+/,$t);
-    defined( $mon = $mon2i{$mon} ) or die "invalid month in $t";
-    my $tz = $y =~s{^(\d+)([A-Z]\S*)}{$1} && $2;
-    if ( ! $tz ) {
-	return timelocal($s,$m,$h,$d,$mon,$y)
-    } elsif ( $tz eq 'GMT' ) {
-	return timegm($s,$m,$h,$d,$mon,$y)
-    } else {
-	die "unexpected TZ $tz from ASN1_TIME_print";
+if ( defined &Net::SSLeay::ASN1_TIME_timet ) {
+    *_asn1t2t = \&Net::SSLeay::ASN1_TIME_timet
+} else {
+    require Time::Local;
+    my %mon2i = qw(
+	Jan 0 Feb 1 Mar 2 Apr 3 May 4 Jun 5
+	Jul 6 Aug 7 Sep 8 Oct 9 Nov 10 Dec 11
+    );
+    *_asn1t2t = sub {
+	my $t = Net::SSLeay::P_ASN1_TIME_put2string( shift );
+	my ($mon,$d,$h,$m,$s,$y,$tz) = split(/[\s:]+/,$t);
+	defined( $mon = $mon2i{$mon} ) or die "invalid month in $t";
+	$tz ||= $y =~s{^(\d+)([A-Z]\S*)}{$1} && $2;
+	if ( ! $tz ) {
+	    return Time::Local::timelocal($s,$m,$h,$d,$mon,$y)
+	} elsif ( $tz eq 'GMT' ) {
+	    return Time::Local::timegm($s,$m,$h,$d,$mon,$y)
+	} else {
+	    die "unexpected TZ $tz from ASN1_TIME_print";
+	}
     }
 }
 

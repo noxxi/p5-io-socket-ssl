@@ -21,7 +21,15 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.983';
+BEGIN {
+    eval { require Scalar::Util; Scalar::Util->import("weaken"); 1 }
+	|| eval { require WeakRef; WeakRef->import("weaken"); 1 }
+	|| die "no support for weaken - please install Scalar::Util";
+}
+
+
+
+our $VERSION = '1.984';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -32,11 +40,18 @@ use constant SSL_VERIFY_CLIENT_ONCE => Net::SSLeay::VERIFY_CLIENT_ONCE();
 use constant SSL_SENT_SHUTDOWN => 1;
 use constant SSL_RECEIVED_SHUTDOWN => 2;
 
+use constant SSL_OCSP_NO_STAPLE   => 0b00001;
+use constant SSL_OCSP_MUST_STAPLE => 0b00010;
+use constant SSL_OCSP_FAIL_HARD   => 0b00100;
+use constant SSL_OCSP_FULL_CHAIN  => 0b01000;
+
 # capabilities of underlying Net::SSLeay/openssl
 my $can_client_sni;  # do we support SNI on the client side
 my $can_server_sni;  # do we support SNI on the server side
 my $can_npn;         # do we support NPN
 my $can_ecdh;        # do we support ECDH key exchange
+my $can_ocsp;        # do we support OCSP
+my $can_ocsp_staple; # do we support OCSP stapling
 BEGIN {
     $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x01000000;
     $can_server_sni = defined &Net::SSLeay::get_servername;
@@ -46,6 +61,9 @@ BEGIN {
 	# http://rt.openssl.org/Ticket/Display.html?id=2975
 	( Net::SSLeay::OPENSSL_VERSION_NUMBER() != 0x1000104f
 	|| length(pack("P",0)) == 4 );
+    $can_ocsp        = defined &Net::SSLeay::OCSP_cert2ids;
+    $can_ocsp_staple = $can_ocsp 
+	&& defined &Net::SSLeay::set_tlsext_status_type;
 }
 
 my $algo2digest = do {
@@ -144,7 +162,6 @@ DH
 	$dh;
     },
     $can_ecdh ? ( SSL_ecdh_curve => 'prime256v1' ):(),
-
 );
 
 # global defaults which can be changed using set_defaults
@@ -190,12 +207,15 @@ use vars qw(@ISA $SSL_ERROR @EXPORT);
     @EXPORT = qw(
 	SSL_WANT_READ SSL_WANT_WRITE SSL_VERIFY_NONE SSL_VERIFY_PEER
 	SSL_VERIFY_FAIL_IF_NO_PEER_CERT SSL_VERIFY_CLIENT_ONCE
+	SSL_OCSP_NO_STAPLE SSL_OCSP_MUST_STAPLE SSL_OCSP_FAIL_HARD
+	SSL_OCSP_FULL_CHAIN
 	$SSL_ERROR GEN_DNS GEN_IPADD
     );
 }
 
 my @caller_force_inet4; # in case inet4 gets forced we store here who forced it
 
+my $IOCLASS;
 BEGIN {
     # declare @ISA depending of the installed socket class
 
@@ -220,6 +240,7 @@ BEGIN {
 	if ( eval { require IO::Socket::IP; IO::Socket::IP->VERSION(0.20); } ) {
 	    @ISA = qw(IO::Socket::IP);
 	    constant->import( CAN_IPV6 => "IO::Socket::IP" );
+	    $IOCLASS = "IO::Socket::IP";
 
 	# if we have IO::Socket::INET6 we will use this not IO::Socket::INET
 	# because it can handle both IPv4 and IPv6
@@ -227,6 +248,7 @@ BEGIN {
 	} elsif( eval { require IO::Socket::INET6; IO::Socket::INET6->VERSION(2.62) } ) {
 	    @ISA = qw(IO::Socket::INET6);
 	    constant->import( CAN_IPV6 => "IO::Socket::INET6" );
+	    $IOCLASS = "IO::Socket::INET6";
 	} else {
 	    $ip6 = 0;
 	}
@@ -235,6 +257,7 @@ BEGIN {
     # fall back to IO::Socket::INET for IPv4 only
     if ( ! $ip6 ) {
 	@ISA = qw(IO::Socket::INET);
+	$IOCLASS = "IO::Socket::INET";
 	constant->import( CAN_IPV6 => '' );
     }
 
@@ -373,6 +396,7 @@ sub import {
     goto &Exporter::import;
 }
 
+my %SSL_OBJECT;
 my %CREATED_IN_THIS_THREAD;
 sub CLONE { %CREATED_IN_THIS_THREAD = (); }
 
@@ -506,6 +530,8 @@ sub connect_SSL {
 	$ssl = ${*$self}{'_SSL_object'} = Net::SSLeay::new($ctx->{context})
 	    || return $self->error("SSL structure creation failed");
 	$CREATED_IN_THIS_THREAD{$ssl} = 1;
+	$SSL_OBJECT{$ssl} = [$self,0];
+	weaken($SSL_OBJECT{$ssl}[0]);
 
 	Net::SSLeay::set_fd($ssl, $fileno)
 	    || return $self->error("SSL filehandle association failed");
@@ -548,6 +574,20 @@ sub connect_SSL {
 		}
 	    }
 	    ${$ctx->{verify_name_ref}} = $host;
+	}
+
+	my $ocsp = $ctx->{ocsp_mode};
+	if ( $ocsp & SSL_OCSP_NO_STAPLE ) { 
+	    # don't try stapling
+	} elsif ( ! $can_ocsp_staple ) {
+	    croak("OCSP stapling not support") if $ocsp & SSL_OCSP_MUST_STAPLE;
+	} elsif ( $ocsp & SSL_OCSP_MUST_STAPLE
+	    or $ctx->{verify_mode} & 0x1 ) {
+	    # staple by default if verification enabled
+	    ${*$self}{_SSL_ocsp_verify} = undef;
+	    Net::SSLeay::set_tlsext_status_type($ssl, 
+		Net::SSLeay::TLSEXT_STATUSTYPE_ocsp());
+	    $DEBUG>=2 && DEBUG("request OCSP stapling");
 	}
 
 	my $session = $ctx->session_cache( $arg_hash->{SSL_session_key} ?
@@ -638,6 +678,30 @@ sub connect_SSL {
     $self->blocking(1) if defined($timeout); # was blocking before
 
     $ctx ||= ${*$self}{'_SSL_ctx'};
+
+    if ( my $ocsp_result = ${*$self}{_SSL_ocsp_verify} ) {
+	# got result from OCSP stapling
+	if ( $ocsp_result->[0] > 0 ) {
+	    $DEBUG>=3 && DEBUG("got OCSP success with stapling");
+	    # successful validated
+	} elsif ( $ocsp_result->[0] < 0 ) {
+	    # Permanent problem with validation because certificate
+	    # is either self-signed or the issuer cannot be found.
+	    # Ignore here, because this will cause other errors too.
+	    $DEBUG>=3 && DEBUG("got OCSP failure with stapling: %s",
+		$ocsp_result->[1]);
+	} else {
+	    # definitly revoked
+	    $DEBUG>=3 && DEBUG("got OCSP revocation with stapling: %s",
+		$ocsp_result->[1]);
+	    $self->error($ocsp_result->[1]);
+	    return $self->fatal_ssl_error();
+	}
+    } elsif ( $ctx->{ocsp_mode} & SSL_OCSP_MUST_STAPLE ) {
+	$self->error("did not receive the required stapled OCSP response");
+	return $self->fatal_ssl_error();
+    }
+
     if ( $ctx->has_session_cache
 	and my $session = Net::SSLeay::get1_session($ssl)) {
 	my $arg_hash = ${*$self}{'_SSL_arguments'};
@@ -715,6 +779,8 @@ sub accept_SSL {
 	$ssl = ${*$socket}{'_SSL_object'} = Net::SSLeay::new($ctx->{context})
 	    || return $socket->error("SSL structure creation failed");
 	$CREATED_IN_THIS_THREAD{$ssl} = 1;
+	$SSL_OBJECT{$ssl} = [$socket,1];
+	weaken($SSL_OBJECT{$ssl}[0]);
 
 	Net::SSLeay::set_fd($ssl, $fileno)
 	    || return $socket->error("SSL filehandle association failed");
@@ -1043,6 +1109,16 @@ sub stop_SSL {
     if (my $ssl = ${*$self}{'_SSL_object'}) {
 	if ( ! $stop_args->{SSL_no_shutdown} ) {
 	    my $status = Net::SSLeay::get_shutdown($ssl);
+
+	    my $timeout = 
+		not($self->blocking) ? undef :
+		exists $stop_args->{Timeout} ? $stop_args->{Timeout} : 
+		${*$self}{io_socket_timeout}; # from IO::Socket
+	    if ($timeout) {
+		$self->blocking(0);
+		$timeout += time();
+	    }
+
 	    while (1) {
 		if ( $status & SSL_SENT_SHUTDOWN and
 		    # don't care for received if fast shutdown
@@ -1057,14 +1133,31 @@ sub stop_SSL {
 		my $rv = Net::SSLeay::shutdown($ssl);
 		if ( $rv < 0 ) {
 		    # non-blocking socket?
-		    $self->_set_rw_error( $ssl,$rv );
-		    # need to try again
-		    return;
+		    if ( ! $timeout ) {
+			$self->_set_rw_error( $ssl,$rv );
+			# need to try again
+			return;
+		    }
+	
+		    # don't use _set_rw_error so that existing error does
+		    # not get cleared
+		    my $wait = $timeout - time();
+		    last if $wait<=0;
+		    vec(my $vec = '',fileno($self),1) = 1;
+		    my $err = Net::SSLeay::get_error($ssl,$rv);
+		    if ( $err == Net::SSLeay::ERROR_WANT_READ()) {
+			select($vec,undef,undef,$wait)
+		    } elsif ( $err == Net::SSLeay::ERROR_WANT_READ()) {
+			select(undef,$vec,undef,$wait)
+		    } else {
+			last;
+		    }
 		}
 
 		$status |= SSL_SENT_SHUTDOWN;
 		$status |= SSL_RECEIVED_SHUTDOWN if $rv>0;
 	    }
+	    $self->blocking(1) if $timeout;
 	}
 	Net::SSLeay::free($ssl);
 	delete ${*$self}{_SSL_object};
@@ -1202,11 +1295,20 @@ sub dump_peer_certificate {
 if ( defined &Net::SSLeay::get_peer_cert_chain
     && $Net::SSLeay::VERSION >= 1.58 ) {
     *peer_certificates = sub {
-	my $ssl = shift()->_get_ssl_object || return;
-	return (
-	    Net::SSLeay::get_peer_certificate($ssl),
-	    Net::SSLeay::get_peer_cert_chain($ssl)
-	);
+	my $self = shift;
+	my $ssl = $self->_get_ssl_object || return;
+	my @chain = Net::SSLeay::get_peer_cert_chain($ssl);
+	if ( ${*$self}{_SSL_arguments}{SSL_server} ) {
+	    # in the client case the chain contains the peer certificate,
+	    # in the server case not
+	    # this one has an increased reference counter, the other not
+	    if ( my $peer = Net::SSLeay::get_peer_certificate($ssl)) {
+		Net::SSLeay::X509_free($peer);
+		unshift @chain, $peer;
+	    }
+	}
+	return @chain;
+	    
     }
 } else {
     *peer_certificates = sub {
@@ -1484,6 +1586,22 @@ sub get_sslversion_int {
     return Net::SSLeay::version($ssl);
 }
 
+if ($can_ocsp) {
+    no warnings 'once';
+    *ocsp_resolver = sub {
+	my $self = shift;
+	my $ssl = $self->_get_ssl_object || return;
+	my $ctx = ${*$self}{_SSL_ctx};
+	return IO::Socket::SSL::OCSP_Resolver->new(
+	    $ssl,
+	    $ctx->{ocsp_cache} ||= IO::Socket::SSL::OCSP_Cache->new,
+	    $ctx->{ocsp_mode} & SSL_OCSP_FAIL_HARD,
+	    @_ ? \@_ : 
+		$ctx->{ocsp_mode} & SSL_OCSP_FULL_CHAIN ? [ $self->peer_certificates ]: 
+		[ $self->peer_certificate ]
+	);
+    };
+}
 
 sub errstr {
     my $self = shift;
@@ -1537,10 +1655,13 @@ sub can_client_sni { return $can_client_sni }
 sub can_server_sni { return $can_server_sni }
 sub can_npn        { return $can_npn }
 sub can_ecdh       { return $can_ecdh }
+sub can_ipv6       { return CAN_IPV6 }
+sub can_ocsp       { return $can_ocsp }
 
 sub DESTROY {
     my $self = shift or return;
     my $ssl = ${*$self}{_SSL_object} or return;
+    delete $SSL_OBJECT{$ssl};
     if ($CREATED_IN_THIS_THREAD{$ssl}) {
 	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
 	    if ${*$self}{'_SSL_opened'};
@@ -1667,22 +1788,12 @@ sub recv   { croak("Use of recv() not implemented in IO::Socket::SSL; use read/s
 
 package IO::Socket::SSL::SSL_HANDLE;
 use strict;
-use vars qw($HAVE_WEAKREF);
 use Errno 'EBADF';
-
-BEGIN {
-    local ($@, $SIG{__DIE__});
-
-    #Use Scalar::Util or WeakRef if possible:
-    eval "use Scalar::Util qw(weaken isweak); 1" or
-	eval "use WeakRef";
-    $HAVE_WEAKREF = $@ ? 0 : 1;
-}
-
+*weaken = *IO::Socket::SSL::weaken;
 
 sub TIEHANDLE {
     my ($class, $handle) = @_;
-    weaken($handle) if $HAVE_WEAKREF;
+    weaken($handle);
     bless \$handle, $class;
 }
 
@@ -2123,6 +2234,60 @@ WARN
     }
     Net::SSLeay::CTX_set_verify($ctx, $verify_mode, $verify_callback);
 
+    if ( $can_ocsp_staple ) {
+	my $mode = $self->{ocsp_mode} = $arg_hash->{SSL_ocsp_mode};
+	$self->{ocsp_cache} = $arg_hash->{SSL_ocsp_cache};
+	Net::SSLeay::CTX_set_tlsext_status_cb($ctx,sub {
+	    my ($ssl,$resp) = @_;
+	    my $iossl = $SSL_OBJECT{$ssl} or 
+		die "no IO::Socket::SSL object found for SSL $ssl";
+	    $iossl->[1] and die "OCSP callback on server side";
+	    $iossl = $iossl->[0];
+	    if ( ! $resp ) {
+		$DEBUG>=3 && DEBUG("did not get stapled OCSP response");
+		return 1;
+	    }
+	    $DEBUG>=3 && DEBUG("got stapled OCSP response");
+	    my $status = Net::SSLeay::OCSP_response_status($resp);
+	    if ($status != Net::SSLeay::OCSP_RESPONSE_STATUS_SUCCESSFUL()) {
+		$DEBUG>=3 && DEBUG("bad status of stapled OCSP response: ".
+		    Net::SSLeay::OCSP_response_status_str($status));
+		return 1;
+	    }
+	    if (!eval { Net::SSLeay::OCSP_response_verify($ssl,$resp) }) {
+		$DEBUG>=3 && DEBUG("verify of stapled OCSP response failed");
+		return 1;
+	    }
+	    my $cert = $iossl->peer_certificate;
+	    my $certid = $cert && eval { Net::SSLeay::OCSP_cert2ids($ssl,$cert) };
+	    if (!$certid) {
+		$DEBUG>=3 && DEBUG("cannot create OCSP_CERTID: $@");
+		${*$iossl}{_SSL_ocsp_verify} = [-1,$@];
+		return 1;
+	    }
+	    ($status) = Net::SSLeay::OCSP_response_results($resp,$certid);
+	    if ($status && $status->[2]
+		and my $cache = ${*$iossl}{_SSL_ctx}{ocsp_cache} ) {
+		if ($status->[1]) {
+		    $cache->put($certid,{ 
+			%{$status->[2]},
+			error => $status->[1],
+		    });
+		} else {
+		    $cache->put($certid,$status->[2]);
+		}
+	    }
+	    if ($status && !$status->[1]) {
+		$DEBUG>=3 && DEBUG("certificate validated, not revoked");
+		${*$iossl}{_SSL_ocsp_verify} = [1,$status->[2]{nextUpdate}];
+		return 1;
+	    }
+	    $DEBUG>=3 && DEBUG("stapled OCSP response: $status->[1]");
+	    ${*$iossl}{_SSL_ocsp_verify} = [0,$status->[1]];
+	    return 1;
+	});
+    }
+
     if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
 	Net::SSLeay::CTX_set_cipher_list($ctx, $cl )
 	    || return IO::Socket::SSL->error("Failed to set SSL cipher list");
@@ -2133,7 +2298,7 @@ WARN
     }
 
     $self->{context} = $ctx;
-    $self->{has_verifycb} = 1 if $verify_callback;
+    $self->{verify_mode} = $arg_hash->{SSL_verify_mode};
     $DEBUG>=3 && DEBUG( "new ctx $ctx" );
     $CTX_CREATED_IN_THIS_THREAD{$ctx} = 1;
 
@@ -2172,9 +2337,13 @@ sub DESTROY {
 	if ( %CTX_CREATED_IN_THIS_THREAD and
 	    delete $CTX_CREATED_IN_THIS_THREAD{$ctx} ) {
 	    # remove any verify callback for this context
-	    if ( $self->{has_verifycb}) {
+	    if ( $self->{verify_mode}) {
 		$DEBUG>=3 && DEBUG("free ctx $ctx callback" );
 		Net::SSLeay::CTX_set_verify($ctx, 0,undef);
+	    }
+	    if ( $self->{ocsp_error_ref}) {
+		$DEBUG>=3 && DEBUG("free ctx $ctx tlsext_status_cb" );
+		Net::SSLeay::CTX_set_tlsext_status_cb($ctx,undef);
 	    }
 	    $DEBUG>=3 && DEBUG("OK free ctx $ctx" );
 	    Net::SSLeay::CTX_free($ctx);
@@ -2247,6 +2416,187 @@ sub DESTROY {
 }
 
 
+
+package IO::Socket::SSL::OCSP_Cache;
+
+sub new {
+    my ($class,$size) = @_;
+    return bless { 
+	'' => { _lru => 0, size => $size || 100 } 
+    },$class;
+}
+sub get {
+    my ($self,$id) = @_;
+    my $e = $self->{$id} or return;
+    $e->{_lru} = $self->{''}{_lru}++;
+    if ( $e->{nextUpdate} && time()<$e->{nextUpdate} ) {
+	delete $self->{$id};
+	return;
+    }
+    return $e;
+}
+
+sub put {
+    my ($self,$id,$e) = @_;
+    $self->{$id} = $e;
+    $e->{_lru} = $self->{''}{_lru}++;
+    my $del = keys(%$self) - $self->{''}{size};
+    if ($del>0) {
+	my @k = sort { $a->{_lru} <=> $b->{_lru} } keys %$self;
+	delete @{$self}{ splice(@k,0,$del) };
+    }
+    return $e;
+}
+
+package IO::Socket::SSL::OCSP_Resolver;
+*DEBUG = *IO::Socket::SSL::DEBUG;
+
+# create a new resolver
+# $ssl - the ssl object
+# $cache - OCSP_Cache object (put,get)
+# $failhard - flag if we should fail hard on OCSP problems
+# $certs - list of certs to verify
+sub new {
+    my ($class,$ssl,$cache,$failhard,$certs) = @_;
+    my ($error,%todo,$done);
+    for my $cert (@$certs) {
+	# skip entries which have no OCSP uri or where we cannot get a certid
+	# (e.g. self-signed or where we don't have the issuer)
+	my $uri = Net::SSLeay::P_X509_get_ocsp_uri($cert) or do {
+	    $DEBUG>2 && DEBUG("no URI for certificate ".
+		Net::SSLeay::X509_NAME_oneline(Net::SSLeay::X509_get_subject_name($cert)));
+	    next;
+	};
+	my $certid = eval { Net::SSLeay::OCSP_cert2ids($ssl,$cert) } or do {
+	    $DEBUG>2 && DEBUG("no OCSP_CERTID for certificate ".
+		Net::SSLeay::X509_NAME_oneline(Net::SSLeay::X509_get_subject_name($cert)).
+		": $@");
+	    next;
+	};
+	if (!($done = $cache->get($certid))) {
+	    push @{ $todo{$uri}{ids} }, $certid;
+	} elsif ( $done->{error} ) {
+	    # one error is enough to fail validation
+	    $error = $done->{error};
+	    %todo = ();
+	    last;
+	}
+    }
+    while ( my($uri,$v) = each %todo) {
+	my $ids = $v->{ids};
+	$v->{req} = Net::SSLeay::i2d_OCSP_REQUEST(
+	    Net::SSLeay::OCSP_ids2req(@$ids));
+    }
+    $error ||= '' if ! %todo;
+    return bless {
+	ssl => $ssl,
+	cache => $cache,
+	failhard => $failhard,
+	hard_error => $error,
+	soft_error => undef,
+	todo => \%todo,
+    },$class;
+}
+
+# return current result, e.g. '' for no error, else error
+# if undef we have no final result yet
+sub hard_error { return shift->{hard_error} }
+sub soft_error { return shift->{soft_error} }
+
+# return hash with uri => ocsp_request_data for open requests
+sub requests {
+    my $todo = shift()->{todo};
+    return map { ($_,$todo->{$_}{req}) } keys %$todo;
+}
+
+# add new response
+sub add_response {
+    my ($self,$uri,$resp) = @_;
+    my $todo = delete $self->{todo}{$uri};
+    return $self->{error} if ! $todo || $self->{error};
+
+    my ($req,@error,@hard_error);
+
+    # do we have a response
+    if (!$resp) {
+	@error = "request to $uri failed"
+
+    # is it an valid OCSP_RESPONSE
+    } elsif ( ! eval { $resp = Net::SSLeay::d2i_OCSP_RESPONSE($resp) }) {
+	@error = "invalid response (no OCSP_RESPONSE)"
+
+    # is the OCSP response status success
+    } elsif ( 
+	( my $status = Net::SSLeay::OCSP_response_status($resp)) 
+	    != Net::SSLeay::OCSP_RESPONSE_STATUS_SUCCESSFUL() 
+    ){
+	@error = "OCSP response failed: ".
+	    Net::SSLeay::OCSP_response_status_str($status);
+
+    # does nonce match the request and can the signature be verified
+    } elsif ( ! eval { 
+	$req = Net::SSLeay::d2i_OCSP_REQUEST($todo->{req});
+	Net::SSLeay::OCSP_response_verify($self->{ssl},$resp,$req);
+    }) {
+	if (!(@error = $@)) {
+	    my @err;
+	    while ( my $err = Net::SSLeay::ERR_get_error()) {
+		push @error, Net::SSLeay::ERR_error_string($err);
+	    }
+	    @error = 'failed to verify OCSP response' if ! @error;
+	}
+
+    # extract results from response
+    } elsif ( my @result = 
+	Net::SSLeay::OCSP_response_results($resp,@{$todo->{ids}})) {
+	for my $rv (@result) {
+	    $self->{cache}->put($rv->[0],$rv->[2]);
+	    push @hard_error,$rv->[1] if $rv->[1];
+	}
+    } else {
+	@error = "no data in response";
+    }
+
+    Net::SSLeay::OCSP_REQUEST_free($req) if $req;
+    if ($self->{failhard}) {
+	push @hard_error,@error;
+	@error = ();
+    }
+    if (@error) {
+	$self->{error} .= "; " if $self->{error};
+	$self->{error} .= join('; ',@error);
+    }
+    if (@hard_error) {
+	$self->{hard_error} = join('; ',@error);
+	%{$self->{todo}} = ();
+    } elsif ( ! %{$self->{todo}} ) {
+	$self->{hard_error} = ''
+    }
+    return $self->{hard_error};
+}
+
+# make all necessary requests to get OCSP responses blocking
+sub resolve_blocking {
+    my ($self,%args) = @_;
+    my %todo = $self->requests or return $self->{hard_error};
+    eval { require HTTP::Tiny } or die "need HTTP::Tiny installed";
+    # OCSP responses have their own signature, so we don't need SSL verification
+    my $ua = HTTP::Tiny->new(verify_SSL => 0,%args);
+    while (my ($uri,$reqdata) = each %todo) {
+	$DEBUG && DEBUG("sending OCSP request to $uri");
+	my $resp = $ua->request('POST',$uri, {
+	    headers => { 'Content-type' => 'application/ocsp-request' },
+	    content => $reqdata
+	});
+	$DEBUG && DEBUG("got  OCSP response from $uri");
+	defined ($self->add_response($uri,
+	    $resp->{success} && $resp->{content}))
+	    && last;
+    }
+    $DEBUG>=2 && DEBUG("no more open OCSP responses");
+    return $self->{hard_error};
+}
+
 1;
 
 __END__
@@ -2260,7 +2610,7 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
     use strict;
     use IO::Socket::SSL;
 
-    # simple HTTP client -----------------------------------------------
+    # simple HTTP client ------------------------------------------------------
     my $client = IO::Socket::SSL->new(
 	# where to connect
 	PeerHost => "www.example.com",
@@ -2289,7 +2639,7 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
     print $client "GET / HTTP/1.0\r\n\r\n";
     print <$client>;
 
-    # simple server ----------------------------------------------------
+    # simple server ------------------------------------------------------------
     my $server = IO::Socket::SSL->new(
 	# where to listen
 	LocalAddr => '127.0.0.1',
@@ -2306,7 +2656,7 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
     my $client = $server->accept or die
 	"failed to accept or ssl handshake: $!,$SSL_ERROR";
 
-    # Upgrade existing socket to SSL ---------------------------------
+    # Upgrade existing socket to SSL -------------------------------------------
     my $sock = IO::Socket::INET->new('imap.example.com:imap');
     # ... receive greeting, send STARTTLS, receive ok ...
     IO::Socket::SSL->start_SSL($sock,
@@ -2323,7 +2673,44 @@ IO::Socket::SSL -- SSL sockets with IO::Socket interface
     # all data are now SSL encrypted
     print $sock ....
 
-    # use non-blocking socket (BEWARE OF SELECT!) -------------------
+    # check with OCSP for certificate revocation -------------------------------
+    # only available with OpenSSL 1.0.0 or higher
+
+    # default will try OCSP stapling and check only leaf certificate
+    my $client = IO::Socket::SSL->new($dst);
+
+    # better yet: require checking of full chain
+    my $client = IO::Socket::SSL->new(
+	PeerAddr => $dst,
+	SSL_ocsp_mode => SSL_OCSP_FULL_CHAIN,
+    );
+
+    # even better: make OCSP errors fatal
+    # also use common OCSP response cache
+    my $ocsp_cache = IO::Socket::SSL::OCSP_Cache->new;
+    my $client = IO::Socket::SSL->new(
+	PeerAddr => $dst,
+	SSL_ocsp_mode => SSL_OCSP_FULL_CHAIN|SSL_OCSP_FAIL_HARD,
+	SSL_ocsp_cache => $ocsp_cache,
+    );
+
+    # disable OCSP stapling in case server has problems with it
+    my $client = IO::Socket::SSL->new(
+	PeerAddr => $dst,
+	SSL_ocsp_mode => SSL_OCSP_NO_STAPLE,
+    );
+
+    # check any certificates which are not yet checked by OCSP stapling or
+    # where we have already cached results. For your own resolving combine
+    # $ocsp->requests with $ocsp->add_response(uri,response).
+    my $ocsp = $client->ocsp_resolver();
+    my $errors = $ocsp->resolve_blocking();
+    if ($errors) {
+	warn "OCSP verification failed: $errors";
+	close($client);
+    }
+
+    # use non-blocking socket (BEWARE OF SELECT!) ------------------------------
     my $cl = IO::Socket::SSL->new($dst);
     $cl->blocking(0);
     my $sel = IO::Select->new($cl);
@@ -2752,6 +3139,60 @@ If you want to specify the CRL file to be used, set this value to the
 pathname to be used.  This must be used in addition to setting
 SSL_check_crl.
 
+=item SSL_ocsp_mode
+
+Defines how certificate revocation is done using OCSP (Online Status Revocation
+Protocol). The default is to send a request for OCSP stapling to the server and
+if the server sends an OCSP response back the result will be used.
+
+Any other OCSP checking needs to be done manually with C<ocsp_resolver>.
+
+The following flags can be combined with C<|>:
+
+=over 8
+
+=item SSL_OCSP_NO_STAPLE 
+
+Don't ask for OCSP stapling.
+
+=item SSL_OCSP_MUST_STAPLE
+
+Consider it a hard error, if the server does not send a stapled OCSP response
+back. Most servers currently send no stapled OCSP response back.
+
+=item SSL_OCSP_FAIL_HARD 
+
+Fail hard on response errors, default is to fail soft like the browsers do.
+Soft errors mean, that the OCSP response is not usable, e.g. no response, 
+error response, no valid signature etc.
+Certificate revocations inside a verified response are considered hard errors
+in any case.
+
+Soft errors inside a stapled response are never considered hard, e.g. it is
+expected that in this case an OCSP request will be send to the responsible
+OCSP responder.
+
+=item SSL_OCSP_FULL_CHAIN
+
+This will set up the C<ocsp_resolver> so that all certificates from the peer
+chain will be checked, otherwise only the leaf certificate will be checked
+against revocation.
+
+=back
+
+=item SSL_ocsp_cache
+
+With this option a cache can be given for caching OCSP responses, which could
+be shared between different SSL contextes. If not given a cache specific to the
+SSL context only will be used.
+
+You can either create a new cache with
+C<<IO::Socket::SSL::OCSP_Cache->new([size]) >> or implement your own cache,
+which needs to have methods C<put($key,\%entry)> and C<get($key)->\%entry>
+where entry is the hash representation of the OCSP response with fields like
+C<nextUpdate>. The default implementation of the cache will consider responses
+valid as long as C<nextUpdate> is less then the current time.
+
 =item SSL_reuse_ctx
 
 If you have already set the above options for a previous instance of
@@ -3173,6 +3614,71 @@ For calling from C<stop_SSL> C<SSL_fast_shutdown> default to false, e.g. it
 waits for the close_notify of the peer. This is necesarry in case you want to
 downgrade the socket and continue to use it as a plain socket.
 
+=item B<ocsp_resolver>
+
+This will create an OCSP resolver object, which can be used to create OCSP
+requests for the certificates of the SSL connection. Which certificates are
+verified depends on the setting of C<SSL_ocsp_mode>: by default only the leaf
+certificate will be checked, but with SSL_OCSP_FULL_CHAIN all chain
+certificates will be checked.
+
+Because to create an OCSP request the certificate and its issuer certificate
+need to be known it is not possible to check certificates when the trust chain
+is incomplete or if the certificate is self-signed.
+
+The OCSP resolver gets created by calling C<$ssl->ocsp_resolver> and provides
+the following methods:
+
+=over 8
+
+=item hard_error
+
+This returns the hard error when checking the OCSP response.
+Hard errors are certificate revocations. With the C<SSL_ocsp_mode> of
+SSL_OCSP_FAIL_HARD any soft error (e.g. failures to get signed information
+about the certificates) will be considered a hard error too.
+
+The OCSP resolving will stop on the first hard error.
+
+The method will return undef as long as no hard errors occured and still
+requests to be resolved. If all requests got resolved and no hard errors
+occured the method will return C<''>.
+
+=item soft_error
+
+This returns the soft error(s) which occured when asking the OCSP responders.
+
+=item requests
+
+This will return a hash consisting of C<(url,request)>-tuples, e.g. which
+contain the OCSP request string and the URL where it should be sent too. The
+usual way to send such a request is as HTTP POST request with an content-type
+of C<application/ocsp-request> or as a GET request with the base64 and
+url-encoded request is added to the path of the URL.
+
+=item add_response($uri,$response)
+
+This method takes the HTTP body of the response which got received when sending
+the OCSP request to C<$uri>. If no response was received or an error occured
+one should either retry or consider C<$response> as empty which will trigger a
+soft error. 
+
+The method returns the current value of C<hard_error>, e.g. a defined value
+when no more requests need to be done.
+
+=item resolve_blocking(%args)
+
+This combines C<requests> and C<add_response> which L<HTTP::Tiny> to do all
+necessary requests in a blocking way. C<%args> will be given to L<HTTP::Tiny>
+so that you can put proxy settings etc here. L<HTTP::Tiny> will be called with
+C<verify_SSL> of false, because the OCSP responses have their own signatures so
+no extra SSL verification is needed.
+
+If you don't want to use blocking requests you need to roll your own user agent
+with C<requests> and C<add_response>.
+
+=back
+
 =item B<< IO::Socket::SSL->new_from_fd($fd, [mode], %sslargs) >>
 
 This will convert a socket identified via a file descriptor into an SSL socket.
@@ -3310,34 +3816,6 @@ and read/sysread families instead.
 
 =back
 
-=head2 Defaults for Cert, Key and CA
-
-Only if no SSL_key*, no SSL_cert* and no SSL_ca* options are given it will fall
-back to the following builtin defaults:
-
-=over 4
-
-=item SSL_cert_file
-
-Depending on the SSL_server setting it will be either C<certs/server-cert.pem>
-or C<certs/client-cert.pem>.
-
-=item SSL_key_file
-
-Depending on the SSL_server setting it will be either C<certs/server-key.pem>
-or C<certs/client-key.pem>.
-
-=item SSL_ca_file | SSL_ca_path
-
-SSL_ca_file will be set to C<certs/my-ca.pem> if it exists.
-Otherwise SSL_ca_path will be set to C<ca/> if it exists.
-
-=back
-
-B<Please note, that these defaults are depreciated and will be removed in the
-near future>, e.g. you should specify all the certificates and keys you use.
-If you don't specify a CA file or path it will fall back to the system default
-built into OpenSSL.
 
 =head1 ERROR HANDLING
 

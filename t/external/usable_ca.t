@@ -27,26 +27,30 @@ my %ca = IO::Socket::SSL::default_ca();
 plan skip_all => "no default CA store found" if ! %ca;
 
 my %have_ca;
-for my $f (
-    ( $ca{SSL_ca_file} ? ($ca{SSL_ca_file}) : ()),
-    ( $ca{SSL_ca_path} ? glob("$ca{SSL_ca_path}/*") :()),
-    ) {
-    open( my $fh,'<',$f ) or next;
-    my $pem;
-    while (<$fh>) {
-	if ( m{^--+END} ) {
-	    my $cert = PEM_string2cert($pem.$_);
-	    $pem = undef;
-	    $cert or next;
-	    my $hash = Net::SSLeay::X509_subject_name_hash($cert);
-	    $have_ca{sprintf("%08x",$hash)} = 1;
-	} elsif ( m{^--+BEGIN (TRUSTED |X509 |)CERTIFICATE-+} ) {
-	    $pem = $_;
-	} elsif ( $pem ) {
-	    $pem .= $_;
+# some systems seems to have junk in the CA stores
+# so better wrap it into eval
+eval {
+    for my $f (
+	( $ca{SSL_ca_file} ? ($ca{SSL_ca_file}) : ()),
+	( $ca{SSL_ca_path} ? glob("$ca{SSL_ca_path}/*") :()),
+	) {
+	open( my $fh,'<',$f ) or next;
+	my $pem;
+	while (<$fh>) {
+	    if ( m{^--+END} ) {
+		my $cert = PEM_string2cert($pem.$_);
+		$pem = undef;
+		$cert or next;
+		my $hash = Net::SSLeay::X509_subject_name_hash($cert);
+		$have_ca{sprintf("%08x",$hash)} = 1;
+	    } elsif ( m{^--+BEGIN (TRUSTED |X509 |)CERTIFICATE-+} ) {
+		$pem = $_;
+	    } elsif ( $pem ) {
+		$pem .= $_;
+	    }
 	}
     }
-}
+};
 diag( "found ".(0+keys %have_ca)." CA certs");
 plan skip_all => "no CA certs found" if ! %have_ca;
 
