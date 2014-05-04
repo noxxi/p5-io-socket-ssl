@@ -1,3 +1,9 @@
+1.983 2014/05/03
+- fix public suffix handling: ajax.googleapis.com should be ok even if googleapis.com
+  is in public suffix list (e.g. check one level less)
+  #95317, thanks to purification[AT]ukr[DOT]net
+- usable_ca.t - update fingerprints after heartbleed attack
+- usable_ca.t - make sure we have usable CA for tested hosts in CA store
 1.982 2014/04/24
 - fix for using subroutine as argument to set_args_filter_hack
 1.981 2014/04/08

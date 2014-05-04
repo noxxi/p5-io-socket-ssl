@@ -9,19 +9,23 @@ if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
 }
 
 my @tests = qw(
-    fail:www.com
+    fail:com
+    fail:googleapis.com
+    ok:ajax.googleapis.com
+    ok:google.com
     ok:www.bar.com
     ok:www.foo.bar.com
     ok:www.foo.co.uk
-    fail:www.co.uk
-    ok:www.foo.bl.uk
+    fail:co.uk
+    ok:bl.uk
     ok:www.bl.uk
     fail:bar.kobe.jp
-    fail:www.bar.kobe.jp
+    ok:foo.bar.kobe.jp
     ok:www.foo.bar.kobe.jp
-    fail:city.kobe.jp
+    ok:city.kobe.jp
     ok:www.city.kobe.jp
-    fail:foo.nodomain
+    fail:nodomain
+    ok:foo.nodomain
     ok:www.foo.nodomain
 );
 

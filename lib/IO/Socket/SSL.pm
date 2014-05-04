@@ -21,7 +21,7 @@ use Errno qw( EAGAIN ETIMEDOUT );
 use Carp;
 use strict;
 
-our $VERSION = '1.982';
+our $VERSION = '1.983';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -1399,7 +1399,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 		    if ! defined $publicsuffix;
 		return 1 if $publicsuffix eq '';
 		my @labels = split( m{\.+}, $identity );
-		my $tld = $publicsuffix->public_suffix(\@labels,+1);
+		my $tld = $publicsuffix->public_suffix(\@labels,+0);
 		return 1 if @labels > ( $tld ? 0+@$tld : 1 );
 	    }
 	    return;
