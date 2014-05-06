@@ -75,7 +75,7 @@ for my $host (@ARGV) {
     my ($ip,$port);
     $host =~m{^(?:\[(.+)\]|([^:]+))(?::(\w+))?$} or die "invalid dst: $host";
     $host = $1||$2;
-    $port = $3 || $stls ? $starttls{$stls}[0] : 443;
+    $port = $3 || ( $stls ? $starttls{$stls}[0] : 443 );
     if ( $host =~m{:|^[\d\.]+$} ) {
 	$ip = $host;
 	$host = undef;
@@ -121,7 +121,7 @@ for my $test (@tests) {
 	SSLv23:!TLSv1_2
 	SSLv23
     )) {
-	for my $ciphers ( '','ALL' ) {
+	for my $ciphers ( '','HIGH:ALL' ) {
 	    my $cl = &$tcp_connect;
 	    if ( IO::Socket::SSL->start_SSL($cl,
 		SSL_version => $v,
@@ -264,31 +264,64 @@ for my $test (@tests) {
     }
 
     # check out all supported ciphers
-    my @all_ciphers;
-    if ($all_ciphers) {
-	my $c = 'ALL';
-	while (1) {
+    my @ciphers;
+    {
+	my $c = 'HIGH:ALL:eNULL';
+	while ($all_ciphers || @ciphers<2 ) {
 	    my $cl = &$tcp_connect;
 	    if ( IO::Socket::SSL->start_SSL($cl, %conf,
 		SSL_verify_mode => 0,
 		SSL_ocsp_mode => 0,
 		SSL_cipher_list => $c,
 	    )) {
-		push @all_ciphers, [ $cl->get_sslversion, $cl->get_cipher ];
-		$c .= ":!".$all_ciphers[-1][1];
+		push @ciphers, [ $cl->get_sslversion, $cl->get_cipher ];
+		$c .= ":!".$ciphers[-1][1];
 		VERBOSE(2,"connect with version %s cipher %s",
-		    @{$all_ciphers[-1]});
+		    @{$ciphers[-1]});
 	    } else {
+		VERBOSE(3,"handshake failed with $c: $SSL_ERROR");
 		last;
 	    }
 	}
     }
+
+    # try to detect if the server accepts our cipher order by trying two
+    # ciphers in different order
+    my $server_cipher_order;
+    if (@ciphers>=2) {
+	my %used_cipher;
+	for( "$ciphers[0][1]:$ciphers[1][1]","$ciphers[1][1]:$ciphers[0][1]" ) {
+	    my $cl = &$tcp_connect;
+	    if ( IO::Socket::SSL->start_SSL($cl,
+		SSL_version => $use_version,
+		SSL_verify_mode => 0,
+		SSL_hostname => '',
+		SSL_cipher_list => $_,
+	    )) {
+		$used_cipher{$cl->get_cipher}++;
+	    } else {
+		warn "failed to SSL handshake with SSL_cipher_list=$_: $SSL_ERROR";
+	    }
+	}
+	if (keys(%used_cipher) == 2) {
+	    VERBOSE(2,"client decides cipher order");
+	    $server_cipher_order = 0;
+	} elsif ( (values(%used_cipher))[0] == 2 ) {
+	    VERBOSE(2,"server decides cipher order");
+	    $server_cipher_order = 1;
+	}
+    }
+
 
     # summary
     print "-- $host port $port".($stls? " starttls $stls":"")."\n";
     print " ! $_\n" for(@problems);
     print " * maximum SSL version  : $version ($use_version)\n";
     print " * preferred cipher     : $cipher\n";
+    print " * cipher order by      : ".(
+	! defined $server_cipher_order ? "unknown\n" :
+	$server_cipher_order ? "server\n" : "client\n"
+    );
     print " * SNI supported        : $sni_status\n" if $sni_status;
     print " * certificate verified : $verify_status\n";
     for(my $i=0;$i<@cert_chain;$i++) {
@@ -297,9 +330,9 @@ for my $test (@tests) {
     }
     print " * OCSP stapling        : $ocsp_staple\n" if $ocsp_staple;
     print " * OCSP status          : $ocsp_status\n" if $ocsp_status;
-    if (@all_ciphers) {
+    if ($all_ciphers) {
 	print " * supported ciphers\n";
-	for(@all_ciphers) {
+	for(@ciphers) {
 	    printf "   * %6s %s\n",@$_;
 	}
     }
