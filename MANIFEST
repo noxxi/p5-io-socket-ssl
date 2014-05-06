@@ -59,5 +59,4 @@ t/sysread_write.t
 t/testlib.pl
 t/verify_fingerprint.t
 t/verify_hostname.t
-util/export_certs.pl
 util/analyze-ssl.pl
