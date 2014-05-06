@@ -114,14 +114,14 @@ for my $test (@tests) {
 
     # basic connects without verification or any TLS extensions (SNI, OCSP)
     # find out usable version and ciphers
-    my ($version,$cipher);
+    my ($use_version,$version,$cipher);
     BASE: for my $v (qw(
 	SSLv23:!TLSv1_2:!TLSv1_1:!TLSv1
-	SSLv23:!TLSv1_1:!TLSv1
-	SSLv23:!TLSv1
+	SSLv23:!TLSv1_2:!TLSv1_1
+	SSLv23:!TLSv1_2
 	SSLv23
     )) {
-	for my $ciphers ( 'ALL','' ) {
+	for my $ciphers ( '','ALL' ) {
 	    my $cl = &$tcp_connect;
 	    if ( IO::Socket::SSL->start_SSL($cl,
 		SSL_version => $v,
@@ -129,6 +129,7 @@ for my $test (@tests) {
 		SSL_hostname => '',
 		SSL_cipher_list => $ciphers,
 	    )) {
+		$use_version = $v;
 		$version = $cl->get_sslversion();
 		$cipher = $cl->get_cipher();
 		VERBOSE(2,"version $v no verification, ciphers=$ciphers, no TLS extensions -> $version,$cipher");
@@ -286,7 +287,7 @@ for my $test (@tests) {
     # summary
     print "-- $host port $port".($stls? " starttls $stls":"")."\n";
     print " ! $_\n" for(@problems);
-    print " * maximum SSL version  : $version\n";
+    print " * maximum SSL version  : $version ($use_version)\n";
     print " * preferred cipher     : $cipher\n";
     print " * SNI supported        : $sni_status\n" if $sni_status;
     print " * certificate verified : $verify_status\n";
