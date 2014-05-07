@@ -121,14 +121,22 @@ my %DEFAULT_SSL_CLIENT_ARGS = (
     )
 );
 
-my %DEFAULT_SSL_SERVER_ARGS = (
-    %DEFAULT_SSL_ARGS,
-    SSL_verify_mode => SSL_VERIFY_NONE,
-    SSL_honor_cipher_order => 1,   # trust server to know the best cipher
-    SSL_dh => do {
-	my $bio = Net::SSLeay::BIO_new(Net::SSLeay::BIO_s_mem());
-	# generated with: openssl dhparam 2048
-	Net::SSLeay::BIO_write($bio,<<'DH');
+# dh handles are unique per process setting this at BEGIN time causes compiled
+# code to break because BEGIN time state is frozen.
+# Cannot use a compile-time variable here because the Net::SSLeay handle $dh
+# needs to be initialized at INIT time, not compile-time. perlcc code cannot
+# use a compile-time handle from Net::SSLeay.
+{
+	my $dh_cache;
+	INIT {
+		undef $dh_cache;
+	}
+	
+	sub get_SSL_dh {
+		return $dh_cache if $dh_cache;
+		my $bio = Net::SSLeay::BIO_new(Net::SSLeay::BIO_s_mem());
+		# generated with: openssl dhparam 2048
+		Net::SSLeay::BIO_write($bio,<<'DH');
 -----BEGIN DH PARAMETERS-----
 MIIBCAKCAQEAr8wskArj5+1VCVsnWt/RUR7tXkHJ7mGW7XxrLSPOaFyKyWf8lZht
 iSY2Lc4oa4Zw8wibGQ3faeQu/s8fvPq/aqTxYmyHPKCMoze77QJHtrYtJAosB9SY
@@ -138,14 +146,23 @@ Ps2vlkxjAHjJcqc3O+OiImKik/X2rtBTZjpKmzN3WWTB0RJZCOWaLlDO81D01o1E
 aZecz3Np9KIYey900f+X7zC2bJxEHp95ywIBAg==
 -----END DH PARAMETERS-----
 DH
-	my $dh = Net::SSLeay::PEM_read_bio_DHparams($bio);
-	Net::SSLeay::BIO_free($bio);
-	$dh or die "no DH";
-	$dh;
-    },
-    $can_ecdh ? ( SSL_ecdh_curve => 'prime256v1' ):(),
+		my $dh_cache = Net::SSLeay::PEM_read_bio_DHparams($bio);
+		Net::SSLeay::BIO_free($bio);
+		$dh_cache or die "no DH";
+		return $dh_cache;
+		
+	}
+}
+sub DEFAULT_SSL_SERVER_ARGS {
+	return (
+	    %DEFAULT_SSL_ARGS,
+	    SSL_verify_mode => SSL_VERIFY_NONE,
+	    SSL_honor_cipher_order => 1,   # trust server to know the best cipher
+	    SSL_dh => get_SSL_dh(),
+	    $can_ecdh ? ( SSL_ecdh_curve => 'prime256v1' ):(),
 
-);
+	);
+};
 
 # global defaults which can be changed using set_defaults
 # either key/value can be set or it can just be set to an external hash
@@ -1618,7 +1635,7 @@ sub set_args_filter_hack {
 	$FILTER_SSL_ARGS = sub {
 	    my ($is_server,$args) = @_;
 	    %$args = ( %$args, $is_server
-		? ( %DEFAULT_SSL_SERVER_ARGS, %$GLOBAL_SSL_SERVER_ARGS )
+		? ( DEFAULT_SSL_SERVER_ARGS(), %$GLOBAL_SSL_SERVER_ARGS )
 		: ( %DEFAULT_SSL_CLIENT_ARGS, %$GLOBAL_SSL_CLIENT_ARGS )
 	    );
 	}
@@ -1750,7 +1767,7 @@ sub new {
     # add library defaults
     %$arg_hash = (
 	SSL_use_cert => $is_server,
-	$is_server ? %DEFAULT_SSL_SERVER_ARGS : %DEFAULT_SSL_CLIENT_ARGS,
+	$is_server ? IO::Socket::SSL::DEFAULT_SSL_SERVER_ARGS() : %DEFAULT_SSL_CLIENT_ARGS,
 	%$arg_hash
     );
 
