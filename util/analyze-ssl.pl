@@ -10,7 +10,7 @@ my $ocsp_cache = $can_ocsp && IO::Socket::SSL::OCSP_Cache->new;
 
 my %starttls = (
     'smtp' => [ 25, \&smtp_starttls ],
-    'http_proxy' => [ 8000, \&http_connect ],
+    'http_proxy' => [ 443, \&http_connect ],
     'http_upgrade' => [ 80, \&http_upgrade ],
     'imap' => [ 143, \&imap_starttls ],
     'pop'  => [ 110, \&pop_stls ],
@@ -64,6 +64,12 @@ Options:
 			   (imap,smtp,http_upgrade,http_proxy,pop,ftp,postgresql)
   -T|--timeout T         - use timeout (default 10)
 
+Examples:
+
+  $0 --show-chain --all-ciphers -v3 www.live.com:443
+  $0 --starttls http_proxy:proxy_host:proxy_port www.live.com:443
+  $0 --starttls imap mail.gmx.de
+
 USAGE
     exit(2);
 }
@@ -93,16 +99,18 @@ for my $test (@tests) {
     my $tcp_connect = sub {
 	my $tries = shift || 1;
 	my ($cl,$error);
+	my %ioargs = (
+	    PeerAddr => $host,
+	    PeerPort => $port,
+	    Timeout => $timeout,
+	);
 	for(1..$tries) {
-	    if ( $cl = $ioclass->new(
-		PeerAddr => $host,
-		PeerPort => $port,
-		Timeout => $timeout,
-	    )) {
-		last if !$stls_sub;
-		last if eval { $stls_sub->($cl,$stls_arg) };
-		$error = "starttls: $@" || 'starttls error';
+	    if ($stls_sub) {
+		last if $cl = eval { $stls_sub->(\%ioargs,$stls_arg) };
+		$error = $@ || 'starttls error';
 		$cl = undef;
+	    } elsif ( $cl = $ioclass->new(%ioargs)) {
+		last;
 	    } else {
 		$error = "tcp connect: $!";
 	    }
@@ -259,7 +267,7 @@ for my $test (@tests) {
 	    $ocsp_status = "FAIL: $errors";
 	}
 	if (my $soft_error = $ocsp_resolver->soft_error) {
-	    $ocsp_status .= " ($soft_error)"
+	    $ocsp_status .= " (soft error: $soft_error)"
 	}
     }
 
@@ -352,11 +360,11 @@ sub smtp_starttls {
     ($line,$code) = _readlines($cl,$last_status_line);
     $code == 2 or die "server did not accept STARTTLS: $line\n";
     VERBOSE(3,"...reply to starttls: $line");
-    return 1;
+    return $cl;
 }
 
 sub imap_starttls {
-    my $cl = shift;
+    my $cl = $ioclass->new(%{shift()}) or die "tcp connect: $!";
     <$cl>; # welcome
     print $cl "abc STARTTLS\r\n";
     while (<$cl>) {
@@ -364,37 +372,44 @@ sub imap_starttls {
 	$1 or die "STARTTLS failed: $_";
 	s{\r?\n$}{};
 	VERBOSE(3,"...starttls: $_");
-	return 1;
+	return $cl;
     }
     die "starttls failed";
 }
 
 sub pop_stls {
-    my $cl = shift;
+    my $cl = $ioclass->new(%{shift()}) or die "tcp connect: $!";
     <$cl>; # welcome
     print $cl "STLS\r\n";
     my $reply = <$cl>;
     die "STLS failed: $reply" if $reply !~m{^\+OK};
     $reply =~s{\r?\n}{};
     VERBOSE(3,"...stls $reply");
-    return 1;
+    return $cl;
 }
 
 sub http_connect {
-    my $cl = shift;
-    $stls_arg or die "no target host:port given";
-    print $cl "CONNECT $stls_arg HTTP/1.0\r\n\r\n";
+    my ($ioargs,$proxy) = @_;
+    $proxy or die "no proxy host:port given";
+    $proxy =~m{^(?:\[(.+)\]|([^:]+)):(\w+)$} or die "invalid dst: $proxy";
+    my $cl = $ioclass->new( %$ioargs,
+	PeerAddr => $1||$2,
+	PeerPort => $3,
+    ) or die "tcp connect: $!";
+    print $cl "CONNECT $ioargs->{PeerAddr}:$ioargs->{PeerPort} HTTP/1.0\r\n\r\n";
     my $hdr = _readlines($cl,qr/\r?\n/);
     $hdr =~m{\A(HTTP/1\.[01]\s+(\d\d\d)[^\r\n]*)};
     die "CONNECT failed: $1" if $2 != 200;
     VERBOSE(3,"...connect request: $1");
-    return 1;
+    return $cl;
 }
 
 sub http_upgrade {
-    my ($cl,$hostname) = @_;
+    my ($ioargs,$arg) = @_;
+    my $hostname = $ioargs->{PeerAddr};
+    my $cl = $ioclass->new(%$ioargs) or die "tcp connect: $!";
     my $rq;
-    if ( $stls_arg && $stls_arg =~m{^get(?:=(\S+))?}i ) {
+    if ( $arg && $arg =~m{^get(?:=(\S+))?}i ) {
 	my $path = $1 || '/';
 	$rq = "GET $path HTTP/1.1\r\n".
 	    "Host: $hostname\r\n".
@@ -402,7 +417,7 @@ sub http_upgrade {
 	    "Connection: Upgrade\r\n".
 	    "\r\n";
     } else {
-	my $path = $stls_arg && $stls_arg =~m{^options=(\S+)}i
+	my $path = $arg && $arg =~m{^options=(\S+)}i
 	    ? $1:'*';
 	$rq = "OPTIONS $path HTTP/1.1\r\n".
 	    "Host: $hostname\r\n".
@@ -415,11 +430,11 @@ sub http_upgrade {
     $hdr =~m{\A(HTTP/1\.[01]\s+(\d\d\d)[^\r\n]*)};
     die "upgrade not accepted, code=$2 (expect 101): $1" if $2 != 101;
     VERBOSE(3,"...tls upgrade request: $1");
-    return 1;
+    return $cl;
 }
 
 sub ftp_auth {
-    my $cl = shift;
+    my $cl = $ioclass->new(%{shift()}) or die "tcp connect: $!";
     my $last_status_line = qr/((\d)\d\d(?:\s.*)?)/;
     my ($line,$code) = _readlines($cl,$last_status_line);
     die "server denies access: $line\n" if $code != 2;
@@ -427,18 +442,18 @@ sub ftp_auth {
     ($line,$code) = _readlines($cl,$last_status_line);
     die "AUTH TLS denied: $line\n" if $code != 2;
     VERBOSE(3,"...ftp auth: $line");
-    return 1;
+    return $cl;
 }
 
 sub postgresql_init {
-    my $cl = shift;
+    my $cl = $ioclass->new(%{shift()}) or die "tcp connect: $!";
     # magic header to initiate SSL:
     # http://www.postgresql.org/docs/devel/static/protocol-message-formats.html
     print $cl pack("NN",8,80877103);
     read($cl, my $buf,1 ) or die "did not get response from postgresql";
     $buf eq 'S' or die "postgresql does not support SSL (response=$buf)";
     VERBOSE(3,"...postgresql supports SSL: $buf");
-    return 1;
+    return $cl;
 }
 
 sub _readlines {

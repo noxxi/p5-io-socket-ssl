@@ -2563,8 +2563,8 @@ sub add_response {
 	@error = ();
     }
     if (@error) {
-	$self->{error} .= "; " if $self->{error};
-	$self->{error} .= join('; ',@error);
+	$self->{soft_error} .= "; " if $self->{soft_error};
+	$self->{soft_error} .= join('; ',@error);
     }
     if (@hard_error) {
 	$self->{hard_error} = join('; ',@error);
@@ -2588,7 +2588,7 @@ sub resolve_blocking {
 	    headers => { 'Content-type' => 'application/ocsp-request' },
 	    content => $reqdata
 	});
-	$DEBUG && DEBUG("got  OCSP response from $uri");
+	$DEBUG && DEBUG("got  OCSP response from $uri code=$resp->{code}");
 	defined ($self->add_response($uri,
 	    $resp->{success} && $resp->{content}))
 	    && last;
