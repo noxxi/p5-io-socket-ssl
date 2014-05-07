@@ -278,7 +278,7 @@ Index: SSLeay.xs
       ASN1_TIME *s
  
  ASN1_TIME *
-@@ -5074,6 +5275,311 @@
+@@ -5074,6 +5275,312 @@
  
  #endif
  
@@ -446,15 +446,16 @@ Index: SSLeay.xs
 +
 +
 +int
-+SSL_OCSP_response_verify(ssl,rsp,req=NULL,flags=0)
++SSL_OCSP_response_verify(ssl,rsp,svreq=NULL,flags=0)
 +	SSL *ssl
 +	OCSP_RESPONSE *rsp
-+	OCSP_REQUEST *req
++	SV *svreq
 +	unsigned long flags
 +    CODE:
 +	SSL_CTX *ctx;
 +	X509_STORE *store;
 +	OCSP_BASICRESP *bsr;
++	OCSP_REQUEST *req = NULL;
 +	int i;
 +
 +	if (!ssl) croak("not a SSL object");
@@ -466,8 +467,8 @@ Index: SSLeay.xs
 +
 +	/* if we get a nonce it should match our nonce, if we get no nonce
 +	 * it was probably pre-signed */
-+	if (req) {
-+	TRACE(1,"need to check none");
++	if (svreq && SvOK(svreq) &&
++	    (req = INT2PTR(OCSP_REQUEST*,SvIV(svreq)))) {
 +	    i = OCSP_check_nonce(req,bsr);
 +	    if ( i <= 0 ) {
 +		if (i == -1) {
@@ -829,7 +830,7 @@ Index: t/external/ocsp.t
 ===================================================================
 --- t/external/ocsp.t	(revision 0)
 +++ t/external/ocsp.t	(working copy)
-@@ -0,0 +1,228 @@
+@@ -0,0 +1,231 @@
 +#!/usr/bin/perl
 +
 +use strict;
@@ -837,6 +838,8 @@ Index: t/external/ocsp.t
 +use Test::More;
 +use IO::Socket::INET;
 +use Net::SSLeay;
++
++#$Net::SSLeay::trace=3;
 +
 +my @tests = (
 +    {
@@ -850,13 +853,13 @@ Index: t/external/ocsp.t
 +	# no OCSP stapling yet
 +	host => 'www.google.com',
 +	port => 443,
-+	fingerprint => 'c0019e434cc04dc9086a6e63c8ecf74781e4f4a0',
++	fingerprint => '007a5ab302f14446e2ea24d3a829de22ba1bf950',
 +    },
 +    {
 +	# this is revoked
 +	host => 'revoked.grc.com',
 +	port => 443,
-+	fingerprint => '...',
++	fingerprint => '34703c40093461ad3ce087e161c7b7f42abe770c',
 +	expect_error => qr/revoked/,
 +    },
 +);
@@ -890,7 +893,7 @@ Index: t/external/ocsp.t
 +	my $ssl = Net::SSLeay::new($ctx) or die "failed to create SSL";
 +
 +	# enable verification with hopefully usable CAs
-+	SSL_CTX_set_default_verify_paths($ctx);
++	Net::SSLeay::CTX_set_default_verify_paths($ctx);
 +	Net::SSLeay::CTX_load_verify_locations($ctx,
 +	    Mozilla::CA::SSL_ca_file(),'')
 +	    if eval { require Mozilla::CA };
@@ -903,8 +906,9 @@ Index: t/external/ocsp.t
 +	Net::SSLeay::CTX_set_tlsext_status_cb($ctx,sub {
 +	    my ($ssl,$resp) = @_;
 +	    diag("got ".($resp ? '':'no ')."stapled OCSP response");
-+	    return if ! $resp;
++	    return 1 if ! $resp;
 +	    $stapled_response = Net::SSLeay::i2d_OCSP_RESPONSE($resp);
++	    return 1;
 +	});
 +
 +	# non-blocking SSL_connect with timeout
@@ -934,13 +938,13 @@ Index: t/external/ocsp.t
 +	my $fp = $leaf_cert 
 +	    && unpack("H*",Net::SSLeay::X509_digest($leaf_cert,$sha1));
 +	skip "could not get fingerprint",1 if !$fp;
-+	skip "bad fingerprint for $test->{host}:$test->{port}",1
++	skip "bad fingerprint $fp for $test->{host}:$test->{port}",1
 +	    if $fp ne $test->{fingerprint};
 +	diag("fingerprint matches");
 +
 +	if ( $test->{ocsp_staple} && ! $stapled_response ) {
 +	    fail("did not get expected stapled OCSP response on $test->{host}:$test->{port}");
-+	    next;
++	    next TEST;
 +	}
 +
 +	# create OCSP_REQUEST for all certs
@@ -950,7 +954,7 @@ Index: t/external/ocsp.t
 +		Net::SSLeay::X509_get_subject_name($cert));
 +	    my $uri = Net::SSLeay::P_X509_get_ocsp_uri($cert);
 +	    if (!$uri) {
-+		fail("no OCSP URI for cert $subj");
++		diag("no OCSP URI for cert $subj");
 +		next;
 +	    }
 +	    my $id = eval { Net::SSLeay::OCSP_cert2ids($ssl,$cert) } or do {
@@ -962,7 +966,7 @@ Index: t/external/ocsp.t
 +	    $cleanup->add(sub { Net::SSLeay::OCSP_REQUEST_free($req) });
 +	}
 +	if (!@requests) {
-+	    fail("no certificates for $test->{host}:$test->{port}");
++	    fail("no certificate checks for $test->{host}:$test->{port}");
 +	    next TEST;
 +	}
 +
@@ -974,19 +978,19 @@ Index: t/external/ocsp.t
 +		return undef;
 +	    } elsif ( ! eval { 
 +		Net::SSLeay::OCSP_response_verify($ssl,$resp,$req) }) {
-+		return [ -1,"cannot verify response: $@" ];
++		return [ undef,"cannot verify response: $@" ];
 +	    }
 +	    # extract result for id 
 +	    my ($status) = Net::SSLeay::OCSP_response_results($resp,$id);
-+	    return [ -1, "no data for cert in response: $status->[1]" ]
++	    return [ undef,"no data for cert in response: $status->[1]" ]
 +		if ! $status->[2];
 +	    if ($expect_error) {
-+		return [ -1,
++		return [ undef,
 +		    "unexpected error (expected $expect_error): $status->[1]" ]
 +		    if !$status->[1] or $status->[1] !~ $expect_error;
 +		diag("expected error: $status->[1]");
 +	    } elsif ($status->[1]) {
-+		return [ -1, "unexpected error: $status->[1]" ]
++		return [ undef, "unexpected error: $status->[1]" ]
 +	    } else {
 +		diag("expected good: nextUpd=".localtime($status->[2]{nextUpdate}));
 +	    }
@@ -998,9 +1002,9 @@ Index: t/external/ocsp.t
 +		Net::SSLeay::d2i_OCSP_RESPONSE($stapled_response),
 +		undef, # no OCSP_REQUEST
 +		$requests[0][2], # stapled response is for the leaf certificate
-+		$test->{expected_error}
++		$test->{expect_error}
 +	    );
-+	    if ($stat->[0] == -1) {
++	    if (!$stat->[0]) {
 +		fail($stat->[1]);
 +		next TEST;
 +	    }
@@ -1026,7 +1030,7 @@ Index: t/external/ocsp.t
 +		diag("$http_ua->{reason}: skip checking $uri | $subj");
 +		next;
 +	    }
-+	    my $resp = eval { d2i_OCSP_RESPONSE($res->{content}) };
++	    my $resp = eval { Net::SSLeay::d2i_OCSP_RESPONSE($res->{content}) };
 +	    if (!$resp) {
 +		diag("bad OCSP response($@): skip checking $uri | $subj");
 +		next;
@@ -1035,9 +1039,9 @@ Index: t/external/ocsp.t
 +		$resp,
 +		$req,
 +		$id,
-+		($i>0) ? undef:$test->{expected_error},
++		($i>0) ? undef:$test->{expect_error},
 +	    );
-+	    if ($stat->[0] == -1) {
++	    if (!$stat->[0]) {
 +		fail($stat->[1]);
 +		next TEST;
 +	    }
