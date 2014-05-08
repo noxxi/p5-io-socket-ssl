@@ -37,6 +37,7 @@ t/core.t
 t/dhe.t
 t/ecdhe.t
 t/external/usable_ca.t
+t/external/ocsp.t
 t/io-socket-inet6.t
 t/io-socket-ip.t
 t/memleak_bad_handshake.t

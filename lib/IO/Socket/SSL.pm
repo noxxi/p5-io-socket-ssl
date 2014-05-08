@@ -322,10 +322,8 @@ BEGIN {
 	}
 	return %default_ca if defined $ca_detected;
 
-	$openssldir ||= eval {
-	    require Net::SSLeay;
-	    Net::SSLeay::SSLeay_version(5) =~m{^OPENSSLDIR: "(.+)"$} && $1 || '';
-	};
+	$openssldir ||= Net::SSLeay::SSLeay_version(5)
+	    =~m{^OPENSSLDIR: "(.+)"$} && $1 || '';
 
 	# (re)detect according to openssl crypto/cryptlib.h
 	my $dir = $ENV{SSL_CERT_DIR}
@@ -2466,19 +2464,19 @@ package IO::Socket::SSL::OCSP_Resolver;
 # $certs - list of certs to verify
 sub new {
     my ($class,$ssl,$cache,$failhard,$certs) = @_;
-    my ($error,%todo,$done);
+    my ($error,%todo,$done,@soft_error);
     for my $cert (@$certs) {
 	# skip entries which have no OCSP uri or where we cannot get a certid
 	# (e.g. self-signed or where we don't have the issuer)
+	my $subj = Net::SSLeay::X509_NAME_oneline(Net::SSLeay::X509_get_subject_name($cert));
 	my $uri = Net::SSLeay::P_X509_get_ocsp_uri($cert) or do {
-	    $DEBUG>2 && DEBUG("no URI for certificate ".
-		Net::SSLeay::X509_NAME_oneline(Net::SSLeay::X509_get_subject_name($cert)));
+	    $DEBUG>2 && DEBUG("no URI for certificate $subj");
+	    push @soft_error,"no ocsp_uri for $subj";
 	    next;
 	};
 	my $certid = eval { Net::SSLeay::OCSP_cert2ids($ssl,$cert) } or do {
-	    $DEBUG>2 && DEBUG("no OCSP_CERTID for certificate ".
-		Net::SSLeay::X509_NAME_oneline(Net::SSLeay::X509_get_subject_name($cert)).
-		": $@");
+	    $DEBUG>2 && DEBUG("no OCSP_CERTID for certificate $subj: $@");
+	    push @soft_error,"no certid for $subj: $@";
 	    next;
 	};
 	if (!($done = $cache->get($certid))) {
@@ -2501,7 +2499,7 @@ sub new {
 	cache => $cache,
 	failhard => $failhard,
 	hard_error => $error,
-	soft_error => undef,
+	soft_error => @soft_error ? join("; ",@soft_error) : undef,
 	todo => \%todo,
     },$class;
 }

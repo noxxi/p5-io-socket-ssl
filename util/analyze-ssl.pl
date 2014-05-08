@@ -43,8 +43,8 @@ GetOptions(
 @ARGV or usage("no hosts given");
 my %default_ca =
     ! $capath ? () :
-    ! -d $capath ? ( SSL_ca_path => $capath, SSL_ca_file => '' ) :
-    ! -f $capath ? ( SSL_ca_file => $capath, SSL_ca_path => '' ) :
+    -d $capath ? ( SSL_ca_path => $capath, SSL_ca_file => '' ) :
+    -f $capath ? ( SSL_ca_file => $capath, SSL_ca_path => '' ) :
     die "no such file or dir: $capath";
 die "need Net::SSLeay>=1.58 for showing chain" if $show_chain
     && ! defined &IO::Socket::SSL::peer_certificates;
@@ -367,7 +367,7 @@ for my $test (@tests) {
 
 
 sub smtp_starttls {
-    my $cl = shift;
+    my $cl = $ioclass->new(%{shift()}) or die "tcp connect: $!";
     my $last_status_line = qr/((\d)\d\d(?:\s.*)?)/;
     my ($line,$code) = _readlines($cl,$last_status_line);
     $code == 2 or die "server denies access: $line\n";
