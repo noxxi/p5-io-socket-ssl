@@ -2,6 +2,7 @@ use strict;
 use warnings;
 use Socket;
 use IO::Socket::SSL 1.984;
+use IO::Socket::SSL::Utils;
 use Getopt::Long qw(:config posix_default bundling);
 
 
@@ -24,6 +25,7 @@ my ($stls,$stls_arg);
 my $capath;
 my $all_ciphers;
 my $show_chain;
+my $dump_chain;
 GetOptions(
     'h|help' => sub { usage() },
     'v|verbose:1' => \$verbose,
@@ -31,6 +33,7 @@ GetOptions(
     'T|timeout=i' => \$timeout,
     'CApath=s' => \$capath,
     'show-chain' => \$show_chain,
+    'dump-chain' => \$dump_chain,
     'all-ciphers' => \$all_ciphers,
     'starttls=s' => sub {
 	($stls,$stls_arg) = $_[1] =~m{^(\w+)(?::(.*))?$};
@@ -60,6 +63,7 @@ Options:
   --CApath file|dir      - use given dir|file instead of system default CA store
   --all-ciphers          - find out all supported ciphers
   --show-chain           - show certificate chain
+  --dump_chain           - dump certificate chain, e.g. all certificates as PEM
   --starttls proto[:arg] - start plain and upgrade to SSL with starttls protocol
 			   (imap,smtp,http_upgrade,http_proxy,pop,ftp,postgresql)
   -T|--timeout T         - use timeout (default 10)
@@ -187,7 +191,7 @@ for my $test (@tests) {
 
     # get chain info
     my @cert_chain;
-    if ($show_chain) {
+    if ($show_chain || $dump_chain) {
 	my $cl = &$tcp_connect;
 	if ( IO::Socket::SSL->start_SSL($cl, %conf,
 	    SSL_verify_mode => 0
@@ -200,7 +204,12 @@ for my $test (@tests) {
 		    $bits = eval { Net::SSLeay::EVP_PKEY_bits($pkey) };
 		    Net::SSLeay::EVP_PKEY_free($pkey);
 		}
-		push @cert_chain,[$bits||'???',$subject]
+		push @cert_chain,[
+		    $bits||'???',
+		    $subject,
+		    join('|',@{ CERT_asHash($cert)->{ocsp_uri} ||  []}),
+		    PEM_cert2string($cert),
+		],
 	    }
 	} else {
 	    die "failed to connect with previously successful config: $SSL_ERROR";
@@ -332,9 +341,11 @@ for my $test (@tests) {
     );
     print " * SNI supported        : $sni_status\n" if $sni_status;
     print " * certificate verified : $verify_status\n";
-    for(my $i=0;$i<@cert_chain;$i++) {
-	my $c = $cert_chain[$i];
-	print "   * [$i] bits=$c->[0],$c->[1]\n"
+    if ($show_chain) {
+	for(my $i=0;$i<@cert_chain;$i++) {
+	    my $c = $cert_chain[$i];
+	    print "   * [$i] bits=$c->[0], ocsp_uri=$c->[2], $c->[1]\n"
+	}
     }
     print " * OCSP stapling        : $ocsp_staple\n" if $ocsp_staple;
     print " * OCSP status          : $ocsp_status\n" if $ocsp_status;
@@ -342,6 +353,13 @@ for my $test (@tests) {
 	print " * supported ciphers\n";
 	for(@ciphers) {
 	    printf "   * %6s %s\n",@$_;
+	}
+    }
+    if ($dump_chain) {
+	print "---------------------------------------------------------------\n";
+	for(my $i=0;$i<@cert_chain;$i++) {
+	    my $c = $cert_chain[$i];
+	    print "# $c->[1]\n$c->[3]\n";
 	}
     }
 }

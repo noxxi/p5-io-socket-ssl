@@ -18,11 +18,11 @@ Index: SSLeay.xs
   *        OUTPUT:
   *            RETVAL
   *
-+ * 
++ *
 + * Runtime debugging:
 + *
 + * with TRACE(level,fmt,...) you can output debug messages.
-+ * it behaves the same as 
++ * it behaves the same as
 + *   warn sprintf($msg,...) if $Net::SSLeay::trace>=$level
 + * would do in Perl (e.g. it is using also the $Net::SSLeay::trace variable)
 + *
@@ -278,7 +278,7 @@ Index: SSLeay.xs
       ASN1_TIME *s
  
  ASN1_TIME *
-@@ -5074,6 +5275,312 @@
+@@ -5074,6 +5275,336 @@
  
  #endif
  
@@ -505,40 +505,51 @@ Index: SSLeay.xs
 +	OCSP_BASICRESP *bsr;
 +	int i,want_array;
 +	time_t nextupd = 0;
++	STACK_OF(OCSP_SINGLERESP) *sks;
++	int getall,sksn;
 +
 +	bsr = OCSP_response_get1_basic(rsp);
 +	if (!bsr) croak("invalid OCSP response");
 +
 +	want_array = (GIMME == G_ARRAY);
++	getall = (items <= 1);
++	sks = bsr->tbsResponseData->responses;
++	sksn = sk_OCSP_SINGLERESP_num(sks);
 +
-+	for(i=1;i<items;i++) {
-+	    STRLEN len;
++	for(i=0; i < (getall ? sksn : items-1); i++) {
 +	    const char *error = NULL;
 +	    OCSP_SINGLERESP *sir = NULL;
-+	    STACK_OF(OCSP_SINGLERESP) *sks;
 +	    OCSP_CERTID *certid = NULL;
-+	    int k;
-+	    SV *idsv = ST(i);
-+	    const unsigned char *p = SvPV(idsv,len);
++	    SV *idsv = NULL;
 +
-+	    if (!(certid = d2i_OCSP_CERTID(NULL,&p,len))) {
-+		error = "failed to get OCSP certid from string";
-+		goto end;
-+	    }
++	    if(getall) {
++		sir = sk_OCSP_SINGLERESP_value(sks,i);
++	    } else {
++		int k;
++		STRLEN len;
++		const unsigned char *p;
 +
-+	    sks = bsr->tbsResponseData->responses;
-+	    for(k=0;k<sk_OCSP_SINGLERESP_num(sks);k++) {
-+		if (!OCSP_id_cmp(certid,sk_OCSP_SINGLERESP_value(sks,k)->certId)) {
-+		    sir = sk_OCSP_SINGLERESP_value(sks,k);
-+		    break;
++		idsv = ST(i+1);
++		if (!SvOK(idsv)) croak("undefined certid in arguments");
++		p = SvPV(idsv,len);
++		if (!(certid = d2i_OCSP_CERTID(NULL,&p,len))) {
++		    error = "failed to get OCSP certid from string";
++		    goto end;
++		}
++		for(k=0;k<sksn;k++) {
++		    if (!OCSP_id_cmp(certid,sk_OCSP_SINGLERESP_value(sks,k)->certId)) {
++			sir = sk_OCSP_SINGLERESP_value(sks,k);
++			break;
++		    }
 +		}
 +	    }
++
 +	    if (!sir) {
 +		error = "cannot find entry for certificate in OCSP response";
 +	    } else if (!OCSP_check_validity(sir->thisUpdate,sir->nextUpdate,0,-1)) {
 +		error = "response not yet valid or expired";
 +	    } else if (sir->certStatus->type == V_OCSP_CERTSTATUS_REVOKED) {
-+		error = "certificate is revoked";
++		error = "certificate status is revoked";
 +	    } else if (sir->certStatus->type != V_OCSP_CERTSTATUS_GOOD) {
 +		error = "certificate status is unkown";
 +	    }
@@ -546,7 +557,20 @@ Index: SSLeay.xs
 +	    end:
 +	    if (want_array) {
 +		AV *idav = newAV();
-+		av_push(idav, SvREFCNT_inc(idsv));
++		if (!idsv) {
++		    /* getall: create new SV with OCSP_CERTID */
++		    unsigned char *pi,*pc;
++		    int len = i2d_OCSP_CERTID(sir->certId,NULL);
++		    if(!len) continue;
++		    pi = pc = calloc(len+1,sizeof(char));
++		    if (!pc) croak("out of memory");
++		    i2d_OCSP_CERTID(sir->certId,&pi);
++		    idsv = newSVpv(pc,len);
++		} else {
++		    /* reuse idsv from ST(..), but increment refcount */
++		    idsv = SvREFCNT_inc(idsv);
++		}
++		av_push(idav, idsv);
 +		av_push(idav, error ? newSVpv(error,0) : newSV(0));
 +		if (sir) {
 +		    HV *details = newHV();
@@ -637,7 +661,7 @@ Index: lib/Net/SSLeay.pod
 ===================================================================
 --- lib/Net/SSLeay.pod	(revision 402)
 +++ lib/Net/SSLeay.pod	(working copy)
-@@ -393,6 +393,188 @@
+@@ -393,6 +393,190 @@
          error reading CRL....
      }
  
@@ -709,8 +733,8 @@ Index: lib/Net/SSLeay.pod
 +
 +    # Check status of response.
 +    my $status = Net::SSLeay::OCSP_response_status($resp);
-+    if ($status != Net::SSLeay::OCSP_RESPONSE_STATUS_SUCCESSFUL()) 
-+    	die "OCSP response failed: ".
++    if ($status != Net::SSLeay::OCSP_RESPONSE_STATUS_SUCCESSFUL())
++	die "OCSP response failed: ".
 +	    Net::SSLeay::OCSP_response_status_str($status);
 +    }
 +
@@ -721,7 +745,7 @@ Index: lib/Net/SSLeay.pod
 +    # It will not complain if the response does not contain a nonce, which is
 +    # usually the case with pre-signed responses.
 +    if ( ! eval { Net::SSLeay::OCSP_response_verify($ssl,$resp,$req) }) {
-+    	die "OCSP response verification failed";
++	die "OCSP response verification failed";
 +    }
 +
 +    # Extract information from OCSP_RESPONSE for each of the ids.
@@ -733,24 +757,26 @@ Index: lib/Net/SSLeay.pod
 +    # - no response for given OCSP_CERTID
 +    # - certificate status is not good (e.g. revoked or unknown)
 +    if ( my $nextupd = eval { Net::SSLeay::OCSP_response_results($resp,$id) }) {
-+    	warn "certificate is valid, next update in ".
++	warn "certificate is valid, next update in ".
 +	    ($nextupd-time())." seconds\n";
 +    } else {
-+    	die "certificate is not valid: $@";
++	die "certificate is not valid: $@";
 +    }
 +
-+    # Bug in array context it will return detailled information about each given
++    # But in array context it will return detailled information about each given
 +    # OCSP_CERTID instead croaking on errors:
++    # if no @ids are given it will return information about all single responses
++    # in the OCSP_RESPONSE
 +    my @results = Net::SSLeay::OCSP_response_results($resp,@ids);
 +    for my $r (@results) {
-+    	print Dumper($r);
++	print Dumper($r);
 +	# @results are in the same order as the @ids and contain:
 +	# $r->[0] - OCSP_CERTID
 +	# $r->[1] - undef if no error (certificate good) OR error message as string
 +	# $r->[2] - hash with details:
 +	#   thisUpdate - time_t of this single response
 +	#   nextUpdate - time_t when update is expected
-+	#   statusType - integer: 
++	#   statusType - integer:
 +	#      V_OCSP_CERTSTATUS_GOOD(0)
 +	#      V_OCSP_CERTSTATUS_REVOKED(1)
 +	#      V_OCSP_CERTSTATUS_UNKNOWN(2)
@@ -763,13 +789,13 @@ Index: lib/Net/SSLeay.pod
 +to instruct the server to staple the OCSP response:
 +
 +    # set TLS extension before doing SSL_connect
-+    Net::SSLeay::set_tlsext_status_type($ssl, 
-+        Net::SSLeay::TLSEXT_STATUSTYPE_ocsp());
++    Net::SSLeay::set_tlsext_status_type($ssl,
++	Net::SSLeay::TLSEXT_STATUSTYPE_ocsp());
 +
 +    # setup callback to verify OCSP response
 +    my $cert_valid = undef;
 +    Net::SSLeay::CTX_set_tlsext_status_cb($context,sub {
-+    	my ($ssl,$resp) = @_;
++	my ($ssl,$resp) = @_;
 +	if (!$resp) {
 +	    # Lots of servers don't return an OCSP response.
 +	    # In this case we must check the OCSP status outside the SSL
@@ -797,7 +823,7 @@ Index: lib/Net/SSLeay.pod
 +	    return 1;
 +	};
 +
-+	if ( $nextupd = eval { 
++	if ( $nextupd = eval {
 +	    Net::SSLeay::OCSP_response_results($resp,$certid) }) {
 +	    warn "certificate not revoked\n";
 +	    $cert_valid = 1;
@@ -830,7 +856,7 @@ Index: t/external/ocsp.t
 ===================================================================
 --- t/external/ocsp.t	(revision 0)
 +++ t/external/ocsp.t	(working copy)
-@@ -0,0 +1,231 @@
+@@ -0,0 +1,230 @@
 +#!/usr/bin/perl
 +
 +use strict;
@@ -848,19 +874,21 @@ Index: t/external/ocsp.t
 +	port => 443,
 +	fingerprint => '10c56ee9e2acaf2e77caeb7072bf6522dd7422b8',
 +	ocsp_staple => 1,
++	expect_status => Net::SSLeay::V_OCSP_CERTSTATUS_GOOD(),
 +    },
 +    {
 +	# no OCSP stapling yet
 +	host => 'www.google.com',
 +	port => 443,
 +	fingerprint => '007a5ab302f14446e2ea24d3a829de22ba1bf950',
++	expect_status => Net::SSLeay::V_OCSP_CERTSTATUS_GOOD(),
 +    },
 +    {
 +	# this is revoked
 +	host => 'revoked.grc.com',
 +	port => 443,
 +	fingerprint => '34703c40093461ad3ce087e161c7b7f42abe770c',
-+	expect_error => qr/revoked/,
++	expect_status => Net::SSLeay::V_OCSP_CERTSTATUS_REVOKED(),
 +    },
 +);
 +
@@ -901,7 +929,7 @@ Index: t/external/ocsp.t
 +
 +	# setup TLS extension and callback to catch stapled OCSP response
 +	my $stapled_response;
-+	Net::SSLeay::set_tlsext_status_type($ssl, 
++	Net::SSLeay::set_tlsext_status_type($ssl,
 +	    Net::SSLeay::TLSEXT_STATUSTYPE_ocsp());
 +	Net::SSLeay::CTX_set_tlsext_status_cb($ctx,sub {
 +	    my ($ssl,$resp) = @_;
@@ -935,7 +963,7 @@ Index: t/external/ocsp.t
 +	# make sure we talk to the right party, e.g. no SSL interception
 +	my $leaf_cert = Net::SSLeay::get_peer_certificate($ssl);
 +	$cleanup->add(sub { Net::SSLeay::X509_free($leaf_cert) }) if $leaf_cert;
-+	my $fp = $leaf_cert 
++	my $fp = $leaf_cert
 +	    && unpack("H*",Net::SSLeay::X509_digest($leaf_cert,$sha1));
 +	skip "could not get fingerprint",1 if !$fp;
 +	skip "bad fingerprint $fp for $test->{host}:$test->{port}",1
@@ -971,28 +999,26 @@ Index: t/external/ocsp.t
 +	}
 +
 +	my $check_response = sub {
-+	    my ($resp,$req,$id,$expect_error) = @_;
-+	    if ( Net::SSLeay::OCSP_response_status($resp) 
++	    my ($resp,$req,$id,$expect_status) = @_;
++	    if ( Net::SSLeay::OCSP_response_status($resp)
 +		!= Net::SSLeay::OCSP_RESPONSE_STATUS_SUCCESSFUL()) {
-+		diag("response bad status");
-+		return undef;
-+	    } elsif ( ! eval { 
++		return [ undef,"response bad status ".
++		    Net::SSLeay::OCSP_response_status_str(Net::SSLeay::OCSP_response_status($resp)) ];
++	    } elsif ( ! eval {
 +		Net::SSLeay::OCSP_response_verify($ssl,$resp,$req) }) {
 +		return [ undef,"cannot verify response: $@" ];
 +	    }
-+	    # extract result for id 
++	    # extract result for id
 +	    my ($status) = Net::SSLeay::OCSP_response_results($resp,$id);
 +	    return [ undef,"no data for cert in response: $status->[1]" ]
 +		if ! $status->[2];
-+	    if ($expect_error) {
++	    if ($expect_status != $status->[2]{statusType}) {
 +		return [ undef,
-+		    "unexpected error (expected $expect_error): $status->[1]" ]
-+		    if !$status->[1] or $status->[1] !~ $expect_error;
-+		diag("expected error: $status->[1]");
-+	    } elsif ($status->[1]) {
-+		return [ undef, "unexpected error: $status->[1]" ]
++		    "unexpected status=$status->[2]{statusType} (expected $expect_status): $status->[1]" ]
++	    } elsif ( $status->[2]{nextUpdate} ) {
++		diag("status=$expect_status as expected: nextUpd=".localtime($status->[2]{nextUpdate}));
 +	    } else {
-+		diag("expected good: nextUpd=".localtime($status->[2]{nextUpdate}));
++		diag("status=$expect_status as expected: no nextUpd");
 +	    }
 +	    return $status;
 +	};
@@ -1002,7 +1028,7 @@ Index: t/external/ocsp.t
 +		Net::SSLeay::d2i_OCSP_RESPONSE($stapled_response),
 +		undef, # no OCSP_REQUEST
 +		$requests[0][2], # stapled response is for the leaf certificate
-+		$test->{expect_error}
++		$test->{expect_status}
 +	    );
 +	    if (!$stat->[0]) {
 +		fail($stat->[1]);
@@ -1039,7 +1065,7 @@ Index: t/external/ocsp.t
 +		$resp,
 +		$req,
 +		$id,
-+		($i>0) ? undef:$test->{expect_error},
++		($i>0) ? Net::SSLeay::V_OCSP_CERTSTATUS_GOOD() : $test->{expect_status},
 +	    );
 +	    if (!$stat->[0]) {
 +		fail($stat->[1]);
@@ -1061,7 +1087,6 @@ Index: t/external/ocsp.t
 +	&$_ for(@$self)
 +    }
 +}
-+
 Index: typemap
 ===================================================================
 --- typemap	(revision 402)

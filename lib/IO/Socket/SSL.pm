@@ -2258,32 +2258,40 @@ WARN
 		$DEBUG>=3 && DEBUG("verify of stapled OCSP response failed");
 		return 1;
 	    }
-	    my $cert = $iossl->peer_certificate;
-	    my $certid = $cert && eval { Net::SSLeay::OCSP_cert2ids($ssl,$cert) };
-	    if (!$certid) {
-		$DEBUG>=3 && DEBUG("cannot create OCSP_CERTID: $@");
-		${*$iossl}{_SSL_ocsp_verify} = [-1,$@];
-		return 1;
-	    }
-	    ($status) = Net::SSLeay::OCSP_response_results($resp,$certid);
-	    if ($status && $status->[2]
-		and my $cache = ${*$iossl}{_SSL_ctx}{ocsp_cache} ) {
-		if ($status->[1]) {
-		    $cache->put($certid,{ 
-			%{$status->[2]},
-			error => $status->[1],
-		    });
+	    my @results;
+	    my @chain = $iossl->peer_certificates;
+	    for my $cert (@chain) {
+		my $certid = eval { Net::SSLeay::OCSP_cert2ids($ssl,$cert) };
+		if (!$certid) {
+		    $DEBUG>=3 && DEBUG("cannot create OCSP_CERTID: $@");
+		    push @results,[-1,$@];
+		    last;
+		}
+		($status) = Net::SSLeay::OCSP_response_results($resp,$certid);
+		if ($status && $status->[2]
+		    and my $cache = ${*$iossl}{_SSL_ctx}{ocsp_cache} ) {
+		    if ($status->[1]) {
+			$cache->put($certid,{ 
+			    %{$status->[2]},
+			    error => $status->[1],
+			});
+		    } else {
+			$cache->put($certid,$status->[2]);
+		    }
+		}
+		if ($status && !$status->[1]) {
+		    $DEBUG>=3 && DEBUG("certificate validated, not revoked");
+		    push @results, [1,$status->[2]{nextUpdate}];
 		} else {
-		    $cache->put($certid,$status->[2]);
+		    $DEBUG>=3 && DEBUG("stapled OCSP response: $status->[1]");
+		    push @results, [0,$status->[1]];
 		}
 	    }
-	    if ($status && !$status->[1]) {
-		$DEBUG>=3 && DEBUG("certificate validated, not revoked");
-		${*$iossl}{_SSL_ocsp_verify} = [1,$status->[2]{nextUpdate}];
-		return 1;
+	    # return result of lead certificate, this should be in chain[0] and
+	    # thus result[0], but we better check
+	    if (@results and $chain[0] == $iossl->peer_certificate) {
+		${*$iossl}{_SSL_ocsp_verify} = $results[0];
 	    }
-	    $DEBUG>=3 && DEBUG("stapled OCSP response: $status->[1]");
-	    ${*$iossl}{_SSL_ocsp_verify} = [0,$status->[1]];
 	    return 1;
 	});
     }
@@ -2519,7 +2527,7 @@ sub add_response {
 
     # do we have a response
     if (!$resp) {
-	@error = "request to $uri failed"
+	@error = "http request failed"
 
     # is it an valid OCSP_RESPONSE
     } elsif ( ! eval { $resp = Net::SSLeay::d2i_OCSP_RESPONSE($resp) }) {
@@ -2538,7 +2546,9 @@ sub add_response {
 	$req = Net::SSLeay::d2i_OCSP_REQUEST($todo->{req});
 	Net::SSLeay::OCSP_response_verify($self->{ssl},$resp,$req);
     }) {
-	if (!(@error = $@)) {
+	if ($@) {
+	    @error = $@
+	} else {
 	    my @err;
 	    while ( my $err = Net::SSLeay::ERR_get_error()) {
 		push @error, Net::SSLeay::ERR_error_string($err);
@@ -2564,10 +2574,10 @@ sub add_response {
     }
     if (@error) {
 	$self->{soft_error} .= "; " if $self->{soft_error};
-	$self->{soft_error} .= join('; ',@error);
+	$self->{soft_error} .= "$uri: ".join('; ',@error);
     }
     if (@hard_error) {
-	$self->{hard_error} = join('; ',@error);
+	$self->{hard_error} = "$uri: ".join('; ',@hard_error);
 	%{$self->{todo}} = ();
     } elsif ( ! %{$self->{todo}} ) {
 	$self->{hard_error} = ''
