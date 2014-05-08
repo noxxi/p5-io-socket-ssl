@@ -2557,9 +2557,24 @@ sub add_response {
     # extract results from response
     } elsif ( my @result = 
 	Net::SSLeay::OCSP_response_results($resp,@{$todo->{ids}})) {
+	my (@found,@miss);
 	for my $rv (@result) {
-	    $self->{cache}->put($rv->[0],$rv->[2]);
-	    push @hard_error,$rv->[1] if $rv->[1];
+	    if ($rv->[2]) {
+		$self->{cache}->put($rv->[0],$rv->[2]);
+		push @hard_error,$rv->[1] if $rv->[1];
+		push @found,$rv->[0];
+	    } else {
+		push @miss,$rv->[0];
+	    }
+	}
+	if (@miss && @found) {
+	    # we sent multiple responses, but server answered only to one
+	    # try again
+	    $self->{todo}{$uri} = $todo;
+	    $todo->{ids} = \@miss;
+	    $todo->{req} = Net::SSLeay::i2d_OCSP_REQUEST(
+		Net::SSLeay::OCSP_ids2req(@miss));
+	    $DEBUG>=2 && DEBUG("$uri just answered ".@found." of ".(@found+@miss)." requests");
 	}
     } else {
 	@error = "no data in response";
@@ -2586,22 +2601,23 @@ sub add_response {
 # make all necessary requests to get OCSP responses blocking
 sub resolve_blocking {
     my ($self,%args) = @_;
-    my %todo = $self->requests or return $self->{hard_error};
-    eval { require HTTP::Tiny } or die "need HTTP::Tiny installed";
-    # OCSP responses have their own signature, so we don't need SSL verification
-    my $ua = HTTP::Tiny->new(verify_SSL => 0,%args);
-    while (my ($uri,$reqdata) = each %todo) {
-	$DEBUG && DEBUG("sending OCSP request to $uri");
-	my $resp = $ua->request('POST',$uri, {
-	    headers => { 'Content-type' => 'application/ocsp-request' },
-	    content => $reqdata
-	});
-	$DEBUG && DEBUG("got  OCSP response from $uri code=$resp->{code}");
-	defined ($self->add_response($uri,
-	    $resp->{success} && $resp->{content}))
-	    && last;
+    while ( my %todo = $self->requests ) {
+	eval { require HTTP::Tiny } or die "need HTTP::Tiny installed";
+	# OCSP responses have their own signature, so we don't need SSL verification
+	my $ua = HTTP::Tiny->new(verify_SSL => 0,%args);
+	while (my ($uri,$reqdata) = each %todo) {
+	    $DEBUG && DEBUG("sending OCSP request to $uri");
+	    my $resp = $ua->request('POST',$uri, {
+		headers => { 'Content-type' => 'application/ocsp-request' },
+		content => $reqdata
+	    });
+	    $DEBUG && DEBUG("got  OCSP response from $uri code=$resp->{code}");
+	    defined ($self->add_response($uri,
+		$resp->{success} && $resp->{content}))
+		&& last;
+	}
     }
-    $DEBUG>=2 && DEBUG("no more open OCSP responses");
+    $DEBUG>=2 && DEBUG("no more open OCSP requests");
     return $self->{hard_error};
 }
 
@@ -3663,6 +3679,13 @@ contain the OCSP request string and the URL where it should be sent too. The
 usual way to send such a request is as HTTP POST request with an content-type
 of C<application/ocsp-request> or as a GET request with the base64 and
 url-encoded request is added to the path of the URL.
+
+After you've handled all these requests and added the response with
+C<add_response> you should better call this method again to make sure, that no
+more requests are outstanding. IO::Socket::SSL will combine multiple OCSP
+requests for the same server inside a single request, but some server don't
+give an response to all these requests, so that one has to ask again with the
+remaining requests.
 
 =item add_response($uri,$response)
 
