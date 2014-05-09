@@ -5,6 +5,7 @@
 use strict;
 use warnings;
 use IO::Socket::SSL 1.984;
+use IO::Socket::SSL::Utils;
 
 # use a common OCSP cache for all
 my $ocsp_cache = IO::Socket::SSL::OCSP_Cache->new(1000);
@@ -39,28 +40,44 @@ while ( my $dst = <>) {
 
 
     warn "DEBUG: trying SSL upgrade on $dst\n";
-    my $result;
     if ( IO::Socket::SSL->start_SSL($cl,
 	SSL_hostname => $dst,
-	SSL_verifycn_scheme => 'www',
+	SSL_verifycn_scheme => 'none', # will check later
 	SSL_ocsp_mode => SSL_OCSP_FULL_CHAIN,
 	SSL_ocsp_cache => $ocsp_cache,
     )) {
-	warn "INFO: $dst got stapled response\n" if ${*$cl}{_SSL_ocsp_verify};
+	my $result = $cl->get_sslversion."/".$cl->get_cipher;
+	my $cert = $cl->peer_certificate;
+	if (my $pkey = Net::SSLeay::X509_get_pubkey($cert)) {
+	    my $bits = eval { Net::SSLeay::EVP_PKEY_bits($pkey) };
+	    $result .= "/$bits" if $bits;
+	    Net::SSLeay::EVP_PKEY_free($pkey);
+	}
+
+	$result .= " (ocsp:stapled)" if ${*$cl}{_SSL_ocsp_verify};
+	my $status;
+	if ( IO::Socket::SSL::verify_hostname_of_cert($dst,$cert,'www')) {
+	    $status = 'ok';
+	} else {
+	    $status = 'badname';
+	    $result .= " (cn:".CERT_asHash($cert)->{subject}{commonName}.")";
+	}
 	my $r = $cl->ocsp_resolver;
 	my %q = $r->requests;
 	warn "DEBUG: $dst need ".keys(%q)." OCSP requests"
 	    ." chain_size=".(0+$cl->peer_certificates)
 	    ." URI=".  join(",",keys %q)."\n" 
 	    if %q;
-	$result = $r->resolve_blocking(timeout => 5);
-	$result ||= 'ok';
-	if ( my $s = $r->soft_error ) {
-	    $result = "$result (soft: $s)";
+	if (my $err = $r->resolve_blocking(timeout => 5)) {
+	    $status = 'badocsp';
+	    $result .= " (ocsp_err:$err)"
 	}
+	if ( my $s = $r->soft_error ) {
+	    $result .= " (ocsp_softerr: $s)";
+	}
+	warn "RESULT($dst) ssl-$status $result\n";
     } else {
-	$result = $SSL_ERROR||$!;
+	warn "RESULT($dst) nossl ".($SSL_ERROR||$!)."\n";
     }
-    warn "RESULT: $dst $result\n";
 }
 
