@@ -2232,8 +2232,9 @@ WARN
     }
     Net::SSLeay::CTX_set_verify($ctx, $verify_mode, $verify_callback);
 
-    if ( $can_ocsp_staple ) {
-	my $mode = $self->{ocsp_mode} = $arg_hash->{SSL_ocsp_mode};
+    $self->{ocsp_mode} = $arg_hash->{SSL_ocsp_mode}||0;
+    if ( !$is_server && $can_ocsp_staple ) {
+	my $mode = $self->{ocsp_mode};
 	$self->{ocsp_cache} = $arg_hash->{SSL_ocsp_cache};
 	Net::SSLeay::CTX_set_tlsext_status_cb($ctx,sub {
 	    my ($ssl,$resp) = @_;

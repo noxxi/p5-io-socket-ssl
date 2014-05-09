@@ -37,6 +37,7 @@ plan tests => 0+@tests;
 my $timeout = 10;
 my $proxy = ( $ENV{http_proxy} || '' )
     =~m{^(?:\w+://)?([\w\-.:\[\]]+:\d+)/?$} && $1;
+my $have_httptiny = eval { require HTTP::Tiny };
 my $ipclass = 'IO::Socket::INET';
 for( qw( IO::Socket::IP IO::Socket::INET6  )) {
     eval { require $_ } or next;
@@ -72,6 +73,7 @@ for my $test (@tests) {
 		$reply .= $_;
 		last if m{\A\r?\n\Z};
 	    }
+	    alarm(0);
 	    $reply =~m{\AHTTP/1\.[01] 200\b} or
 		die "unexpected response from proxy: $reply";
 	}
@@ -120,6 +122,9 @@ for my $test (@tests) {
 		diag("got stapled response as expected");
 	    }
 	}
+
+	goto done if ! $have_httptiny;
+
 	# use OCSP resolver to resolve remaining certs, should be at most one
 	my $ocsp_resolver = $cl->ocsp_resolver;
 	my %rq = $ocsp_resolver->requests;
@@ -168,6 +173,8 @@ for my $test (@tests) {
 	    }
 	}
 	diag("validation with default CA with OCSP full chain ok");
+
+	done:
 	pass("OCSP tests $test->{host}:$test->{port} ok");
     }
 }
