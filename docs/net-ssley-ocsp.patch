@@ -267,18 +267,18 @@ Index: SSLeay.xs
  P_X509_get_ext_key_usage(cert,format=0)
          X509 * cert
          int format
-@@ -3051,8 +3252,8 @@
+@@ -3055,6 +3256,10 @@
+ ASN1_TIME_free(s)
       ASN1_TIME *s
-      time_t t
  
--void
--ASN1_TIME_free(s)
 +time_t
 +ASN1_TIME_timet(s)
-      ASN1_TIME *s
- 
++     ASN1_TIME *s
++
  ASN1_TIME *
-@@ -5074,6 +5275,336 @@
+ ASN1_TIME_new()
+ 
+@@ -5074,6 +5279,336 @@
  
  #endif
  
@@ -637,7 +637,7 @@ Index: lib/Net/SSLeay.pm
 ===================================================================
 --- lib/Net/SSLeay.pm	(revision 402)
 +++ lib/Net/SSLeay.pm	(working copy)
-@@ -339,7 +339,18 @@
+@@ -339,7 +339,28 @@
      use_certificate_ASN1
      use_certificate_file
      write
@@ -654,6 +654,16 @@ Index: lib/Net/SSLeay.pm
 +    OCSP_response_status_str
 +    OCSP_response_verify
 +    OCSP_response_results
++    OCSP_RESPONSE_STATUS_INTERNALERROR
++    OCSP_RESPONSE_STATUS_MALFORMEDREQUEST
++    OCSP_RESPONSE_STATUS_SIGREQUIRED
++    OCSP_RESPONSE_STATUS_SUCCESSFUL
++    OCSP_RESPONSE_STATUS_TRYLATER
++    OCSP_RESPONSE_STATUS_UNAUTHORIZED
++    TLSEXT_STATUSTYPE_ocsp
++    V_OCSP_CERTSTATUS_GOOD
++    V_OCSP_CERTSTATUS_REVOKED
++    V_OCSP_CERTSTATUS_UNKNOWN
  );
  
  sub AUTOLOAD {

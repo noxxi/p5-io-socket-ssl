@@ -61,3 +61,4 @@ t/testlib.pl
 t/verify_fingerprint.t
 t/verify_hostname.t
 util/analyze-ssl.pl
+util/https_ocsp_bulk.pl

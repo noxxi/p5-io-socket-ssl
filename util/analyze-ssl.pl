@@ -147,7 +147,7 @@ for my $test (@tests) {
 		VERBOSE(2,"version $v no verification, ciphers=$ciphers, no TLS extensions -> $version,$cipher");
 	    } else {
 		VERBOSE(2,"version $v, no verification, ciphers=$ciphers, no TLS extensions -> FAIL! $SSL_ERROR");
-		if ( ! $ciphers && $version eq 'SSLv23' ) {
+		if ( ! $ciphers && $v eq 'SSLv23' ) {
 		    push @problems, "using default SSL_version $v, default ciphers -> $SSL_ERROR";
 		} elsif ( ! $ciphers ) {
 		    push @problems, "using SSL_version $v, default ciphers -> $SSL_ERROR";

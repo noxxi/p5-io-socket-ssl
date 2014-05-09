@@ -2435,6 +2435,10 @@ sub get {
     my ($self,$id) = @_;
     my $e = $self->{$id} or return;
     $e->{_lru} = $self->{''}{_lru}++;
+    if ( $e->{expire} && time()<$e->{expire}) {
+	delete $self->{$id};
+	return;
+    }
     if ( $e->{nextUpdate} && time()<$e->{nextUpdate} ) {
 	delete $self->{$id};
 	return;
@@ -2448,7 +2452,7 @@ sub put {
     $e->{_lru} = $self->{''}{_lru}++;
     my $del = keys(%$self) - $self->{''}{size};
     if ($del>0) {
-	my @k = sort { $a->{_lru} <=> $b->{_lru} } keys %$self;
+	my @k = sort { $self->{$a}{_lru} <=> $self->{$b}{_lru} } keys %$self;
 	delete @{$self}{ splice(@k,0,$del) };
     }
     return $e;
@@ -2486,6 +2490,8 @@ sub new {
 	    $error = $done->{error};
 	    %todo = ();
 	    last;
+	} elsif ( $done->{soft_error} ) {
+	    push @soft_error,$done->{soft_error};
 	}
     }
     while ( my($uri,$v) = each %todo) {
@@ -2521,23 +2527,32 @@ sub add_response {
     my $todo = delete $self->{todo}{$uri};
     return $self->{error} if ! $todo || $self->{error};
 
-    my ($req,@error,@hard_error);
+    my ($req,@soft_error,@hard_error);
 
     # do we have a response
     if (!$resp) {
-	@error = "http request failed"
+	@soft_error = "http request failed"
 
     # is it an valid OCSP_RESPONSE
     } elsif ( ! eval { $resp = Net::SSLeay::d2i_OCSP_RESPONSE($resp) }) {
-	@error = "invalid response (no OCSP_RESPONSE)"
-
+	@soft_error = "invalid response (no OCSP_RESPONSE)";
+	# hopefully short-time error
+	$self->{cache}->put($_,{
+	    soft_error => "@soft_error",
+	    expire => time()+10,
+	}) for (@{$todo->{ids}});
     # is the OCSP response status success
     } elsif ( 
 	( my $status = Net::SSLeay::OCSP_response_status($resp)) 
 	    != Net::SSLeay::OCSP_RESPONSE_STATUS_SUCCESSFUL() 
     ){
-	@error = "OCSP response failed: ".
+	@soft_error = "OCSP response failed: ".
 	    Net::SSLeay::OCSP_response_status_str($status);
+	# hopefully short-time error
+	$self->{cache}->put($_,{
+	    soft_error => "@soft_error",
+	    expire => time()+10,
+	}) for (@{$todo->{ids}});
 
     # does nonce match the request and can the signature be verified
     } elsif ( ! eval { 
@@ -2545,14 +2560,19 @@ sub add_response {
 	Net::SSLeay::OCSP_response_verify($self->{ssl},$resp,$req);
     }) {
 	if ($@) {
-	    @error = $@
+	    @soft_error = $@
 	} else {
 	    my @err;
 	    while ( my $err = Net::SSLeay::ERR_get_error()) {
-		push @error, Net::SSLeay::ERR_error_string($err);
+		push @soft_error, Net::SSLeay::ERR_error_string($err);
 	    }
-	    @error = 'failed to verify OCSP response' if ! @error;
+	    @soft_error = 'failed to verify OCSP response' if ! @soft_error;
 	}
+	# configuration problem or we don't know the signer
+	$self->{cache}->put($_,{
+	    soft_error => "@soft_error",
+	    expire => time()+120,
+	}) for (@{$todo->{ids}});
 
     # extract results from response
     } elsif ( my @result = 
@@ -2577,17 +2597,22 @@ sub add_response {
 	    $DEBUG>=2 && DEBUG("$uri just answered ".@found." of ".(@found+@miss)." requests");
 	}
     } else {
-	@error = "no data in response";
+	@soft_error = "no data in response";
+	# probably configuration problem 
+	$self->{cache}->put($_,{
+	    soft_error => "@soft_error",
+	    expire => time()+120,
+	}) for (@{$todo->{ids}});
     }
 
     Net::SSLeay::OCSP_REQUEST_free($req) if $req;
     if ($self->{failhard}) {
-	push @hard_error,@error;
-	@error = ();
+	push @hard_error,@soft_error;
+	@soft_error = ();
     }
-    if (@error) {
+    if (@soft_error) {
 	$self->{soft_error} .= "; " if $self->{soft_error};
-	$self->{soft_error} .= "$uri: ".join('; ',@error);
+	$self->{soft_error} .= "$uri: ".join('; ',@soft_error);
     }
     if (@hard_error) {
 	$self->{hard_error} = "$uri: ".join('; ',@hard_error);
