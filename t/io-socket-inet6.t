@@ -33,6 +33,8 @@ unless( IO::Socket::SSL->CAN_IPV6 eq "IO::Socket::INET6" ) {
     # not available or IO::Socket::SSL forgot to load it
     if ( ! eval { require IO::Socket::INET6 } ) {
 	print "1..0 # Skipped: no IO::Socket::INET6 available\n";
+    } elsif ( ! eval { IO::Socket::INET6->VERSION(2.62) } ) {
+	print "1..0 # Skipped: no IO::Socket::INET6 available\n";
     } else {
 	print "1..1\nnot ok # automatic use of INET6\n";
     }
