@@ -1,3 +1,4 @@
+1.984 2014/05/10
 - added OCSP support:
   - needs Net::SSLeay >=1.59
   - for usage see documentation of IO::Socket::SSL (examples and anything with
