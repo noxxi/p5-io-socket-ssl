@@ -1,12 +1,10 @@
 - added OCSP support:
-  - see README for the requirements on the Net::SSLeay version
-  - see documentation of IO::Socket::SSL (examples and anything with OCSP in
-    the name)
+  - needs Net::SSLeay >=1.59
+  - for usage see documentation of IO::Socket::SSL (examples and anything with
+    OCSP in the name)
 - new tool util/analyze-ssl.pl which is intended to help in debugging of SSL
   problems and to get information about capabilities of server. Works also
   as en example of how to use various features (like OCSP, SNI..)
-- new tool util/https_ocsp_bulk.pl to check verification and revocation for
-  lots of sites at once
 - fix peer_certificates (returns leaf certificate only once on client side)
 - added timeout for stop_SSL (either with Timeout or with the default
   timeout for IO::Socket)
