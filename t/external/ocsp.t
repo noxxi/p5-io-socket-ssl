@@ -86,7 +86,7 @@ for my $test (@tests) {
 	diag("tcp connect to $test->{host}:$test->{port} ok");
 	skip "SSL upgrade w/o validation failed: $SSL_ERROR",1 
 	    if ! IO::Socket::SSL->start_SSL($cl, SSL_verify_mode => 0);
-	skip "fingerprints do not match" 
+	skip "fingerprints do not match",1
 	    if $cl->get_fingerprint('sha1') ne $test->{fingerprint};
 	diag("fingerprint matches");
 
