@@ -29,7 +29,7 @@ BEGIN {
 
 
 
-our $VERSION = '1.984';
+our $VERSION = '1.985';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -2240,7 +2240,13 @@ WARN
 	    my ($ssl,$resp) = @_;
 	    my $iossl = $SSL_OBJECT{$ssl} or 
 		die "no IO::Socket::SSL object found for SSL $ssl";
-	    $iossl->[1] and die "OCSP callback on server side";
+	    $iossl->[1] and do {
+		# we must return with 1 or it will be called again
+		# and beause we have no SSL object we must make the error global
+		Carp::cluck($IO::Socket::SSL::SSL_ERROR 
+		    = "OCSP callback on server side");
+		return 1;
+	    };
 	    $iossl = $iossl->[0];
 	    if ( ! $resp ) {
 		$DEBUG>=3 && DEBUG("did not get stapled OCSP response");
@@ -2257,7 +2263,7 @@ WARN
 		$DEBUG>=3 && DEBUG("verify of stapled OCSP response failed");
 		return 1;
 	    }
-	    my @results;
+	    my (@results,$hard_error);
 	    my @chain = $iossl->peer_certificates;
 	    for my $cert (@chain) {
 		my $certid = eval { Net::SSLeay::OCSP_cert2ids($ssl,$cert) };
@@ -2267,28 +2273,34 @@ WARN
 		    last;
 		}
 		($status) = Net::SSLeay::OCSP_response_results($resp,$certid);
-		if ($status && $status->[2]
-		    and my $cache = ${*$iossl}{_SSL_ctx}{ocsp_cache} ) {
-		    if ($status->[1]) {
-			$cache->put($certid,{ 
+		if ($status && $status->[2]) {
+		    my $cache = ${*$iossl}{_SSL_ctx}{ocsp_cache};
+		    if (!$status->[1]) {
+			push @results,[1,$status->[2]{nextUpdate}];
+			$cache && $cache->put($certid,$status->[2]);
+		    } elsif ( $status->[2]{statusType} == 
+			Net::SSLeay::V_OCSP_CERTSTATUS_GOOD()) {
+			push @results,[1,$status->[2]{nextUpdate}];
+			$cache && $cache->put($certid,{ 
 			    %{$status->[2]},
-			    error => $status->[1],
+			    expire => time()+120,
+			    soft_error => $status->[1],
 			});
 		    } else {
-			$cache->put($certid,$status->[2]);
+			push @results,($hard_error = [0,$status->[1]]);
+			$cache && $cache->put($certid,{ 
+			    %{$status->[2]},
+			    hard_error => $status->[1],
+			});
 		    }
-		}
-		if ($status && !$status->[1]) {
-		    $DEBUG>=3 && DEBUG("certificate validated, not revoked");
-		    push @results, [1,$status->[2]{nextUpdate}];
-		} else {
-		    $DEBUG>=3 && DEBUG("stapled OCSP response: $status->[1]");
-		    push @results, [0,$status->[1]];
 		}
 	    }
 	    # return result of lead certificate, this should be in chain[0] and
-	    # thus result[0], but we better check
-	    if (@results and $chain[0] == $iossl->peer_certificate) {
+	    # thus result[0], but we better check. But if we had any hard_error
+	    # return this instead
+	    if ($hard_error) {
+		${*$iossl}{_SSL_ocsp_verify} = $hard_error;
+	    } elsif (@results and $chain[0] == $iossl->peer_certificate) {
 		${*$iossl}{_SSL_ocsp_verify} = $results[0];
 	    }
 	    return 1;
@@ -2469,7 +2481,7 @@ package IO::Socket::SSL::OCSP_Resolver;
 # $certs - list of certs to verify
 sub new {
     my ($class,$ssl,$cache,$failhard,$certs) = @_;
-    my ($error,%todo,$done,@soft_error);
+    my (%todo,$done,$hard_error,@soft_error);
     for my $cert (@$certs) {
 	# skip entries which have no OCSP uri or where we cannot get a certid
 	# (e.g. self-signed or where we don't have the issuer)
@@ -2486,9 +2498,9 @@ sub new {
 	};
 	if (!($done = $cache->get($certid))) {
 	    push @{ $todo{$uri}{ids} }, $certid;
-	} elsif ( $done->{error} ) {
+	} elsif ( $done->{hard_error} ) {
 	    # one error is enough to fail validation
-	    $error = $done->{error};
+	    $hard_error = $done->{hard_error};
 	    %todo = ();
 	    last;
 	} elsif ( $done->{soft_error} ) {
@@ -2500,12 +2512,12 @@ sub new {
 	$v->{req} = Net::SSLeay::i2d_OCSP_REQUEST(
 	    Net::SSLeay::OCSP_ids2req(@$ids));
     }
-    $error ||= '' if ! %todo;
+    $hard_error ||= '' if ! %todo;
     return bless {
 	ssl => $ssl,
 	cache => $cache,
 	failhard => $failhard,
-	hard_error => $error,
+	hard_error => $hard_error,
 	soft_error => @soft_error ? join("; ",@soft_error) : undef,
 	todo => \%todo,
     },$class;
@@ -2581,9 +2593,24 @@ sub add_response {
 	my (@found,@miss);
 	for my $rv (@result) {
 	    if ($rv->[2]) {
-		$self->{cache}->put($rv->[0],$rv->[2]);
-		push @hard_error,$rv->[1] if $rv->[1];
 		push @found,$rv->[0];
+		if (!$rv->[1]) { 
+		    # no error
+		    $self->{cache}->put($rv->[0],$rv->[2]);
+		} elsif ( $rv->[2]{statusType} == 
+		    Net::SSLeay::V_OCSP_CERTSTATUS_GOOD()) {
+		    # soft error, like response after nextUpdate
+		    push @soft_error,$rv->[1];
+		    $self->{cache}->put($rv->[0],{
+			%{$rv->[2]},
+			soft_error => "@soft_error",
+			expire => time()+120,
+		    });
+		} else {
+		    # hard error
+		    $self->{cache}->put($rv->[0],$rv->[2]);
+		    push @hard_error, $rv->[1];
+		}
 	    } else {
 		push @miss,$rv->[0];
 	    }

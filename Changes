@@ -1,3 +1,14 @@
+1.985 2014/05/15
+- make OCSP callback return 1 even if it was called on the server side
+  because of bad setup of the socket. Otherwise we get an endless calling
+  of the OCSP callback.
+- consider an OCSP response which is not yet or no longer valid a soft error
+  instead of an hard error
+- fix skip in t/external/ocsp.t in case fingerprint does not match
+- RT#95633 call EVP_PKEY_free not EVP_KEY_free in
+  IO::Socket::SSL::Utils::KEY_free. Thanks to paul[AT]city-fan[DOT]org
+- util/analyze.pl - with --show-chain check if chain with SNI is different
+  from chain w/o SNI. 
 1.984 2014/05/10
 - added OCSP support:
   - needs Net::SSLeay >=1.59

@@ -190,29 +190,42 @@ for my $test (@tests) {
     }
 
     # get chain info
-    my @cert_chain;
+    my (@cert_chain,@cert_chain_nosni);
     if ($show_chain || $dump_chain) {
-	my $cl = &$tcp_connect;
-	if ( IO::Socket::SSL->start_SSL($cl, %conf,
-	    SSL_verify_mode => 0
-	)) {
-	    for my $cert ( $cl->peer_certificates ) {
-		my ($subject,$bits);
-		$subject = Net::SSLeay::X509_NAME_oneline(
-		    Net::SSLeay::X509_get_subject_name($cert));
-		if (my $pkey = Net::SSLeay::X509_get_pubkey($cert)) {
-		    $bits = eval { Net::SSLeay::EVP_PKEY_bits($pkey) };
-		    Net::SSLeay::EVP_PKEY_free($pkey);
+	for(
+	    [ \%conf, \@cert_chain ],
+	    ! $conf{SSL_hostname} ? () 
+		: ([ { %conf, SSL_hostname => '' }, \@cert_chain_nosni ])
+	) {
+	    my ($conf,$chain) = @$_;
+	    my $cl = &$tcp_connect;
+	    if ( IO::Socket::SSL->start_SSL($cl, %$conf,
+		SSL_verify_mode => 0
+	    )) {
+		for my $cert ( $cl->peer_certificates ) {
+		    my ($subject,$bits);
+		    $subject = Net::SSLeay::X509_NAME_oneline(
+			Net::SSLeay::X509_get_subject_name($cert));
+		    if (my $pkey = Net::SSLeay::X509_get_pubkey($cert)) {
+			$bits = eval { Net::SSLeay::EVP_PKEY_bits($pkey) };
+			Net::SSLeay::EVP_PKEY_free($pkey);
+		    }
+		    push @$chain,[
+			$bits||'???',
+			$subject,
+			join('|',@{ CERT_asHash($cert)->{ocsp_uri} || []}),
+			PEM_cert2string($cert),
+		    ],
 		}
-		push @cert_chain,[
-		    $bits||'???',
-		    $subject,
-		    join('|',@{ CERT_asHash($cert)->{ocsp_uri} ||  []}),
-		    PEM_cert2string($cert),
-		],
+	    } else {
+		die "failed to connect with previously successful config: $SSL_ERROR";
 	    }
-	} else {
-	    die "failed to connect with previously successful config: $SSL_ERROR";
+	}
+	# if same certificate ignore nosni
+	if (@cert_chain_nosni 
+	    && $cert_chain_nosni[0][3] eq $cert_chain[0][3]) {
+	    VERBOSE(2,"same certificate in without SNI");
+	    @cert_chain_nosni = ();
 	}
     }
 
@@ -345,6 +358,13 @@ for my $test (@tests) {
 	for(my $i=0;$i<@cert_chain;$i++) {
 	    my $c = $cert_chain[$i];
 	    print "   * [$i] bits=$c->[0], ocsp_uri=$c->[2], $c->[1]\n"
+	}
+	if (@cert_chain_nosni) {
+	    print " * chain without SNI\n";
+	    for(my $i=0;$i<@cert_chain_nosni;$i++) {
+		my $c = $cert_chain_nosni[$i];
+		print "   * [$i] bits=$c->[0], ocsp_uri=$c->[2], $c->[1]\n"
+	    }
 	}
     }
     print " * OCSP stapling        : $ocsp_staple\n" if $ocsp_staple;

@@ -93,7 +93,7 @@ sub CERT_free {
 
 sub KEY_free {
     my $key = shift or return;
-    Net::SSLeay::EVP_KEY_free($key);
+    Net::SSLeay::EVP_PKEY_free($key);
 }
 
 sub KEY_create_rsa {
