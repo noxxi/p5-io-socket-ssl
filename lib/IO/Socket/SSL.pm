@@ -1364,11 +1364,12 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	    wildcards_in_cn  => 'anywhere',
 	    wildcards_in_alt => 'anywhere',
 	    check_cn         => 'always',
+	    ip_in_cn         => 1,
 	},
     );
 
     for(qw(
-	rfc2818 http www
+	rfc2818
 	rfc3920 xmpp
 	rfc4217 ftp
     )) {
@@ -1376,6 +1377,15 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	    wildcards_in_cn  => 'anywhere',
 	    wildcards_in_alt => 'anywhere',
 	    check_cn         => 'when_only',
+	}
+    }
+
+    for(qw(www http)) {
+	$scheme{$_} = {
+	    wildcards_in_cn  => 'anywhere',
+	    wildcards_in_alt => 'anywhere',
+	    check_cn         => 'when_only',
+	    ip_in_cn         => 1,
 	}
     }
 
@@ -1522,11 +1532,14 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	    }
 	}
 
-	if ( ! $ipn and (
-	    $scheme->{check_cn} eq 'always' or
-	    $scheme->{check_cn} eq 'when_only' and !$alt_dnsNames)) {
-	    $check_name->($commonName,$identity,$scheme->{wildcards_in_cn},$publicsuffix)
-		and return 1;
+	if ( $scheme->{check_cn} eq 'always' or
+	    $scheme->{check_cn} eq 'when_only' and !$alt_dnsNames ) {
+	    if ( ! $ipn ) {
+		$check_name->($commonName,$identity,$scheme->{wildcards_in_cn},$publicsuffix)
+		    and return 1;
+	    } elsif ( $scheme->{ip_in_cn} ) {
+		$identity eq $commonName and return 1;
+	    }
 	}
 
 	return 0; # no match
@@ -3554,11 +3567,18 @@ name and rfcXXXX name can be used):
 
 =over 8
 
-=item http (alias www, rfc2818), xmpp (rfc3920), ftp (rfc4217)
+=item rfc2818, xmpp (rfc3920), ftp (rfc4217)
 
 Extended wildcards in subjectAltNames and common name are possible, e.g.
 *.example.org or even www*.example.org. The common
 name will be only checked if no DNS names are given in subjectAltNames.
+
+=item http (alias www)
+
+While name checking is defined in rfc2818 the current browsers usually accept
+also an IP address (w/o wildcards) within the common name as long as no
+subjectAltNames are defined. Thus this is rfc2818 extended with this feature.
+
 
 =item smtp (rfc2595), imap, pop3, acap (rfc4642), netconf (rfc5538), syslog (rfc5425), snmp (rfc5953)
 
@@ -3620,6 +3640,11 @@ For compatibility with older versions 'leftmost' can be given instead of
 
 Similar to wildcards_in_alt, but checks the common name. There is no predefined
 scheme which allows wildcards in common names.
+
+=item ip_in_cn: 0|1
+
+Determines if an IP address is allowed in the common name (no wildcards are
+allowed).
 
 =item callback: \&coderef
 
