@@ -60,5 +60,6 @@ t/sysread_write.t
 t/testlib.pl
 t/verify_fingerprint.t
 t/verify_hostname.t
+t/verify_hostname_standalone.t
 util/analyze-ssl.pl
 util/https_ocsp_bulk.pl

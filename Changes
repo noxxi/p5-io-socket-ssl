@@ -1,3 +1,15 @@
+1.986 2014/05/16
+- allow IPv4 in common name, because browsers allow this too. But only for
+  scheme www/http, not for rfc2818 (because RC2818 does not allow this).
+  In default scheme IPv6 and IPv4 are allowed in CN.
+  Thanks to heiko[DOT]hund[AT]sophos[DOT]com for reporting the problem.
+- Fix handling of public suffix. Add exemption for *.googleapis.com
+  wildcard, which should be better not allowed according to public suffix
+  list but actually is used.
+- Add hostname verification test based on older test of chromium. But change
+  some of the test expectations because we don't want to support IP as SAN
+  DNS and because we enforce a public suffix list (and thus *.co.uk should
+  not be allowed)
 1.985 2014/05/15
 - make OCSP callback return 1 even if it was called on the server side
   because of bad setup of the socket. Otherwise we get an endless calling

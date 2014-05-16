@@ -9,24 +9,30 @@ if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
 }
 
 my @tests = qw(
-    fail:com
-    fail:googleapis.com
-    ok:ajax.googleapis.com
-    ok:google.com
-    ok:www.bar.com
-    ok:www.foo.bar.com
-    ok:www.foo.co.uk
-    fail:co.uk
-    ok:bl.uk
-    ok:www.bl.uk
-    fail:bar.kobe.jp
-    ok:foo.bar.kobe.jp
-    ok:www.foo.bar.kobe.jp
-    ok:city.kobe.jp
-    ok:www.city.kobe.jp
-    fail:nodomain
-    ok:foo.nodomain
-    ok:www.foo.nodomain
+    fail:com|*
+    ok:com|com
+    fail:googleapis.com|*.com
+    ok:googleapis.com|googleapis.com
+    ok:ajax.googleapis.com|*.googleapis.com
+    fail:google.com|*.com
+    ok:google.com|google.com
+    ok:www.google.com|*.google.com
+    ok:www.bar.com|*.bar.com
+    ok:www.foo.bar.com|*.foo.bar.com
+    ok:www.foo.co.uk|*.foo.co.uk
+    fail:www.co.uk|*.co.uk
+    fail:co.uk|*.uk
+    ok:bl.uk|bl.uk
+    ok:www.bl.uk|*.bl.uk
+    fail:bar.kobe.jp|*.kobe.jp
+    fail:foo.bar.kobe.jp|*.bar.kobe.jp
+    ok:www.foo.bar.kobe.jp|*.foo.bar.kobe.jp
+    fail:city.kobe.jp|*.kobe.jp
+    ok:city.kobe.jp|city.kobe.jp
+    ok:www.city.kobe.jp|*.city.kobe.jp
+    fail:nodomain|*
+    fail:foo.nodomain|*.nodomain
+    ok:www.foo.nodomain|*.foo.nodomain
 );
 
 $|=1;
@@ -77,8 +83,7 @@ $SIG{ALRM} = sub { die "test takes too long" };
 
 close($server);
 for my $test (@tests) {
-    my ($expect,$host) = $test=~m{^(ok|fail):(\S+)} or die $test;
-    ( my $cn = $host ) =~s{[^.]+}{*}; # expect cn to have wildcard
+    my ($expect,$host,$cn) = $test=~m{^(ok|fail):(\S+)\|(\S+)} or die $test;
     my $cl = IO::Socket::INET->new($saddr) or die "failed to connect: $!";
     print $cl "$cn\n";
     <$cl>;

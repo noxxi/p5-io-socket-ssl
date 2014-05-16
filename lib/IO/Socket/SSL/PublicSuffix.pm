@@ -291,7 +291,10 @@ sub public_suffix {
     my $data;
     sub _default_data {
 	if ( ! defined $data ) {
-	    $data = do { local $/; <DATA> }
+	    $data = do { local $/; <DATA> };
+	    # known exceptions of behavior of SSL certificates from PSL
+	    $data .= "!googleapis.com";
+
 	}
 	return $data;
     }

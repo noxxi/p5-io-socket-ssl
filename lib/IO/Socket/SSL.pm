@@ -29,7 +29,7 @@ BEGIN {
 
 
 
-our $VERSION = '1.985';
+our $VERSION = '1.986';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -1385,7 +1385,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	    wildcards_in_cn  => 'anywhere',
 	    wildcards_in_alt => 'anywhere',
 	    check_cn         => 'when_only',
-	    ip_in_cn         => 1,
+	    ip_in_cn         => 4,
 	}
     }
 
@@ -1451,6 +1451,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	}
 
 	return 1 if ! %$scheme; # 'none'
+	$identity =~s{\.+$}{}; # ignore absolutism
 
 	# get data from certificate
 	my $commonName = $dispatcher{cn}->($cert);
@@ -1467,23 +1468,25 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	my $ipn;
 	if ( CAN_IPV6 and $identity =~m{:} ) {
 	    # no IPv4 or hostname have ':'  in it, try IPv6.
-	    $ipn = inet_pton(AF_INET6,$identity)
-		or croak "'$identity' is not IPv6, but neither IPv4 nor hostname";
-	} elsif ( $identity =~m{^\d+\.\d+\.\d+\.\d+$} ) {
-	     # definitely no hostname, try IPv4
-	    $ipn = inet_aton( $identity ) or croak "'$identity' is not IPv4, but neither IPv6 nor hostname";
+	    $ipn = inet_pton(AF_INET6,$identity) or return; # invalid name
+	} elsif ( $identity =~m{^\d[\d\.]*\.\d+$} ) {
+	    $ipn = inet_aton($identity) or return; # invalid name
 	} else {
 	    # assume hostname, check for umlauts etc
 	    if ( $identity =~m{[^a-zA-Z0-9_.\-]} ) {
-		$identity =~m{\0} and croak("name '$identity' has \\0 byte");
-		$identity = idn_to_ascii($identity) or
-		    croak "Warning: Given name '$identity' could not be converted to IDNA!";
+		$identity =~m{\0} and return; # $identity has \\0 byte
+		$identity = idn_to_ascii($identity) 
+		    or return; # conversation to IDNA failed
+		$identity =~m{[^a-zA-Z0-9_.\-]}
+		    and return; # still junk inside
 	    }
 	}
 
 	# do the actual verification
 	my $check_name = sub {
 	    my ($name,$identity,$wtyp,$publicsuffix) = @_;
+	    $name =~s{\.+$}{}; # ignore absolutism
+	    $name eq '' and return;
 	    $wtyp ||= '';
 	    my $pattern;
 	    ### IMPORTANT!
@@ -1509,7 +1512,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 		    if ! defined $publicsuffix;
 		return 1 if $publicsuffix eq '';
 		my @labels = split( m{\.+}, $identity );
-		my $tld = $publicsuffix->public_suffix(\@labels,+0);
+		my $tld = $publicsuffix->public_suffix(\@labels,+1);
 		return 1 if @labels > ( $tld ? 0+@$tld : 1 );
 	    }
 	    return;
@@ -1538,7 +1541,12 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 		$check_name->($commonName,$identity,$scheme->{wildcards_in_cn},$publicsuffix)
 		    and return 1;
 	    } elsif ( $scheme->{ip_in_cn} ) {
-		$identity eq $commonName and return 1;
+		if ( $identity eq $commonName ) {
+		    return 1 if 
+			$scheme->{ip_in_cn} == 4 ? length($ipn) == 4 :
+			$scheme->{ip_in_cn} == 6 ? length($ipn) == 8 :
+			1;
+		}
 	    }
 	}
 
@@ -3641,10 +3649,11 @@ For compatibility with older versions 'leftmost' can be given instead of
 Similar to wildcards_in_alt, but checks the common name. There is no predefined
 scheme which allows wildcards in common names.
 
-=item ip_in_cn: 0|1
+=item ip_in_cn: 0|1|4|6
 
 Determines if an IP address is allowed in the common name (no wildcards are
-allowed).
+allowed). If set to 4 or 6 it only allows IPv4 or IPv6 addresses, any other
+true value allows both.
 
 =item callback: \&coderef
 
