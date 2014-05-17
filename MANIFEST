@@ -5,8 +5,12 @@ certs/client-key.pem
 certs/my-ca.pem
 certs/proxyca.pem
 certs/server-cert.pem
+certs/server-cert.der
 certs/server-key.enc
 certs/server-key.pem
+certs/server-key.der
+certs/server.p12
+certs/server_enc.p12
 certs/server-rsa384-dh.pem
 certs/server-wildcard.pem
 certs/test-ca.pem
@@ -30,6 +34,7 @@ t/01loadmodule.t
 t/acceptSSL-timeout.t
 t/auto_verify_hostname.t
 t/cert_no_file.t
+t/cert_formats.t
 t/compatibility.t
 t/connectSSL-timeout.t
 t/core.t

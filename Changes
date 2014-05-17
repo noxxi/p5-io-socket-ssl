@@ -1,3 +1,8 @@
+1.988 2014/05/17
+- add transparent support for DER and PKCS#12 files to specify cert and key,
+  e.g. it will autodetect the format
+- if SSL_cert_file is PEM and no SSL_key_file is given it will check if
+  the key is in SSL_cert_file too
 1.987 2014/05/17
 - fix t/verify_hostname_standalone.t on systems without usable IDNA or IPv6
   #95719, thanks srchulo
