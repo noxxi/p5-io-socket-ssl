@@ -1842,10 +1842,11 @@ use strict;
 my %CTX_CREATED_IN_THIS_THREAD;
 *DEBUG = *IO::Socket::SSL::DEBUG;
 
-# should be better taken from Net::SSLeay, but they are not (yet) defined there
 use constant SSL_MODE_ENABLE_PARTIAL_WRITE => 1;
 use constant SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER => 2;
 
+use constant FILETYPE_PEM => Net::SSLeay::FILETYPE_PEM();
+use constant FILETYPE_ASN1 => Net::SSLeay::FILETYPE_ASN1();
 
 # Note that the final object will actually be a reference to the scalar
 # (C-style pointer) returned by Net::SSLeay::CTX_*_new() so that
@@ -2095,7 +2096,6 @@ WARN
     }
 
     if ($arg_hash->{'SSL_server'} || $arg_hash->{'SSL_use_cert'}) {
-	my $filetype = Net::SSLeay::FILETYPE_PEM();
 
 	if ($arg_hash->{'SSL_passwd_cb'}) {
 	    Net::SSLeay::CTX_set_default_passwd_cb($ctx, $arg_hash->{'SSL_passwd_cb'});
@@ -2125,8 +2125,15 @@ WARN
 		Net::SSLeay::CTX_use_PrivateKey($snictx, $pkey)
 		    || return IO::Socket::SSL->error("Failed to use Private Key");
 	    } elsif ( my $f = $sni->{SSL_key_file} ) {
-		Net::SSLeay::CTX_use_PrivateKey_file($snictx, $f, $filetype)
-		    || return IO::Socket::SSL->error("Failed to open Private Key");
+		my $havekey;
+		for my $ft ( FILETYPE_PEM, FILETYPE_ASN1 ) {
+		    if (Net::SSLeay::CTX_use_PrivateKey_file($snictx,$f,$ft)) {
+			$havekey = 1;
+			last;
+		    }
+		}
+		$havekey or return 
+		    IO::Socket::SSL->error("Failed to open Private Key");
 	    }
 
 	    if ( my $x509 = $sni->{SSL_cert} ) {
@@ -2142,8 +2149,31 @@ WARN
 			|| return IO::Socket::SSL->error("Failed to use Certificate");
 		}
 	    } elsif ( my $f = $sni->{SSL_cert_file} ) {
-		Net::SSLeay::CTX_use_certificate_chain_file($snictx, $f)
-		    || return IO::Socket::SSL->error("Failed to open Certificate");
+		my $havecert;
+		# try to load chain from PEM or certificate from ASN1
+		if (Net::SSLeay::CTX_use_certificate_chain_file($snictx,$f)
+		    || Net::SSLeay::CTX_use_certificate_file($snictx,$f,FILETYPE_ASN1)) {
+		    $havecert = 1;
+		} else {
+		    # try to load certificate, key and chain from PKCS12 file
+		    my ($key,$cert,@chain) = Net::SSLeay::P_PKCS12_load_file($f,1);
+		    if (!$cert and $arg_hash->{SSL_passwd_cb}
+			and defined( my $pw = $arg_hash->{SSL_passwd_cb}->(0))) {
+			($key,$cert,@chain) = Net::SSLeay::P_PKCS12_load_file($f,1,$pw);
+		    }
+		    PKCS12: while ($cert) {
+			Net::SSLeay::CTX_use_certificate($snictx,$cert) or last;
+			for my $ca (@chain) {
+			    Net::SSLeay::CTX_add_extra_chain_cert($snictx,$ca)
+				or last PKCS12;
+			}
+			last if $key && ! Net::SSLeay::CTX_use_PrivateKey($snictx,$key);
+			$havecert = 1;
+			last;
+		    }
+		}
+		$havecert or return	
+		    IO::Socket::SSL->error("Failed to use certificate file");
 	    }
 	}
 
