@@ -1,3 +1,8 @@
+1.987 2014/05/17
+- fix t/verify_hostname_standalone.t on systems without usable IDNA or IPv6
+  #95719, thanks srchulo
+- enable IPv6 support only if we have a usable inet_pton
+- remove stale entries from MANIFEST (thanks seen[AT]myfairpoint[DOT]net)
 1.986 2014/05/16
 - allow IPv4 in common name, because browsers allow this too. But only for
   scheme www/http, not for rfc2818 (because RC2818 does not allow this).

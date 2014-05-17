@@ -29,7 +29,7 @@ BEGIN {
 
 
 
-our $VERSION = '1.986';
+our $VERSION = '1.987';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -219,22 +219,21 @@ my $IOCLASS;
 BEGIN {
     # declare @ISA depending of the installed socket class
 
-    # try to load inet_pton from Socket or Socket6
+    # try to load inet_pton from Socket or Socket6 and make sure it is usable
     local $SIG{__DIE__}; local $SIG{__WARN__}; # be silent
     my $ip6 = eval {
 	require Socket;
 	Socket->VERSION(1.95);
 	Socket->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
-	AF_INET6(); # >0 if defined in IO::Socket
+	inet_pton( AF_INET6(),'::1') && AF_INET6();
     } || eval {
 	require Socket6;
 	Socket6->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
-	AF_INET6(); # >0 if defined in IO::Socket
+	inet_pton( AF_INET6(),'::1') && AF_INET6();
     };
 
     # try IO::Socket::IP or IO::Socket::INET6 for IPv6 support
     if ( $ip6 ) {
-
 	# if we have IO::Socket::IP >= 0.20 we will use this in preference
 	# because it can handle both IPv4 and IPv6
 	if ( eval { require IO::Socket::IP; IO::Socket::IP->VERSION(0.20); } ) {
