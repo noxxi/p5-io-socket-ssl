@@ -1945,7 +1945,7 @@ sub new {
 			"Cannot determine peer hostname for verification" );
 		    return 0;
 		}
-		warn "Cannot determine hostname if peer for verification. ".
+		warn "Cannot determine hostname of peer for verification. ".
 		    "Disabling default hostname verification for now. ".
 		    "Please specify hostname with SSL_verifycn_name and better set SSL_verifycn_scheme too.\n";
 		return $ok;
