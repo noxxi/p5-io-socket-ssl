@@ -3079,6 +3079,12 @@ Supported file formats are PEM, DER and PKCS#12, where PEM and PKCS#12 can
 contain the certicate and the chain to use, while DER can only contain a single
 certificate.
 
+If given as a list of X509* please note, that the all the chain certificates
+(e.g. all except the first) will be "consumed" by openssl and will be freed
+if the SSL context gets destroyed - so you should never free them yourself. But
+the servers certificate (e.g. the first) will not be consumed by openssl and
+thus must be freed by the application.
+
 For each certificate a key is need, which can either be given as a file with
 SSL_key_file or as an internal representation of a EVP_PKEY* object with
 SSL_key.
