@@ -29,7 +29,7 @@ BEGIN {
 
 
 
-our $VERSION = '1.988';
+our $VERSION = '1.989';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -224,12 +224,14 @@ BEGIN {
     my $ip6 = eval {
 	require Socket;
 	Socket->VERSION(1.95);
+	my $ok = Socket::inet_pton( AF_INET6(),'::1') && AF_INET6();
 	Socket->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
-	inet_pton( AF_INET6(),'::1') && AF_INET6();
+	$ok;
     } || eval {
 	require Socket6;
+	my $ok = Socket6::inet_pton( AF_INET6(),'::1') && AF_INET6();
 	Socket6->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
-	inet_pton( AF_INET6(),'::1') && AF_INET6();
+	$ok;
     };
 
     # try IO::Socket::IP or IO::Socket::INET6 for IPv6 support

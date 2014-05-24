@@ -1,3 +1,5 @@
+1.989 2014/05/24
+- fix #95881 (warnings on windows), thanks to TMHALL
 1.988 2014/05/17
 - add transparent support for DER and PKCS#12 files to specify cert and key,
   e.g. it will autodetect the format
