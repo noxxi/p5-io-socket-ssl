@@ -138,6 +138,9 @@ for my $test (@tests) {
 	    if ($err =~m/revoked/) {
 		pass("revoked within stapling as expected");
 		next TEST;
+	    } elsif ( $err =~m/status not yet valid/ ) {
+		pass("temporary server side error with OCSP check: $err");
+		next TEST;
 	    } else {
 		fail("expected revoked, but error=$err");
 		next TEST;

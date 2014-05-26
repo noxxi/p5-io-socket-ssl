@@ -29,7 +29,7 @@ BEGIN {
 
 
 
-our $VERSION = '1.989';
+our $VERSION = '1.989_1';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -225,12 +225,12 @@ BEGIN {
 	require Socket;
 	Socket->VERSION(1.95);
 	my $ok = Socket::inet_pton( AF_INET6(),'::1') && AF_INET6();
-	Socket->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
+	$ok && Socket->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
 	$ok;
     } || eval {
 	require Socket6;
 	my $ok = Socket6::inet_pton( AF_INET6(),'::1') && AF_INET6();
-	Socket6->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
+	$ok && Socket6->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
 	$ok;
     };
 
