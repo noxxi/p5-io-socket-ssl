@@ -29,7 +29,7 @@ BEGIN {
 
 
 
-our $VERSION = '1.989_1';
+our $VERSION = '1.990';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -2295,6 +2295,7 @@ WARN
     Net::SSLeay::CTX_set_verify($ctx, $verify_mode, $verify_callback);
 
     $self->{ocsp_mode} = $arg_hash->{SSL_ocsp_mode}||0;
+    my $staple_callback = $arg_hash->{SSL_ocsp_staple_callback};
     if ( !$is_server && $can_ocsp_staple ) {
 	my $mode = $self->{ocsp_mode};
 	$self->{ocsp_cache} = $arg_hash->{SSL_ocsp_cache};
@@ -2310,6 +2311,15 @@ WARN
 		return 1;
 	    };
 	    $iossl = $iossl->[0];
+
+	    # if we have a callback use this
+	    # callback must not free or copy $resp !!
+	    if ( $staple_callback ) {
+		$staple_callback->($iossl,$resp);
+		return 1;
+	    }
+
+	    # default callback does verification
 	    if ( ! $resp ) {
 		$DEBUG>=3 && DEBUG("did not get stapled OCSP response");
 		return 1;
@@ -3332,6 +3342,21 @@ chain will be checked, otherwise only the leaf certificate will be checked
 against revocation.
 
 =back
+
+=item SSL_ocsp_staple_callback
+
+If this callback is defined, it will be called with the SSL object and the OCSP
+response handle obtained from the peer, e.g. C<<$cb->($ssl,$resp)>>.
+If the peer did not provide a stapled OCSP response the function will be called
+with C<$resp=undef>. 
+Because the OCSP response handle is no longer valid after leaving this function
+it should not by copied or freed. If access to the response is necessary after
+leaving this function it can be serialized with
+L<Net::SSLeay::i2d_OCSP_RESPONSE>.
+
+If no such callback is provided, it will use the default one, which verifies the
+response and uses it to check if the certificate(s) of the connection got
+revoked.
 
 =item SSL_ocsp_cache
 

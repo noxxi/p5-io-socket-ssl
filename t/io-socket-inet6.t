@@ -53,6 +53,7 @@ if ( ! IO::Socket::INET6->new(
 
 $|=1;
 print "1..3\n";
+print "# IO::Socket::INET6 version=$IO::Socket::INET6::VERSION\n";
 
 # first create simple ssl-server
 my $ID = 'server';

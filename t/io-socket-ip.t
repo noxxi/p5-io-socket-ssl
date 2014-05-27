@@ -41,6 +41,7 @@ if ( ! IO::Socket::IP->new(
 
 $|=1;
 print "1..3\n";
+print "# IO::Socket::IP version=$IO::Socket::IP::VERSION\n";
 
 # first create simple ssl-server
 my $ID = 'server';
