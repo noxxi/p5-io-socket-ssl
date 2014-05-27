@@ -1,3 +1,7 @@
+1.991 2014/05/27
+- new option SSL_OCSP_TRY_STAPLE to enforce staple request even if
+  VERIFY_NONE
+- work around for RT#96013 in peer_certificates
 1.990 2014/05/27
 - added option SSL_ocsp_staple_callback to get the stapled OCSP response
   and verify it somewhere else

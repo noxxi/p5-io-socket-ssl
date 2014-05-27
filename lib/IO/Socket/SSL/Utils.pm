@@ -190,6 +190,7 @@ sub CERT_asHash {
     } else {
 	$hash{ocsp_uri} = [];
 	for( @ext ) {
+	    $_->{sn} or next;
 	    $_->{sn} eq 'authorityInfoAccess' or next;
 	    push @{ $hash{ocsp_uri}}, $_->{data} =~m{\bOCSP - URI:(\S+)}g;
 	}

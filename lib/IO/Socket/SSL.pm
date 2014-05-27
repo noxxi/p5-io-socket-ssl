@@ -29,7 +29,7 @@ BEGIN {
 
 
 
-our $VERSION = '1.990';
+our $VERSION = '1.991';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -44,6 +44,7 @@ use constant SSL_OCSP_NO_STAPLE   => 0b00001;
 use constant SSL_OCSP_MUST_STAPLE => 0b00010;
 use constant SSL_OCSP_FAIL_HARD   => 0b00100;
 use constant SSL_OCSP_FULL_CHAIN  => 0b01000;
+use constant SSL_OCSP_TRY_STAPLE  => 0b10000;
 
 # capabilities of underlying Net::SSLeay/openssl
 my $can_client_sni;  # do we support SNI on the client side
@@ -207,8 +208,8 @@ use vars qw(@ISA $SSL_ERROR @EXPORT);
     @EXPORT = qw(
 	SSL_WANT_READ SSL_WANT_WRITE SSL_VERIFY_NONE SSL_VERIFY_PEER
 	SSL_VERIFY_FAIL_IF_NO_PEER_CERT SSL_VERIFY_CLIENT_ONCE
-	SSL_OCSP_NO_STAPLE SSL_OCSP_MUST_STAPLE SSL_OCSP_FAIL_HARD
-	SSL_OCSP_FULL_CHAIN
+	SSL_OCSP_NO_STAPLE SSL_OCSP_TRY_STAPLE SSL_OCSP_MUST_STAPLE
+	SSL_OCSP_FAIL_HARD SSL_OCSP_FULL_CHAIN
 	$SSL_ERROR GEN_DNS GEN_IPADD
     );
 }
@@ -580,8 +581,7 @@ sub connect_SSL {
 	    # don't try stapling
 	} elsif ( ! $can_ocsp_staple ) {
 	    croak("OCSP stapling not support") if $ocsp & SSL_OCSP_MUST_STAPLE;
-	} elsif ( $ocsp & SSL_OCSP_MUST_STAPLE
-	    or $ctx->{verify_mode} & 0x1 ) {
+	} elsif ( $ocsp & (SSL_OCSP_TRY_STAPLE|SSL_OCSP_MUST_STAPLE)) {
 	    # staple by default if verification enabled
 	    ${*$self}{_SSL_ocsp_verify} = undef;
 	    Net::SSLeay::set_tlsext_status_type($ssl, 
@@ -1297,6 +1297,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	my $self = shift;
 	my $ssl = $self->_get_ssl_object || return;
 	my @chain = Net::SSLeay::get_peer_cert_chain($ssl);
+	@chain = () if @chain && !$self->peer_certificate; # work around #96013
 	if ( ${*$self}{_SSL_arguments}{SSL_server} ) {
 	    # in the client case the chain contains the peer certificate,
 	    # in the server case not
@@ -2294,10 +2295,8 @@ WARN
     }
     Net::SSLeay::CTX_set_verify($ctx, $verify_mode, $verify_callback);
 
-    $self->{ocsp_mode} = $arg_hash->{SSL_ocsp_mode}||0;
     my $staple_callback = $arg_hash->{SSL_ocsp_staple_callback};
     if ( !$is_server && $can_ocsp_staple ) {
-	my $mode = $self->{ocsp_mode};
 	$self->{ocsp_cache} = $arg_hash->{SSL_ocsp_cache};
 	Net::SSLeay::CTX_set_tlsext_status_cb($ctx,sub {
 	    my ($ssl,$resp) = @_;
@@ -2390,6 +2389,10 @@ WARN
 
     $self->{context} = $ctx;
     $self->{verify_mode} = $arg_hash->{SSL_verify_mode};
+    $self->{ocsp_mode} = 
+	defined($arg_hash->{SSL_ocsp_mode}) ? $arg_hash->{SSL_ocsp_mode} :
+	$self->{verify_mode} ? IO::Socket::SSL::SSL_OCSP_TRY_STAPLE() :
+	0;
     $DEBUG>=3 && DEBUG( "new ctx $ctx" );
     $CTX_CREATED_IN_THIS_THREAD{$ctx} = 1;
 
@@ -3317,6 +3320,12 @@ The following flags can be combined with C<|>:
 =item SSL_OCSP_NO_STAPLE 
 
 Don't ask for OCSP stapling.
+This is the default if SSL_verify_mode is VERIFY_NONE.
+
+=item SSL_OCSP_TRY_STAPLE 
+
+Try OCSP stapling, but don't complain if it gets no stapled response back.
+This is the default if SSL_verify_mode is VERIFY_PEER (the default).
 
 =item SSL_OCSP_MUST_STAPLE
 

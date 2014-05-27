@@ -170,7 +170,7 @@ for my $test (@tests) {
     my $sni_status;
     if ( $name && $version !~m{^TLS} ) {
 	VERBOSE(1,"disabling SNI because SSL version $version too low");
-	$name = undef
+	$name = undef;
     }
     if ($name) {
 	my $cl = &$tcp_connect;
