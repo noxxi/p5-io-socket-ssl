@@ -10,13 +10,14 @@ my $can_ocsp = IO::Socket::SSL->can_ocsp;
 my $ocsp_cache = $can_ocsp && IO::Socket::SSL::OCSP_Cache->new;
 
 my %starttls = (
-    'smtp' => [ 25, \&smtp_starttls ],
-    'http_proxy' => [ 443, \&http_connect ],
-    'http_upgrade' => [ 80, \&http_upgrade ],
-    'imap' => [ 143, \&imap_starttls ],
-    'pop'  => [ 110, \&pop_stls ],
-    'ftp'  => [ 21, \&ftp_auth ],
-    'postgresql'  => [ 5432, \&postgresql_init ],
+    ''  => [ 443,undef, 'http' ],
+    'smtp' => [ 25, \&smtp_starttls, 'smtp' ],
+    'http_proxy' => [ 443, \&http_connect,' http' ],
+    'http_upgrade' => [ 80, \&http_upgrade,'http' ],
+    'imap' => [ 143, \&imap_starttls,'imap' ],
+    'pop'  => [ 110, \&pop_stls,'pop3' ],
+    'ftp'  => [ 21, \&ftp_auth,'ftp' ],
+    'postgresql'  => [ 5432, \&postgresql_init,'default' ],
 );
 
 my $verbose = 0;
@@ -85,20 +86,20 @@ for my $host (@ARGV) {
     my ($ip,$port);
     $host =~m{^(?:\[(.+)\]|([^:]+))(?::(\w+))?$} or die "invalid dst: $host";
     $host = $1||$2;
-    $port = $3 || ( $stls ? $starttls{$stls}[0] : 443 );
+    my $st = $starttls{$stls ||''};
+    $port = $3 || $st->[0] || 443;
     if ( $host =~m{:|^[\d\.]+$} ) {
 	$ip = $host;
 	$host = undef;
     }
-    push @tests, [ $host||$ip,$port,$host ];
+    push @tests, [ $host||$ip,$port,$host,$st->[1],$st->[2] || 'default' ];
 }
 
 my $ioclass = IO::Socket::SSL->can_ipv6 || 'IO::Socket::INET';
 for my $test (@tests) {
-    my ($host,$port,$name,$starttls) = @$test;
+    my ($host,$port,$name,$stls_sub,$scheme) = @$test;
     VERBOSE(1,"checking host=$host port=$port".
 	($stls ? " starttls=$stls":""));
-    my $stls_sub = $stls && $starttls{$stls}[1];
 
     my $tcp_connect = sub {
 	my $tries = shift || 1;
@@ -206,6 +207,14 @@ for my $test (@tests) {
 		    my ($subject,$bits);
 		    $subject = Net::SSLeay::X509_NAME_oneline(
 			Net::SSLeay::X509_get_subject_name($cert));
+		    if ( !@$chain) {
+			my @san = $cl->peer_certificate('subjectAltNames');
+			for( my $i=0;$i<@san;$i++) {
+			    $san[$i] = 'DNS' if $san[$i] == 2;
+			    $san[$i] .= ":".splice(@san,$i+1,1);
+			}
+			$subject .= " SAN=".join(",",@san) if @san;
+		    }
 		    if (my $pkey = Net::SSLeay::X509_get_pubkey($cert)) {
 			$bits = eval { Net::SSLeay::EVP_PKEY_bits($pkey) };
 			Net::SSLeay::EVP_PKEY_free($pkey);
@@ -213,7 +222,7 @@ for my $test (@tests) {
 		    push @$chain,[
 			$bits||'???',
 			$subject,
-			join('|',@{ CERT_asHash($cert)->{ocsp_uri} || []}),
+			join('|', grep { $_ } @{ CERT_asHash($cert)->{ocsp_uri} || []}),
 			PEM_cert2string($cert),
 		    ],
 		}
@@ -235,11 +244,31 @@ for my $test (@tests) {
     if ( IO::Socket::SSL->start_SSL($cl, %conf,
 	SSL_verify_mode => SSL_VERIFY_PEER,
 	SSL_ocsp_mode => SSL_OCSP_NO_STAPLE,
+	SSL_verifycn_scheme => 'none',
 	%default_ca
     )) {
 	%conf = ( %conf, SSL_verify_mode => SSL_VERIFY_PEER, %default_ca );
-	VERBOSE(1,"certificate verify success");
-	$verify_status = 'ok';
+	if ( $cl->verify_hostname( $name,$scheme )) {
+	    VERBOSE(1,"certificate verify success");
+	    $verify_status = 'ok';
+	    %conf = ( %conf,
+		SSL_verifycn_scheme => $scheme,
+		SSL_verifycn_name => $name,
+	    );
+	} else {
+	    my @san = $cl->peer_certificate('subjectAltNames');
+	    for( my $i=0;$i<@san;$i++) {
+		$san[$i] = 'DNS' if $san[$i] == 2;
+		$san[$i] .= ":".splice(@san,$i+1,1);
+	    }
+	    VERBOSE(1,"certificate verify - name does not match:".
+		" subject=".$cl->peer_certificate('subject').
+		" SAN=".join(",",@san)
+	    );
+	    $verify_status = 'name-mismatch';
+	    %conf = ( %conf, SSL_verifycn_scheme => 'none');
+	}
+
     } else {
 	VERBOSE(1,"certificate verify FAIL!");
 	$verify_status = "FAIL: $SSL_ERROR";
