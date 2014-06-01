@@ -29,7 +29,7 @@ BEGIN {
 
 
 
-our $VERSION = '1.991';
+our $VERSION = '1.992';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -598,7 +598,7 @@ sub connect_SSL {
 
     $ssl ||= ${*$self}{'_SSL_object'};
 
-    $SSL_ERROR = undef;
+    $SSL_ERROR = $! = undef;
     my $timeout = exists $args->{Timeout}
 	? $args->{Timeout}
 	: ${*$self}{io_socket_timeout}; # from IO::Socket
@@ -787,7 +787,7 @@ sub accept_SSL {
 
     $ssl ||= ${*$socket}{'_SSL_object'};
 
-    $SSL_ERROR = undef;
+    $SSL_ERROR = $! = undef;
     #$DEBUG>=2 && DEBUG('calling ssleay::accept' );
 
     my $timeout = exists $args->{Timeout}
@@ -871,7 +871,7 @@ sub generic_read {
     my $ssl = $self->_get_ssl_object || return;
     my $buffer=\$_[2];
 
-    $SSL_ERROR = undef;
+    $SSL_ERROR = $! = undef;
     my $data = $read_func->($ssl, $length);
     if ( !defined($data)) {
 	$self->_set_rw_error( $ssl,-1 ) || $self->error("SSL read error");
@@ -921,7 +921,7 @@ sub generic_write {
     return $self->error("Invalid offset for SSL write") if ($offset>$buf_len);
     return 0 if ($offset == $buf_len);
 
-    $SSL_ERROR = undef;
+    $SSL_ERROR = $! = undef;
     my $written;
     if ( $write_all ) {
 	my $data = $length < $buf_len-$offset ? substr($$buffer, $offset, $length) : $$buffer;

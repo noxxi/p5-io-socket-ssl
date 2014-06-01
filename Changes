@@ -1,3 +1,7 @@
+1.992 2014/06/01
+- set $! to undef before doing IO (accept, read..). On Winwdows a connection
+  reset could cause SSL read error without setting $!, so make sure we don't
+  keep the old value and maybe thus run into endless loop.
 1.991 2014/05/27
 - new option SSL_OCSP_TRY_STAPLE to enforce staple request even if
   VERIFY_NONE
