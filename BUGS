@@ -9,16 +9,6 @@ yourself. See the bug for examples how to do it.
 
 ---------------------
 
-If you plan on having IO::Socket::SSL sockets auto-close themselves
-when they go out of scope (like LWP::UserAgent expects), you will
-need to get Scalar::Util or WeakRef from CPAN (Scalar::Util comes
-standard with Perl 5.8.0 and above).  This is because the self-tying
-mechanism that IO::Socket::SSL uses to appear simultaneously as an
-object and a glob reference only works if a circular reference is
-used.
-
----------------------
-
 Note that a random number generator is required for the proper
 operation of this module.  Systems that have /dev/random or
 /dev/urandom are fine, but those that do not, like most versions
@@ -57,5 +47,5 @@ http://groups.google.de/group/mailing.openssl.users/msg/d60330cfa7a6034b
 for an explanation why you need it.
 
 -- 
-Steffen Ullrich (Steffen_Ullrich at genua.de)
+Steffen Ullrich (sullr at cpan.org)
 Peter Behroozi (behrooz at fas.harvard.edu)

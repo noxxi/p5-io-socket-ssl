@@ -20,7 +20,6 @@ my $server = IO::Socket::SSL->new(
     Listen => 2,
     ReuseAddr => 1,
     SSL_server => 1,
-    SSL_ca_file => "certs/test-ca.pem",
     SSL_cert_file => "certs/server-wildcard.pem",
     SSL_key_file => "certs/server-wildcard.pem",
 );
@@ -48,10 +47,10 @@ my @tests = qw(
     bla.server.local ldap OK
 );
 
+IO::Socket::SSL::default_ca('certs/test-ca.pem');
 for( my $i=0;$i<@tests;$i+=3 ) {
     my ($name,$scheme,$result) = @tests[$i,$i+1,$i+2];
     my $cl = IO::Socket::SSL->new(
-	SSL_ca_file => 'certs/test-ca.pem',
 	PeerAddr => $saddr,
 	SSL_verify_mode => 1,
 	SSL_verifycn_scheme => $scheme,
@@ -76,7 +75,6 @@ for( my $i=0;$i<@tests;$i+=3 ) {
     ) || print "not ";
     ok( "tcp connect" );
     $cl = IO::Socket::SSL->start_SSL( $cl,
-	SSL_ca_file => 'certs/test-ca.pem',
 	SSL_verify_mode => 1,
 	SSL_verifycn_scheme => $scheme,
 	SSL_verifycn_name => $name,
