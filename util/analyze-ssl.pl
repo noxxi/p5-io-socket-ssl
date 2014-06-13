@@ -171,9 +171,7 @@ for my $test (@tests) {
     my $sni_status;
     if ( $name && $version !~m{^TLS} ) {
 	VERBOSE(1,"disabling SNI because SSL version $version too low");
-	$name = undef;
-    }
-    if ($name) {
+    } elsif ($name) {
 	my $cl = &$tcp_connect;
 	if ( IO::Socket::SSL->start_SSL($cl, %conf,
 	    SSL_verify_mode => 0,
@@ -186,7 +184,6 @@ for my $test (@tests) {
 	    VERBOSE(1,"SNI FAIL!");
 	    $sni_status = "FAIL: $SSL_ERROR";
 	    push @problems, "using SNI (default) -> $SSL_ERROR";
-	    $name = undef;
 	}
     }
 
@@ -328,9 +325,9 @@ for my $test (@tests) {
 	my $c = 'HIGH:ALL:eNULL';
 	while ($all_ciphers || @ciphers<2 ) {
 	    my $cl = &$tcp_connect;
-	    if ( IO::Socket::SSL->start_SSL($cl, %conf,
+	    if ( IO::Socket::SSL->start_SSL($cl, 
 		SSL_verify_mode => 0,
-		SSL_ocsp_mode => 0,
+		SSL_version => $conf{SSL_version},
 		SSL_cipher_list => $c,
 	    )) {
 		push @ciphers, [ $cl->get_sslversion, $cl->get_cipher ];

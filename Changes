@@ -1,3 +1,6 @@
+- rework error handling to distinguish between SSL errors and internal errors
+  (like missing capabilities).
+- util/analyze-ssl.pl - fix hostname check if SNI does not work
 1.992 2014/06/01
 - set $! to undef before doing IO (accept, read..). On Winwdows a connection
   reset could cause SSL read error without setting $!, so make sure we don't

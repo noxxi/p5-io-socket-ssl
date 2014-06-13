@@ -57,13 +57,13 @@ BEGIN {
     $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x01000000;
     $can_server_sni = defined &Net::SSLeay::get_servername;
     $can_npn        = defined &Net::SSLeay::P_next_proto_negotiated;
-    $can_ecdh       = defined &Net::SSLeay::CTX_set_tmp_ecdh && 
+    $can_ecdh       = defined &Net::SSLeay::CTX_set_tmp_ecdh &&
 	# There is a regression with elliptic curves on 1.0.1d with 64bit
 	# http://rt.openssl.org/Ticket/Display.html?id=2975
 	( Net::SSLeay::OPENSSL_VERSION_NUMBER() != 0x1000104f
 	|| length(pack("P",0)) == 4 );
     $can_ocsp        = defined &Net::SSLeay::OCSP_cert2ids;
-    $can_ocsp_staple = $can_ocsp 
+    $can_ocsp_staple = $can_ocsp
 	&& defined &Net::SSLeay::set_tlsext_status_type;
 }
 
@@ -425,7 +425,7 @@ sub configure {
     $self->configure_SSL($arg_hash) || return;
 
     $self->SUPER::configure($arg_hash)
-	|| return $self->error("@ISA configuration failed");
+	|| return $self->_internal_error("@ISA configuration failed");
 
     $self->blocking(0) if defined $blocking && !$blocking;
     return $self;
@@ -475,16 +475,20 @@ sub configure_SSL {
 }
 
 
-sub _set_rw_error {
+sub _skip_rw_error {
     my ($self,$ssl,$rv) = @_;
     my $err = Net::SSLeay::get_error($ssl,$rv);
-    $SSL_ERROR =
-	$err == Net::SSLeay::ERROR_WANT_READ()  ? SSL_WANT_READ :
-	$err == Net::SSLeay::ERROR_WANT_WRITE() ? SSL_WANT_WRITE :
-	return;
+    if ( $err == Net::SSLeay::ERROR_WANT_READ()) {
+	$SSL_ERROR = SSL_WANT_READ;
+    } elsif ( $err == Net::SSLeay::ERROR_WANT_WRITE()) {
+	$SSL_ERROR = SSL_WANT_WRITE;
+    } else {
+	return $err;
+    }
     $! ||= EAGAIN;
     ${*$self}{'_SSL_last_err'} = $SSL_ERROR if ref($self);
-    return 1;
+    Net::SSLeay::ERR_clear_error();
+    return 0;
 }
 
 
@@ -524,7 +528,8 @@ sub connect_SSL {
 	my $arg_hash = ${*$self}{'_SSL_arguments'};
 
 	my $fileno = ${*$self}{'_SSL_fileno'} = fileno($self);
-	return $self->error("Socket has no fileno") unless (defined $fileno);
+	return $self->_internal_error("Socket has no fileno")
+	    if ! defined $fileno;
 
 	$ctx = ${*$self}{'_SSL_ctx'};  # Reference to real context
 	$ssl = ${*$self}{'_SSL_object'} = Net::SSLeay::new($ctx->{context})
@@ -557,7 +562,7 @@ sub connect_SSL {
 		$DEBUG>=2 && DEBUG("not using SNI because hostname is unknown");
 	    }
 	} elsif ( $arg_hash->{SSL_hostname} ) {
-	    return $self->error(
+	    return $self->_internal_error(
 		"Client side SNI not supported for this openssl");
 	} else {
 	    $DEBUG>=2 && DEBUG("not using SNI because openssl is too old");
@@ -577,14 +582,14 @@ sub connect_SSL {
 	}
 
 	my $ocsp = $ctx->{ocsp_mode};
-	if ( $ocsp & SSL_OCSP_NO_STAPLE ) { 
+	if ( $ocsp & SSL_OCSP_NO_STAPLE ) {
 	    # don't try stapling
 	} elsif ( ! $can_ocsp_staple ) {
 	    croak("OCSP stapling not support") if $ocsp & SSL_OCSP_MUST_STAPLE;
 	} elsif ( $ocsp & (SSL_OCSP_TRY_STAPLE|SSL_OCSP_MUST_STAPLE)) {
 	    # staple by default if verification enabled
 	    ${*$self}{_SSL_ocsp_verify} = undef;
-	    Net::SSLeay::set_tlsext_status_type($ssl, 
+	    Net::SSLeay::set_tlsext_status_type($ssl,
 		Net::SSLeay::TLSEXT_STATUSTYPE_ocsp());
 	    $DEBUG>=2 && DEBUG("request OCSP stapling");
 	}
@@ -617,8 +622,8 @@ sub connect_SSL {
 	my $rv = Net::SSLeay::connect($ssl);
 	$DEBUG>=3 && DEBUG("Net::SSLeay::connect -> $rv" );
 	if ( $rv < 0 ) {
-	    unless ( $self->_set_rw_error( $ssl,$rv )) {
-		$self->error("SSL connect attempt failed with unknown error");
+	    if ( my $err = $self->_skip_rw_error( $ssl,$rv )) {
+		$self->error("SSL connect attempt failed");
 		delete ${*$self}{'_SSL_opening'};
 		${*$self}{'_SSL_opened'} = -1;
 		$DEBUG>=1 && DEBUG( "fatal SSL error: $SSL_ERROR" );
@@ -693,11 +698,11 @@ sub connect_SSL {
 	    # definitly revoked
 	    $DEBUG>=3 && DEBUG("got OCSP revocation with stapling: %s",
 		$ocsp_result->[1]);
-	    $self->error($ocsp_result->[1]);
+	    $self->_internal_error($ocsp_result->[1]);
 	    return $self->fatal_ssl_error();
 	}
     } elsif ( $ctx->{ocsp_mode} & SSL_OCSP_MUST_STAPLE ) {
-	$self->error("did not receive the required stapled OCSP response");
+	$self->_internal_error("did not receive the required stapled OCSP response");
 	return $self->fatal_ssl_error();
     }
 
@@ -773,7 +778,8 @@ sub accept_SSL {
 	my $ctx = ${*$socket}{'_SSL_ctx'} = ${*$self}{'_SSL_ctx'};
 
 	my $fileno = ${*$socket}{'_SSL_fileno'} = fileno($socket);
-	return $socket->error("Socket has no fileno") unless (defined $fileno);
+	return $socket->_internal_error("Socket has no fileno")
+	    if ! defined $fileno;
 
 	$ssl = ${*$socket}{'_SSL_object'} = Net::SSLeay::new($ctx->{context})
 	    || return $socket->error("SSL structure creation failed");
@@ -806,8 +812,8 @@ sub accept_SSL {
 	my $rv = Net::SSLeay::accept($ssl);
 	$DEBUG>=3 && DEBUG( "Net::SSLeay::accept -> $rv" );
 	if ( $rv < 0 ) {
-	    unless ( $socket->_set_rw_error( $ssl,$rv )) {
-		$socket->error("SSL accept attempt failed with unknown error");
+	    if ( my $err = $socket->_skip_rw_error( $ssl,$rv )) {
+		$socket->error("SSL accept attempt failed");
 		delete ${*$self}{'_SSL_opening'};
 		${*$socket}{'_SSL_opened'} = -1;
 		return $socket->fatal_ssl_error();
@@ -872,9 +878,11 @@ sub generic_read {
     my $buffer=\$_[2];
 
     $SSL_ERROR = $! = undef;
-    my $data = $read_func->($ssl, $length);
+    my ($data,$rwerr) = $read_func->($ssl, $length);
     if ( !defined($data)) {
-	$self->_set_rw_error( $ssl,-1 ) || $self->error("SSL read error");
+	if ( my $err = $self->_skip_rw_error( $ssl, defined($rwerr) ? $rwerr:-1 )) {
+	    $self->error("SSL read error");
+	}
 	return;
     }
 
@@ -918,7 +926,8 @@ sub generic_write {
     my $buf_len = length($$buffer);
     $length ||= $buf_len;
     $offset ||= 0;
-    return $self->error("Invalid offset for SSL write") if ($offset>$buf_len);
+    return $self->_internal_error("Invalid offset for SSL write")
+	if $offset>$buf_len;
     return 0 if ($offset == $buf_len);
 
     $SSL_ERROR = $! = undef;
@@ -934,8 +943,9 @@ sub generic_write {
 	$written = undef if $written < 0;
     }
     if ( !defined($written) ) {
-	$self->_set_rw_error( $ssl,-1 )
-	    || $self->error("SSL write error");
+	if ( my $err = $self->_skip_rw_error( $ssl,-1 )) {
+	    $self->error("SSL write error");
+	}
 	return;
     }
 
@@ -1109,9 +1119,9 @@ sub stop_SSL {
 	if ( ! $stop_args->{SSL_no_shutdown} ) {
 	    my $status = Net::SSLeay::get_shutdown($ssl);
 
-	    my $timeout = 
+	    my $timeout =
 		not($self->blocking) ? undef :
-		exists $stop_args->{Timeout} ? $stop_args->{Timeout} : 
+		exists $stop_args->{Timeout} ? $stop_args->{Timeout} :
 		${*$self}{io_socket_timeout}; # from IO::Socket
 	    if ($timeout) {
 		$self->blocking(0);
@@ -1133,12 +1143,12 @@ sub stop_SSL {
 		if ( $rv < 0 ) {
 		    # non-blocking socket?
 		    if ( ! $timeout ) {
-			$self->_set_rw_error( $ssl,$rv );
+			$self->_skip_rw_error( $ssl,$rv );
 			# need to try again
 			return;
 		    }
-	
-		    # don't use _set_rw_error so that existing error does
+
+		    # don't use _skip_rw_error so that existing error does
 		    # not get cleared
 		    my $wait = $timeout - time();
 		    last if $wait<=0;
@@ -1203,9 +1213,8 @@ sub fileno {
 # _get_ssl_object is for internal use ONLY!
 sub _get_ssl_object {
     my $self = shift;
-    my $ssl = ${*$self}{'_SSL_object'};
-    return IO::Socket::SSL->error("Undefined SSL object") unless($ssl);
-    return $ssl;
+    return ${*$self}{'_SSL_object'} ||
+	IO::Socket::SSL->_internal_error("Undefined SSL object");
 }
 
 # _get_ctx_object is for internal use ONLY!
@@ -1217,7 +1226,7 @@ sub _get_ctx_object {
 
 # default error for undefined arguments
 sub _invalid_object {
-    return IO::Socket::SSL->error("Undefined IO::Socket::SSL object");
+    return IO::Socket::SSL->_internal_error("Undefined IO::Socket::SSL object");
 }
 
 
@@ -1228,13 +1237,14 @@ sub pending {
 
 sub start_SSL {
     my ($class,$socket) = (shift,shift);
-    return $class->error("Not a socket") unless(ref($socket));
+    return $class->_internal_error("Not a socket") if ! ref($socket);
     my $arg_hash = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
     my %to = exists $arg_hash->{Timeout} ? ( Timeout => delete $arg_hash->{Timeout} ) :();
     my $original_class = ref($socket);
     my $original_fileno = (UNIVERSAL::can($socket, "fileno"))
 	? $socket->fileno : CORE::fileno($socket);
-    return $class->error("Socket has no fileno") unless defined $original_fileno;
+    return $class->_internal_error("Socket has no fileno")
+	if ! defined $original_fileno;
 
     bless $socket, $class;
     $socket->configure_SSL($arg_hash) or bless($socket, $original_class) && return;
@@ -1308,7 +1318,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	    }
 	}
 	return @chain;
-	    
+
     }
 } else {
     *peer_certificates = sub {
@@ -1477,7 +1487,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	    # assume hostname, check for umlauts etc
 	    if ( $identity =~m{[^a-zA-Z0-9_.\-]} ) {
 		$identity =~m{\0} and return; # $identity has \\0 byte
-		$identity = idn_to_ascii($identity) 
+		$identity = idn_to_ascii($identity)
 		    or return; # conversation to IDNA failed
 		$identity =~m{[^a-zA-Z0-9_.\-]}
 		    and return; # still junk inside
@@ -1503,7 +1513,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	    if ( $wtyp eq 'anywhere' and $name =~m{^([a-zA-Z0-9_\-]*)\*(.+)} ) {
 		return if $1 ne '' and substr($identity,0,4) eq 'xn--'; # IDNA
 		$pattern = qr{^\Q$1\E[a-zA-Z0-9_\-]+\Q$2\E$}i;
-	    } elsif ( $wtyp =~ m{^(?:full_label|leftmost)$} 
+	    } elsif ( $wtyp =~ m{^(?:full_label|leftmost)$}
 		and $name =~m{^\*(\..+)$} ) {
 		$pattern = qr{^[a-zA-Z0-9_\-]+\Q$1\E$}i;
 	    } else {
@@ -1544,7 +1554,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 		    and return 1;
 	    } elsif ( $scheme->{ip_in_cn} ) {
 		if ( $identity eq $commonName ) {
-		    return 1 if 
+		    return 1 if
 			$scheme->{ip_in_cn} == 4 ? length($ipn) == 4 :
 			$scheme->{ip_in_cn} == 6 ? length($ipn) == 8 :
 			1;
@@ -1617,8 +1627,8 @@ if ($can_ocsp) {
 	    $ssl,
 	    $ctx->{ocsp_cache} ||= IO::Socket::SSL::OCSP_Cache->new,
 	    $ctx->{ocsp_mode} & SSL_OCSP_FAIL_HARD,
-	    @_ ? \@_ : 
-		$ctx->{ocsp_mode} & SSL_OCSP_FULL_CHAIN ? [ $self->peer_certificates ]: 
+	    @_ ? \@_ :
+		$ctx->{ocsp_mode} & SSL_OCSP_FULL_CHAIN ? [ $self->peer_certificates ]:
 		[ $self->peer_certificate ]
 	);
     };
@@ -1652,17 +1662,21 @@ sub get_ssleay_error {
     return Net::SSLeay::print_errs('SSL error: ') || '';
 }
 
+# internal errors, e.g unsupported features etc
+sub _internal_error {
+    my ($self, $error, $destroy_socket) = @_;
+    $SSL_ERROR = dualvar( -1, $error );
+    ${*$self}{'_SSL_last_err'} = $SSL_ERROR if (ref($self));
+    return;
+}
+
+# OpenSSL errors
 sub error {
     my ($self, $error, $destroy_socket) = @_;
     my @err;
     while ( my $err = Net::SSLeay::ERR_get_error()) {
 	push @err, Net::SSLeay::ERR_error_string($err);
 	$DEBUG>=2 && DEBUG( $error."\n".$self->get_ssleay_error());
-    }
-    # if no new error occurred report last again
-    if ( ! @err and my $err =
-	ref($self) ? ${*$self}{'_SSL_last_err'} : $SSL_ERROR ) {
-	push @err,$err;
     }
     $error .= ' '.join(' ',@err) if @err;
     if ($error) {
@@ -1769,7 +1783,7 @@ sub set_args_filter_hack {
 
 sub next_proto_negotiated {
     my $self = shift;
-    return $self->error("NPN not supported in Net::SSLeay") if ! $can_npn;
+    return $self->_internal_error("NPN not supported in Net::SSLeay") if ! $can_npn;
     my $ssl = $self->_get_ssl_object || return;
     return Net::SSLeay::P_next_proto_negotiated($ssl);
 }
@@ -1945,7 +1959,7 @@ sub new {
 	    my $host = $verify_name || ref($vcn_scheme) && $vcn_scheme->{callback} && 'unknown';
 	    if ( ! $host ) {
 		if ( $vcn_scheme ) {
-		    IO::Socket::SSL->error(
+		    IO::Socket::SSL->_internal_error(
 			"Cannot determine peer hostname for verification" );
 		    return 0;
 		}
@@ -1981,7 +1995,7 @@ WARN
 		return $ok;
 	    }
 	    if ( ! $rv ) {
-		IO::Socket::SSL->error(
+		IO::Socket::SSL->_internal_error(
 		    "hostname verification failed" );
 	    }
 	    return $rv;
@@ -2014,7 +2028,7 @@ WARN
 	$ver eq 'TLSv1_1' ? 'CTX_tlsv1_1_new' :
 	$ver eq 'TLSv1_2' ? 'CTX_tlsv1_2_new' :
 	'CTX_new'
-    ) or return IO::Socket::SSL->error("SSL Version $ver not supported");
+    ) or return IO::Socket::SSL->_internal_error("SSL Version $ver not supported");
     my $ctx = $ctx_new_sub->() or return
 	IO::Socket::SSL->error("SSL Context init failed");
 
@@ -2040,7 +2054,7 @@ WARN
 	SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER|SSL_MODE_ENABLE_PARTIAL_WRITE);
 
     if ( my $proto_list = $arg_hash->{SSL_npn_protocols} ) {
-	return IO::Socket::SSL->error("NPN not supported in Net::SSLeay")
+	return IO::Socket::SSL->_internal_error("NPN not supported in Net::SSLeay")
 	    if ! $can_npn;
 	if($arg_hash->{SSL_server}) {
 	    # on server side SSL_npn_protocols means a list of advertised protocols
@@ -2166,7 +2180,7 @@ WARN
 		    # don't free @chain, because CTX_add_extra_chain_cert
 		    # did not duplicate the certificates
 		}
-		$havecert or return	
+		$havecert or return
 		    IO::Socket::SSL->error("Failed to use certificate file");
 	    }
 
@@ -2177,7 +2191,7 @@ WARN
 		Net::SSLeay::CTX_use_PrivateKey($snictx, $pkey)
 		    || return IO::Socket::SSL->error("Failed to use Private Key");
 		$havekey = 'MEM';
-	    } elsif ( my $f = $sni->{SSL_key_file} 
+	    } elsif ( my $f = $sni->{SSL_key_file}
 		|| (($havecert eq 'PEM') ? $sni->{SSL_cert_file}:undef) ) {
 		for my $ft ( FILETYPE_PEM, FILETYPE_ASN1 ) {
 		    if (Net::SSLeay::CTX_use_PrivateKey_file($snictx,$f,$ft)) {
@@ -2186,13 +2200,13 @@ WARN
 		    }
 		}
 	    }
-	    $havekey or return 
+	    $havekey or return
 		IO::Socket::SSL->error("Failed to use private key");
 	}
 
 	if ( keys %sni > 1 or ! exists $sni{''} ) {
 	    # we definitely want SNI support
-	    $can_server_sni or return IO::Socket::SSL->error(
+	    $can_server_sni or return IO::Socket::SSL->_internal_error(
 		"Server side SNI not supported for this openssl/Net::SSLeay");
 	    $_ = $_->{ctx} for( values %sni);
 	    Net::SSLeay::CTX_set_tlsext_servername_callback($ctx, sub {
@@ -2226,7 +2240,7 @@ WARN
 	}
 
 	if ( my $curve = $arg_hash->{SSL_ecdh_curve} ) {
-	    return IO::Socket::SSL->error(
+	    return IO::Socket::SSL->_internal_error(
 		"ECDH curve needs Net::SSLeay>=1.56 and OpenSSL>=1.0")
 		if ! $can_ecdh;
 	    if ( $curve !~ /^\d+$/ ) {
@@ -2250,7 +2264,7 @@ WARN
     if ( my $fp = $arg_hash->{SSL_fingerprint} ) {
 	for( ref($fp) ? @$fp : $fp) {
 	    my ($algo,$digest) = m{^([\w-]+)\$([a-f\d:]+)$}i;
-	    return IO::Socket::SSL->error("invalid fingerprint '$_'")
+	    return IO::Socket::SSL->_internal_error("invalid fingerprint '$_'")
 		if ! $algo;
 	    $algo = lc($algo);
 	    ( $digest = lc($digest) ) =~s{:}{}g;
@@ -2300,12 +2314,12 @@ WARN
 	$self->{ocsp_cache} = $arg_hash->{SSL_ocsp_cache};
 	Net::SSLeay::CTX_set_tlsext_status_cb($ctx,sub {
 	    my ($ssl,$resp) = @_;
-	    my $iossl = $SSL_OBJECT{$ssl} or 
+	    my $iossl = $SSL_OBJECT{$ssl} or
 		die "no IO::Socket::SSL object found for SSL $ssl";
 	    $iossl->[1] and do {
 		# we must return with 1 or it will be called again
 		# and beause we have no SSL object we must make the error global
-		Carp::cluck($IO::Socket::SSL::SSL_ERROR 
+		Carp::cluck($IO::Socket::SSL::SSL_ERROR
 		    = "OCSP callback on server side");
 		return 1;
 	    };
@@ -2349,17 +2363,17 @@ WARN
 		    if (!$status->[1]) {
 			push @results,[1,$status->[2]{nextUpdate}];
 			$cache && $cache->put($certid,$status->[2]);
-		    } elsif ( $status->[2]{statusType} == 
+		    } elsif ( $status->[2]{statusType} ==
 			Net::SSLeay::V_OCSP_CERTSTATUS_GOOD()) {
 			push @results,[1,$status->[2]{nextUpdate}];
-			$cache && $cache->put($certid,{ 
+			$cache && $cache->put($certid,{
 			    %{$status->[2]},
 			    expire => time()+120,
 			    soft_error => $status->[1],
 			});
 		    } else {
 			push @results,($hard_error = [0,$status->[1]]);
-			$cache && $cache->put($certid,{ 
+			$cache && $cache->put($certid,{
 			    %{$status->[2]},
 			    hard_error => $status->[1],
 			});
@@ -2389,7 +2403,7 @@ WARN
 
     $self->{context} = $ctx;
     $self->{verify_mode} = $arg_hash->{SSL_verify_mode};
-    $self->{ocsp_mode} = 
+    $self->{ocsp_mode} =
 	defined($arg_hash->{SSL_ocsp_mode}) ? $arg_hash->{SSL_ocsp_mode} :
 	$self->{verify_mode} ? IO::Socket::SSL::SSL_OCSP_TRY_STAPLE() :
 	0;
@@ -2515,8 +2529,8 @@ package IO::Socket::SSL::OCSP_Cache;
 
 sub new {
     my ($class,$size) = @_;
-    return bless { 
-	'' => { _lru => 0, size => $size || 100 } 
+    return bless {
+	'' => { _lru => 0, size => $size || 100 }
     },$class;
 }
 sub get {
@@ -2630,9 +2644,9 @@ sub add_response {
 	    expire => time()+10,
 	}) for (@{$todo->{ids}});
     # is the OCSP response status success
-    } elsif ( 
-	( my $status = Net::SSLeay::OCSP_response_status($resp)) 
-	    != Net::SSLeay::OCSP_RESPONSE_STATUS_SUCCESSFUL() 
+    } elsif (
+	( my $status = Net::SSLeay::OCSP_response_status($resp))
+	    != Net::SSLeay::OCSP_RESPONSE_STATUS_SUCCESSFUL()
     ){
 	@soft_error = "OCSP response failed: ".
 	    Net::SSLeay::OCSP_response_status_str($status);
@@ -2643,7 +2657,7 @@ sub add_response {
 	}) for (@{$todo->{ids}});
 
     # does nonce match the request and can the signature be verified
-    } elsif ( ! eval { 
+    } elsif ( ! eval {
 	$req = Net::SSLeay::d2i_OCSP_REQUEST($todo->{req});
 	Net::SSLeay::OCSP_response_verify($self->{ssl},$resp,$req);
     }) {
@@ -2663,16 +2677,16 @@ sub add_response {
 	}) for (@{$todo->{ids}});
 
     # extract results from response
-    } elsif ( my @result = 
+    } elsif ( my @result =
 	Net::SSLeay::OCSP_response_results($resp,@{$todo->{ids}})) {
 	my (@found,@miss);
 	for my $rv (@result) {
 	    if ($rv->[2]) {
 		push @found,$rv->[0];
-		if (!$rv->[1]) { 
+		if (!$rv->[1]) {
 		    # no error
 		    $self->{cache}->put($rv->[0],$rv->[2]);
-		} elsif ( $rv->[2]{statusType} == 
+		} elsif ( $rv->[2]{statusType} ==
 		    Net::SSLeay::V_OCSP_CERTSTATUS_GOOD()) {
 		    # soft error, like response after nextUpdate
 		    push @soft_error,$rv->[1];
@@ -2701,7 +2715,7 @@ sub add_response {
 	}
     } else {
 	@soft_error = "no data in response";
-	# probably configuration problem 
+	# probably configuration problem
 	$self->{cache}->put($_,{
 	    soft_error => "@soft_error",
 	    expire => time()+120,
@@ -3087,9 +3101,9 @@ when creating the socket.
 If you create a server you usually need to specify a server certificate which
 should be verified by the client. Same is true for client certificates, which
 should be verified by the server.
-The certificate can be given as a file with SSL_cert_file or as an internal 
+The certificate can be given as a file with SSL_cert_file or as an internal
 representation of a X509* object with SSL_cert.
-If given as a file it will automatically detect the format. 
+If given as a file it will automatically detect the format.
 Supported file formats are PEM, DER and PKCS#12, where PEM and PKCS#12 can
 contain the certicate and the chain to use, while DER can only contain a single
 certificate.
@@ -3317,12 +3331,12 @@ The following flags can be combined with C<|>:
 
 =over 8
 
-=item SSL_OCSP_NO_STAPLE 
+=item SSL_OCSP_NO_STAPLE
 
 Don't ask for OCSP stapling.
 This is the default if SSL_verify_mode is VERIFY_NONE.
 
-=item SSL_OCSP_TRY_STAPLE 
+=item SSL_OCSP_TRY_STAPLE
 
 Try OCSP stapling, but don't complain if it gets no stapled response back.
 This is the default if SSL_verify_mode is VERIFY_PEER (the default).
@@ -3332,10 +3346,10 @@ This is the default if SSL_verify_mode is VERIFY_PEER (the default).
 Consider it a hard error, if the server does not send a stapled OCSP response
 back. Most servers currently send no stapled OCSP response back.
 
-=item SSL_OCSP_FAIL_HARD 
+=item SSL_OCSP_FAIL_HARD
 
 Fail hard on response errors, default is to fail soft like the browsers do.
-Soft errors mean, that the OCSP response is not usable, e.g. no response, 
+Soft errors mean, that the OCSP response is not usable, e.g. no response,
 error response, no valid signature etc.
 Certificate revocations inside a verified response are considered hard errors
 in any case.
@@ -3357,7 +3371,7 @@ against revocation.
 If this callback is defined, it will be called with the SSL object and the OCSP
 response handle obtained from the peer, e.g. C<<$cb->($ssl,$resp)>>.
 If the peer did not provide a stapled OCSP response the function will be called
-with C<$resp=undef>. 
+with C<$resp=undef>.
 Because the OCSP response handle is no longer valid after leaving this function
 it should not by copied or freed. If access to the response is necessary after
 leaving this function it can be serialized with
@@ -3868,7 +3882,7 @@ remaining requests.
 This method takes the HTTP body of the response which got received when sending
 the OCSP request to C<$uri>. If no response was received or an error occured
 one should either retry or consider C<$response> as empty which will trigger a
-soft error. 
+soft error.
 
 The method returns the current value of C<hard_error>, e.g. a defined value
 when no more requests need to be done.
