@@ -480,22 +480,22 @@ The following debugs levels are defined, but used not in a consistent way:
 
 =over 4
 
-=item 0
+=item *
 
-No debugging (default).
+0 - No debugging (default).
 
-=item 1
+=item *
 
-Print out errors from IO::Socket::SSL and ciphers from Net::SSLeay.
+1 - Print out errors from IO::Socket::SSL and ciphers from Net::SSLeay.
 
-=item 2
+=item *
 
-Print also information about call flow from IO::Socket::SSL and progress
+2 - Print also information about call flow from IO::Socket::SSL and progress
 information from Net::SSLeay.
 
-=item 3
+=item * 
 
-Print also some data dumps from IO::Socket::SSL and from Net::SSLeay.
+3 - Print also some data dumps from IO::Socket::SSL and from Net::SSLeay.
 
 =back
 
