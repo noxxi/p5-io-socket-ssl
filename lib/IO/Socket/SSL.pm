@@ -13,6 +13,8 @@
 
 package IO::Socket::SSL;
 
+our $VERSION = '1.994';
+
 use IO::Socket;
 use Net::SSLeay 1.46;
 use IO::Socket::SSL::PublicSuffix;
@@ -28,8 +30,6 @@ BEGIN {
 }
 
 
-
-our $VERSION = '1.993';
 
 use constant SSL_VERIFY_NONE => Net::SSLeay::VERIFY_NONE();
 use constant SSL_VERIFY_PEER => Net::SSLeay::VERIFY_PEER();
@@ -195,7 +195,7 @@ use vars qw(@ISA $SSL_ERROR @EXPORT);
 
 {
     # These constants will be used in $! at return from SSL_connect,
-    # SSL_accept, generic_read and write, thus notifying the caller
+    # SSL_accept, _generic_(read|write), thus notifying the caller
     # the usual way of problems. Like with EAGAIN, EINPROGRESS..
     # these are especially important for non-blocking sockets
 
@@ -491,8 +491,7 @@ sub _skip_rw_error {
 }
 
 
-#Call to connect occurs when a new client socket is made using
-#IO::Socket::INET
+# Call to connect occurs when a new client socket is made using IO::Socket::*
 sub connect {
     my $self = shift || return _invalid_object();
     return $self if ${*$self}{'_SSL_opened'};  # already connected
@@ -510,6 +509,10 @@ sub connect {
 	# on non-blocking re-connect by returning true, even if $! is set
 	# but it does not clear $!, so do it here
 	$! = undef;
+
+	# don't continue with connect_SSL if SSL_startHandshake is set to 0
+	my $sh = ${*$self}{_SSL_arguments}{SSL_startHandshake};
+	return $self if defined $sh && ! $sh;
     }
     return $self->connect_SSL;
 }
@@ -755,6 +758,18 @@ sub accept {
 	$DEBUG>=2 && DEBUG('no socket yet' );
 	$socket = $self->SUPER::accept($class) || return;
 	$DEBUG>=2 && DEBUG('accept created normal socket '.$socket );
+
+	# don't continue with accept_SSL if SSL_startHandshake is set to 0
+	my $sh = ${*$self}{_SSL_arguments}{SSL_startHandshake};
+	if (defined $sh && ! $sh) {
+	    ${*$socket}{_SSL_ctx} = ${*$self}{_SSL_ctx};
+	    ${*$socket}{_SSL_arguments} = {
+		%{${*$self}{_SSL_arguments}},
+		SSL_server => 0,
+	    };
+	    $DEBUG>=2 && DEBUG('will not start SSL handshake yet');
+	    return wantarray ? ($socket, getpeername($socket) ) : $socket
+	};
     }
 
     $self->accept_SSL($socket) || return;
@@ -772,15 +787,20 @@ sub accept_SSL {
     if ( ! ${*$self}{'_SSL_opening'} ) {
 	$DEBUG>=2 && DEBUG('starting sslifying' );
 	${*$self}{'_SSL_opening'} = $socket;
-	my $arg_hash = ${*$self}{'_SSL_arguments'};
-	${*$socket}{'_SSL_arguments'} = { %$arg_hash, SSL_server => 0 };
-	my $ctx = ${*$socket}{'_SSL_ctx'} = ${*$self}{'_SSL_ctx'};
+	if ($socket != $self) {
+	    ${*$socket}{_SSL_ctx} = ${*$self}{_SSL_ctx};
+	    ${*$socket}{_SSL_arguments} = {
+		%{${*$self}{_SSL_arguments}},
+		SSL_server => 0
+	    };
+	}
 
 	my $fileno = ${*$socket}{'_SSL_fileno'} = fileno($socket);
 	return $socket->_internal_error("Socket has no fileno")
 	    if ! defined $fileno;
 
-	$ssl = ${*$socket}{'_SSL_object'} = Net::SSLeay::new($ctx->{context})
+	$ssl = ${*$socket}{_SSL_object} =
+	    Net::SSLeay::new(${*$socket}{_SSL_ctx}{context})
 	    || return $socket->error("SSL structure creation failed");
 	$CREATED_IN_THIS_THREAD{$ssl} = 1;
 	$SSL_OBJECT{$ssl} = [$socket,1];
@@ -871,7 +891,7 @@ sub accept_SSL {
 
 ####### I/O subroutines ########################
 
-sub generic_read {
+sub _generic_read {
     my ($self, $read_func, undef, $length, $offset) = @_;
     my $ssl = $self->_get_ssl_object || return;
     my $buffer=\$_[2];
@@ -898,25 +918,40 @@ sub generic_read {
 
 sub read {
     my $self = shift;
-    return $self->generic_read(
+    ${*$self}{_SSL_object} && return _generic_read($self,
 	$self->blocking ? \&Net::SSLeay::ssl_read_all : \&Net::SSLeay::read,
 	@_
     );
+
+    # fall back to plain read if we are not required to use SSL yet
+    return $self->SUPER::read(@_);
 }
 
 # contrary to the behavior of read sysread can read partial data
 sub sysread {
     my $self = shift;
-    return $self->generic_read( \&Net::SSLeay::read, @_ );
+    ${*$self}{_SSL_object} && return _generic_read( $self,
+	\&Net::SSLeay::read, @_ );
+
+    # fall back to plain sysread if we are not required to use SSL yet
+    my $rv = $self->SUPER::sysread(@_);
+    return $rv;
 }
 
 sub peek {
     my $self = shift;
-    return $self->generic_read(\&Net::SSLeay::peek, @_);
+    ${*$self}{_SSL_object} && return _generic_read( $self,
+	\&Net::SSLeay::peek, @_ );
+
+    # fall back to plain peek if we are not required to use SSL yet
+    # emulate peek with recv(...,MS_PEEK) - peek(buf,len,offset)
+    return if ! defined recv($self,my $buf,$_[1],MSG_PEEK);
+    $_[0] = $_[2] ? substr($_[0],0,$_[2]).$buf : $buf;
+    return length($buf);
 }
 
 
-sub generic_write {
+sub _generic_write {
     my ($self, $write_all, undef, $length, $offset) = @_;
 
     my $ssl = $self->_get_ssl_object || return;
@@ -955,14 +990,21 @@ sub generic_write {
 # if all data are written
 sub write {
     my $self = shift;
-    return $self->generic_write( scalar($self->blocking),@_ );
+    ${*$self}{_SSL_object} && return _generic_write( $self,
+	scalar($self->blocking),@_ );
+
+    # fall back to plain write if we are not required to use SSL yet
+    return $self->SUPER::write(@_);
 }
 
 # contrary to write syswrite() returns already if only
 # a part of the data is written
 sub syswrite {
     my $self = shift;
-    return $self->generic_write( 0,@_ );
+    ${*$self}{_SSL_object} && return _generic_write($self,0,@_);
+
+    # fall back to plain syswrite if we are not required to use SSL yet
+    return $self->SUPER::syswrite(@_);
 }
 
 sub print {
@@ -1109,6 +1151,11 @@ sub close {
     return 1;
 }
 
+sub is_SSL {
+    my $self = pop;
+    return ${*$self}{_SSL_object} && 1
+}
+
 sub stop_SSL {
     my $self = shift || return _invalid_object();
     my $stop_args = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
@@ -1167,8 +1214,16 @@ sub stop_SSL {
 	    }
 	    $self->blocking(1) if $timeout;
 	}
+
+	# destroy allocated objects for SSL and untie
+	# do not destroy CTX unless explicitly specified
 	Net::SSLeay::free($ssl);
 	delete ${*$self}{_SSL_object};
+	if (my $cert = delete ${*$self}{'_SSL_certificate'}) {
+	    Net::SSLeay::X509_free($cert);
+	}
+	${*$self}{'_SSL_opened'} = 0;
+	untie(*$self);
     }
 
     if ($stop_args->{'SSL_ctx_free'}) {
@@ -1176,11 +1231,6 @@ sub stop_SSL {
 	$ctx && $ctx->DESTROY();
     }
 
-    if (my $cert = delete ${*$self}{'_SSL_certificate'}) {
-	Net::SSLeay::X509_free($cert);
-    }
-
-    ${*$self}{'_SSL_opened'} = 0;
 
     if ( ! $stop_args->{_SSL_in_DESTROY} ) {
 
@@ -1189,12 +1239,11 @@ sub stop_SSL {
 	    # rebless to original class from start_SSL
 	    if ( my $orig_class = delete ${*$self}{'_SSL_ioclass_upgraded'} ) {
 		bless $self,$orig_class;
-		untie(*$self);
 		# FIXME: if original class was tied too we need to restore the tie
+		# remove all _SSL related from *$self
+		my @sslkeys = grep { m{^_?SSL_} } keys %{*$self};
+		delete @{*$self}{@sslkeys} if @sslkeys;
 	    }
-	    # remove all _SSL related from *$self
-	    my @sslkeys = grep { m{^_?SSL_} } keys %{*$self};
-	    delete @{*$self}{@sslkeys} if @sslkeys;
 	}
     }
     return 1;
@@ -1240,6 +1289,11 @@ sub start_SSL {
     my $arg_hash = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
     my %to = exists $arg_hash->{Timeout} ? ( Timeout => delete $arg_hash->{Timeout} ) :();
     my $original_class = ref($socket);
+    if ( ! $original_class ) {
+	$socket = ($original_class = $ISA[0])->new_from_fd($socket,'<+')
+	    or return $class->_internal_error(
+	    "creating $original_class from file handle failed");
+    }
     my $original_fileno = (UNIVERSAL::can($socket, "fileno"))
 	? $socket->fileno : CORE::fileno($socket);
     return $class->_internal_error("Socket has no fileno")
@@ -1249,7 +1303,8 @@ sub start_SSL {
     $socket->configure_SSL($arg_hash) or bless($socket, $original_class) && return;
 
     ${*$socket}{'_SSL_fileno'} = $original_fileno;
-    ${*$socket}{'_SSL_ioclass_upgraded'} = $original_class;
+    ${*$socket}{'_SSL_ioclass_upgraded'} = $original_class
+	if $class ne $original_class;
 
     my $start_handshake = $arg_hash->{SSL_startHandshake};
     if ( ! defined($start_handshake) || $start_handshake ) {
@@ -2065,33 +2120,37 @@ WARN
 	}
     }
 
-    if ( $verify_mode != Net::SSLeay::VERIFY_NONE()) {
-	if ( $arg_hash->{SSL_ca}
-	    || defined $arg_hash->{SSL_ca_file}
-	    || defined $arg_hash->{SSL_ca_path} ) {
-	    my $file = $arg_hash->{SSL_ca_file};
-	    $file = undef if ref($file) && ! $$file;
-	    my $dir = $arg_hash->{SSL_ca_path};
-	    $dir = undef if ref($dir) && ! $$dir;
-	    if ( $arg_hash->{SSL_ca} ) {
-		my $store = Net::SSLeay::CTX_get_cert_store($ctx);
-		for (@{$arg_hash->{SSL_ca}}) {
-		    Net::SSLeay::X509_STORE_add_cert($store,$_) or
-			return IO::Socket::SSL->error(
-			    "Failed to add certificate to CA store");
-		}
+    # Try to apply SSL_ca even if SSL_verify_mode is 0, so that they can be
+    # used to verify OCSP responses.
+    # If applying fails complain only if verify_mode != VERIFY_NONE.
+    if ( $arg_hash->{SSL_ca}
+	|| defined $arg_hash->{SSL_ca_file}
+	|| defined $arg_hash->{SSL_ca_path} ) {
+	my $file = $arg_hash->{SSL_ca_file};
+	$file = undef if ref($file) && ! $$file;
+	my $dir = $arg_hash->{SSL_ca_path};
+	$dir = undef if ref($dir) && ! $$dir;
+	if ( $arg_hash->{SSL_ca} ) {
+	    my $store = Net::SSLeay::CTX_get_cert_store($ctx);
+	    for (@{$arg_hash->{SSL_ca}}) {
+		Net::SSLeay::X509_STORE_add_cert($store,$_) or
+		    return IO::Socket::SSL->error(
+			"Failed to add certificate to CA store");
 	    }
-	    if ( $file || $dir and ! Net::SSLeay::CTX_load_verify_locations(
-		$ctx, $file || '', $dir || '')) {
-		return IO::Socket::SSL->error(
-		    "Invalid certificate authority locations")
-	    }
-	} elsif ( my %ca = IO::Socket::SSL::default_ca()) {
-	    # no CA path given, continue with system defaults
+	}
+	if ( $file || $dir and ! Net::SSLeay::CTX_load_verify_locations(
+	    $ctx, $file || '', $dir || '')) {
+	    return IO::Socket::SSL->error(
+		"Invalid certificate authority locations")
+		if $verify_mode != Net::SSLeay::VERIFY_NONE();
+	}
+    } elsif ( my %ca = IO::Socket::SSL::default_ca()) {
+	# no CA path given, continue with system defaults
+	if (! Net::SSLeay::CTX_load_verify_locations( $ctx,
+	    $ca{SSL_ca_file} || '',$ca{SSL_ca_path} || '')
+	    && $verify_mode != Net::SSLeay::VERIFY_NONE()) {
 	    return IO::Socket::SSL->error(
 		"Invalid default certificate authority locations")
-		if ! Net::SSLeay::CTX_load_verify_locations( $ctx,
-		    $ca{SSL_ca_file} || '',$ca{SSL_ca_path} || '');
 	}
     }
 
@@ -2752,7 +2811,7 @@ sub resolve_blocking {
 		headers => { 'Content-type' => 'application/ocsp-request' },
 		content => $reqdata
 	    });
-	    $DEBUG && DEBUG("got  OCSP response from $uri code=$resp->{code}");
+	    $DEBUG && DEBUG("got  OCSP response from $uri code=$resp->{status}");
 	    defined ($self->add_response($uri,
 		$resp->{success} && $resp->{content}))
 		&& last;

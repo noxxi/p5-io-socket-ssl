@@ -53,7 +53,7 @@ The documentation consists of the following parts:
 
 =item * L</"Using Non-Blocking Sockets">
 
-=item * L</"Adavanced Usage">
+=item * L</"Advanced Usage">
 
 =item * L</"Integration Into Own Modules">
 
@@ -493,7 +493,7 @@ The following debugs levels are defined, but used not in a consistent way:
 2 - Print also information about call flow from IO::Socket::SSL and progress
 information from Net::SSLeay.
 
-=item * 
+=item *
 
 3 - Print also some data dumps from IO::Socket::SSL and from Net::SSLeay.
 
@@ -628,7 +628,7 @@ TCP socket in a non-blocking way with C<start_SSL> and C<accept_SSL>.
 
 
 
-=head1 Adavanced Usage
+=head1 Advanced Usage
 
 =head2 SNI Support
 
@@ -652,6 +652,45 @@ To check for support you might call C<IO::Socket::SSL->can_server_sni()>.
 If server side SNI is supported, you might specify different certificates per
 host with C<SSL_cert*> and C<SSL_key*>, and check the requested name using
 C<get_servername>.
+
+=head2 Talk Plain and SSL With The Same Socket
+
+It is often required to first exchange some plain data and then upgrade the
+socket to SSL after some kind of STARTTLS command. Protocols like FTPS even
+need a way to downgrade the socket again back to plain.
+
+The common way to do this would be to create a normal socket and use start_SSL
+to upgrade and stop_SSL to downgrade:
+
+    my $sock = IO::Socket::INET->new(...) or die $!;
+    ... exchange plain data on $sock until starttls command ...
+    IO::Socket::SSL->start_SSL($sock,%sslargs) or die $SSL_ERROR;
+    ... now $sock is a IO::Socket::SSL object ...
+    ... exchange data with SSL on $sock until stoptls command ...
+    $sock->stop_SSL or die $SSL_ERROR;
+    ... now $sock is again a IO::Socket::INET object ...
+
+But, lots of modules just derive directly from IO::Socket::INET.
+While this base class can be replaced with IO::Socket::SSL these modules cannot
+easily support different base classes for SSL and plain data and switch between
+these classes on a starttls command.
+
+To help in this case, IO::Socket::SSL can be reduced to a plain socket on
+startup, and connect_SSL/accept_SSL/start_SSL can be used to enable SSL and
+stop_SSL to talk plain again:
+
+    my $sock = IO::Socket::SSL->new(
+	PeerAddr => ...
+	SSL_startHandshake => 0,
+	%sslargs
+    ) or die $!;
+    ... exchange plain data on $sock until starttls command ...
+    $sock->connect_SSL or die $SSL_ERROR;
+    ... now $sock is a IO::Socket::SSL object ...
+    ... exchange data with SSL on $sock until stoptls command ...
+    $sock->stop_SSL or die $SSL_ERROR;
+    ... $sock is still a IO::Socket::SSL object ...
+    ... but data exchanged again in plain ...
 
 
 
@@ -735,6 +774,12 @@ secure defaults, e.g. chosing good ciphers, enabling proper verification etc.
 
 =over 2
 
+=item SSL_server
+
+Set this option to a true value, if the socket should be used as a server.
+If this is not explicitly set it is assumed, if the Listen parameter is given
+when creating the socket.
+
 =item SSL_hostname
 
 This can be given to specify the hostname used for SNI, which is needed if you
@@ -749,64 +794,43 @@ side.
 
 See section "SNI Support" for details of SNI the support.
 
-=item SSL_version
+=item SSL_startHandshake
 
-Sets the version of the SSL protocol used to transmit data.
-'SSLv23' auto-negotiates between SSLv2 and SSLv3, while 'SSLv2', 'SSLv3',
-'TLSv1', 'TLSv1_1' or 'TLSv1_2' restrict the protocol to the specified version.
-All values are case-insensitive.  Instead of 'TLSv1_1' and 'TLSv1_2' one can
-also use 'TLSv11' and 'TLSv12'.  Support for 'TLSv1_1' and 'TLSv1_2' requires
-recent versions of Net::SSLeay and openssl.
+If this option is set to false (defaults to true) it will no start the SSL
+handshake yet. This has to be done later with C<accept_SSL> or C<connect_SSL>.
+Before the handshake is started read/write etc can be used to exchange plain
+data.
 
-You can limit to set of supported protocols by adding !version separated by ':'.
+=item SSL_ca | SSL_ca_file | SSL_ca_path
 
-The default SSL_version is 'SSLv23:!SSLv2' which means, that SSLv2, SSLv3 and
-TLSv1 are supported for initial protocol handshakes, but SSLv2 will not be
-accepted, leaving only SSLv3 and TLSv1. You can also use !TLSv1_1 and !TLSv1_2
-to disable TLS versions 1.1 and 1.2 while allowing TLS version 1.0.
+Usually you want to verify that the peer certificate has been signed by a
+trusted certificate authority. In this case you should use this option to
+specify the file (C<SSL_ca_file>) or directory (C<SSL_ca_path>) containing the
+certificateZ<>(s) of the trusted certificate authorities.
+Also you can give X509* certificate handles (from L<Net::SSLeay> or
+L<IO::Socket::SSL::Utils>) as a list with C<SSL_ca>. These will be added to the
+CA store before path and file and thus take precedence.
+If neither SSL_ca, nor SSL_ca_file or SSL_ca_path are set it will use
+C<default_ca()> to determine the user-set or system defaults.
+If you really don't want to set a CA set SSL_ca_file or SSL_ca_path to
+C<\undef> or SSL_ca to an empty list. (unfortunatly C<''> is used by some
+modules using IO::Socket::SSL when CA is not exlicitly given).
 
-Setting the version instead to 'TLSv1' will probably break interaction with
-lots of clients which start with SSLv2 and then upgrade to TLSv1. On the other
-side some clients just close the connection when they receive a TLS version 1.1
-request. In this case setting the version to 'SSLv23:!SSLv2:!TLSv1_1:!TLSv1_2'
-might help.
+=item SSL_fingerprint
 
-=item SSL_cipher_list
+Sometimes you have a self-signed certificate or a certificate issued by an
+unknown CA and you really want to accept it, but don't want to disable
+verification at all. In this case you can specify the fingerprint of the
+certificate as C<'algo$hex_fingerprint'>. C<algo> is a fingerprint algorithm
+supported by OpenSSL, e.g. 'sha1','sha256'... and C<hex_fingerprint> is the
+hexadecimal representation of the binary fingerprint.
+To get the fingerprint of an established connection you can use
+C<get_fingerprint>.
 
-If this option is set the cipher list for the connection will be set to the
-given value, e.g. something like 'ALL:!LOW:!EXP:!aNULL'. Look into the OpenSSL
-documentation (L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>)
-for more details.
-
-Unless you fail to contact your peer because of no shared ciphers it is
-recommended to leave this option at the default setting. The default setting
-prefers ciphers with forward secrecy, disables anonymous authentication and
-disables known insecure ciphers like MD5, DES etc. This gives a grade A result
-at the tests of SSL Labs.
-To use the less secure OpenSSL builtin default (whatever this is) set
-SSL_cipher_list to ''.
-
-=item SSL_honor_cipher_order
-
-If this option is true the cipher order the server specified is used instead
-of the order proposed by the client. This option defaults to true to make use of
-our secure cipher list setting.
-
-=item SSL_use_cert
-
-If this is true, it forces IO::Socket::SSL to use a certificate and key, even if
-you are setting up an SSL client.  If this is set to 0 (the default), then you
-will only need a certificate and key if you are setting up a server.
-
-SSL_use_cert will implicitly be set if SSL_server is set.
-For convenience it is also set if it was not given but a cert was given for use
-(SSL_cert_file or similar).
-
-=item SSL_server
-
-Set this option to a true value, if the socket should be used as a server.
-If this is not explicitly set it is assumed, if the Listen parameter is given
-when creating the socket.
+You can specify a list of fingerprints in case you have several acceptable
+certificates.
+If a fingerprint matches no additional verification of the certificate will be
+done.
 
 =item SSL_cert_file | SSL_cert | SSL_key_file | SSL_key
 
@@ -859,6 +883,65 @@ Examples:
     '' => 'default-key.pem',
  }
 
+=item SSL_passwd_cb
+
+If your private key is encrypted, you might not want the default password prompt
+from Net::SSLeay.  This option takes a reference to a subroutine that should
+return the password required to decrypt your private key.
+
+=item SSL_use_cert
+
+If this is true, it forces IO::Socket::SSL to use a certificate and key, even if
+you are setting up an SSL client.  If this is set to 0 (the default), then you
+will only need a certificate and key if you are setting up a server.
+
+SSL_use_cert will implicitly be set if SSL_server is set.
+For convenience it is also set if it was not given but a cert was given for use
+(SSL_cert_file or similar).
+
+
+=item SSL_version
+
+Sets the version of the SSL protocol used to transmit data.
+'SSLv23' auto-negotiates between SSLv2 and SSLv3, while 'SSLv2', 'SSLv3',
+'TLSv1', 'TLSv1_1' or 'TLSv1_2' restrict the protocol to the specified version.
+All values are case-insensitive.  Instead of 'TLSv1_1' and 'TLSv1_2' one can
+also use 'TLSv11' and 'TLSv12'.  Support for 'TLSv1_1' and 'TLSv1_2' requires
+recent versions of Net::SSLeay and openssl.
+
+You can limit to set of supported protocols by adding !version separated by ':'.
+
+The default SSL_version is 'SSLv23:!SSLv2' which means, that SSLv2, SSLv3 and
+TLSv1 are supported for initial protocol handshakes, but SSLv2 will not be
+accepted, leaving only SSLv3 and TLSv1. You can also use !TLSv1_1 and !TLSv1_2
+to disable TLS versions 1.1 and 1.2 while allowing TLS version 1.0.
+
+Setting the version instead to 'TLSv1' will probably break interaction with
+lots of clients which start with SSLv2 and then upgrade to TLSv1. On the other
+side some clients just close the connection when they receive a TLS version 1.1
+request. In this case setting the version to 'SSLv23:!SSLv2:!TLSv1_1:!TLSv1_2'
+might help.
+
+=item SSL_cipher_list
+
+If this option is set the cipher list for the connection will be set to the
+given value, e.g. something like 'ALL:!LOW:!EXP:!aNULL'. Look into the OpenSSL
+documentation (L<http://www.openssl.org/docs/apps/ciphers.html#CIPHER_STRINGS>)
+for more details.
+
+Unless you fail to contact your peer because of no shared ciphers it is
+recommended to leave this option at the default setting. The default setting
+prefers ciphers with forward secrecy, disables anonymous authentication and
+disables known insecure ciphers like MD5, DES etc. This gives a grade A result
+at the tests of SSL Labs.
+To use the less secure OpenSSL builtin default (whatever this is) set
+SSL_cipher_list to ''.
+
+=item SSL_honor_cipher_order
+
+If this option is true the cipher order the server specified is used instead
+of the order proposed by the client. This option defaults to true to make use of
+our secure cipher list setting.
 
 =item SSL_dh_file
 
@@ -890,43 +973,6 @@ exchange by default. If you don't want this explicitly set it to undef.
 
 You can check if ECDH support is available by calling
 C<IO::Socket::SSL->can_ecdh>.
-
-=item SSL_passwd_cb
-
-If your private key is encrypted, you might not want the default password prompt
-from Net::SSLeay.  This option takes a reference to a subroutine that should
-return the password required to decrypt your private key.
-
-=item SSL_ca | SSL_ca_file | SSL_ca_path
-
-Usually you want to verify that the peer certificate has been signed by a
-trusted certificate authority. In this case you should use this option to
-specify the file (C<SSL_ca_file>) or directory (C<SSL_ca_path>) containing the
-certificateZ<>(s) of the trusted certificate authorities.
-Also you can give X509* certificate handles (from L<Net::SSLeay> or
-L<IO::Socket::SSL::Utils>) as a list with C<SSL_ca>. These will be added to the
-CA store before path and file and thus take precedence.
-If neither SSL_ca, nor SSL_ca_file or SSL_ca_path are set it will use
-C<default_ca()> to determine the user-set or system defaults.
-If you really don't want to set a CA set SSL_ca_file or SSL_ca_path to
-C<\undef> or SSL_ca to an empty list. (unfortunatly C<''> is used by some
-modules using IO::Socket::SSL when CA is not exlicitly given).
-
-=item SSL_fingerprint
-
-Sometimes you have a self-signed certificate or a certificate issued by an
-unknown CA and you really want to accept it, but don't want to disable
-verification at all. In this case you can specify the fingerprint of the
-certificate as C<'algo$hex_fingerprint'>. C<algo> is a fingerprint algorithm
-supported by OpenSSL, e.g. 'sha1','sha256'... and C<hex_fingerprint> is the
-hexadecimal representation of the binary fingerprint.
-To get the fingerprint of an established connection you can use
-C<get_fingerprint>.
-
-You can specify a list of fingerprints in case you have several acceptable
-certificates.
-If a fingerprint matches no additional verification of the certificate will be
-done.
 
 =item SSL_verify_mode
 
@@ -1544,9 +1590,10 @@ used.
 
 =item B<stop_SSL(...)>
 
-This is the opposite of start_SSL(), e.g. it will shutdown the SSL connection
-and return to the class before start_SSL(). It gets the same arguments as
-close(), in fact close() calls stop_SSL() (but without downgrading the class).
+This is the opposite of start_SSL(), connect_SSL() and accept_SSL(), e.g. it
+will shutdown the SSL connection and return to the class before start_SSL(). It
+gets the same arguments as close(), in fact close() calls stop_SSL() (but
+without downgrading the class).
 
 Will return true if it succeeded and undef if failed. This might be the case for
 non-blocking sockets. In this case $! is set to EAGAIN and the ssl error to
@@ -1557,10 +1604,13 @@ For calling from C<stop_SSL> C<SSL_fast_shutdown> default to false, e.g. it
 waits for the close_notify of the peer. This is necesarry in case you want to
 downgrade the socket and continue to use it as a plain socket.
 
+After stop_SSL the socket can again be used to exchange plain data.
+
 =item B<connect_SSL>, B<accept_SSL>
 
 These functions should be used to do the relevant handshake, if the socket got
-upgraded with C<start_SSL> and C<SSL_startHandshake> 0.
+created with C<new> or upgraded with C<start_SSL> and C<SSL_startHandshake> was
+set to false.
 They will return undef until the handshake succeeded or an error got thrown.
 As long as the function returns undef and $! is set to EAGAIN one could retry
 the call after the socket got readable (SSL_WANT_READ) or writeable
