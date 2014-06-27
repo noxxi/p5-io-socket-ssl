@@ -443,10 +443,10 @@ this list consists of a hash with oid, nid, ln and sn.
 Binary digest of the pubkey using the given digest algorithm, e.g.
 pubkey_digest_sha256 if (the default) SHA-256 was used.
 
-=item cert_digest_xxx
+=item x509_digest_xxx
 
-Binary digest of the certificate using the given digest algorithm, e.g.
-cert_digest_sha256 if (the default) SHA-256 was used.
+Binary digest of the X.509 certificate using the given digest algorithm, e.g.
+x509_digest_sha256 if (the default) SHA-256 was used.
 
 =item fingerprint_xxx
 

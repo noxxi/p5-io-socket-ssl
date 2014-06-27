@@ -1,3 +1,4 @@
+- fix documentation bug RT#96765, thanks to Salvatore Bonaccorso.
 1.994 2014/06/22
 - IO::Socket::SSL can now be used as dual-use socket, e.g. start plain, upgrade
   to SSL and downgrade again all with the same object. See documentation of
