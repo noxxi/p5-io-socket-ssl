@@ -87,12 +87,12 @@ SSL enables end-to-end security by providing two essential functions:
 =item Encryption
 
 This part encrypts the data for transit between the communicating parties, so
-that nobody in between can read them. It also provides temper resistance so that
+that nobody in between can read them. It also provides tamper resistance so that
 nobody in between can manipulate the data.
 
 =item Identification
 
-This part makes sure, that you talk to the right peer.
+This part makes sure that you talk to the right peer.
 If the identification is done wrong it is easy to mount man-in-the-middle
 attacks, e.g. if Alice wants to talk to Bob it would be possible for Mallory to
 put itself in the middle, so that Alice talks to Mallory and Mallory to Bob.
@@ -136,14 +136,14 @@ to the peers certificate and checking in each step if the we can verify the
 issuers signature.
 
 This step often causes problems, because the client does not know the necessary
-trusted root certificates. These are usually stored in a system dependend
+trusted root certificates. These are usually stored in a system dependent
 CA store, but often the browsers have their own CA store.
 
 =item *
 
 Check if the certificate is still valid.
 Each certificate has a lifetime and should not be used after that time because
-it might be compromised or the underlying cryptographie got broken in the mean
+it might be compromised or the underlying cryptography got broken in the mean
 time.
 
 =item *
@@ -157,7 +157,7 @@ for connecting against the names represented in the certificate.
 A certificate might contain multiple names or wildcards, so that it can be used
 for multiple hosts (e.g.  *.example.com and *.example.org).
 
-Although nobody sane would accept an identity card, where the picture does not
+Although nobody sane would accept an identity card where the picture does not
 match the person we see, it is a common implementation error with SSL to omit
 this check or get it wrong.
 
@@ -182,7 +182,7 @@ developer.
 
 =back
 
-When accessing a web site with SSL or delivering a mail a secure way the
+When accessing a web site with SSL or delivering mail a secure way the
 identity is usually only checked one way, e.g. the client wants to make sure it
 talks to the right server, but the server usually does not care which client it
 is.
@@ -198,7 +198,7 @@ A basic SSL client is simple:
 	or die "error=$!, ssl_error=$SSL_ERROR";
 
 This will take the OpenSSL default CA store as the store for the trusted CA.
-This usually works find on UNIX systems.
+This usually works on UNIX systems.
 If their are no certificates in the store it will try use L<Mozilla::CA> which
 provides the default CAs of Firefox.
 
@@ -207,7 +207,7 @@ version, do a proper hostname check against the certificate and uses SNI (server
 name indication) to send the hostname inside the SSL handshake. This is
 necessary to work with servers, which have different certificates behind the
 same IP address.
-It will also do check the revocation of the certificate with OCSP, but currently
+It will also check the revocation of the certificate with OCSP, but currently
 only if the server provides OCSP stapling (for deeper checks see
 C<ocsp_resolver> method).
 
@@ -324,7 +324,7 @@ supports Forward Secrecy with (Elliptic-Curve) Diffie-Hellmann Key Exchange.
 
 If you do a forking a threading server it is recommended to do the SSL handshake
 inside the new process/thread, so that the master is free for new connections.
-Because a client with improper oder slow SSL handshake could make the server
+Because a client with improper or slow SSL handshake could make the server
 block in the handshake which would be bad to do on the listening socket:
 
     # inet server
@@ -395,7 +395,7 @@ C<SSL_verifycn_name> to specify they hostname you expect in the certificate.
 A common error pattern is also to disable verification if they found no CA
 store (different modules look at different "default" places).
 Because IO::Socket::SSL is now able to provide a usable CA store on most
-plattforms (UNIX, Mac OSX and Windows) it is better to use the defaults provided
+platforms (UNIX, Mac OSX and Windows) it is better to use the defaults provided
 by IO::Socket::SSL.
 If necessary these can be checked with the C<default_ca> method.
 
@@ -415,7 +415,7 @@ return more bytes from the same frame until all bytes are returned and the
 next SSL frame will be read from the socket.
 
 Thus, in order to decide if you can read more data (e.g. if sysread will block)
-you must check, if there are still data in the current SSL frame by calling
+you must check if there are still data in the current SSL frame by calling
 C<pending> and if there are no data pending you might check the underlying
 socket with select or poll.
 Another way might be if you try to sysread at least 16kByte all the time.
@@ -473,7 +473,7 @@ gets problems with older versions, minimal versions in load balancers or plain
 wrong setups.
 
 Unfortunatly these problems are hard to debug.
-Helpful for debugging are a knowledge of SSL interna, wireshark and the use of
+Helpful for debugging are a knowledge of SSL internals, wireshark and the use of
 the debug settings of IO::Socket::SSL and L<Net::SSLeay>, which can both be
 set with C<$IO::Socket::SSL::DEBUG>.
 The following debugs levels are defined, but used not in a consistent way:
@@ -511,7 +511,7 @@ The following problems are not uncommon:
 
 Bad server setup: missing imtermediate certificates.
 
-It is a regular problem, that administrators fail to include all necessary
+It is a regular problem that administrators fail to include all necessary
 certificates into their server setup, e.g. everything needed to build the trust
 chain from the trusted root.
 If they check the setup with the browser everything looks ok, because browsers
@@ -539,7 +539,7 @@ stalled connection. But downgrading the SSL version often works here too.
 
 A cause of such problems are often load balancers or security devices, which
 have hardware acceleration and only a minimal (and less robust) SSL stack. They
-can often be detected because they support much less ciphers than other
+can often be detected because they support much fewer ciphers than other
 implementations.
 
 =item *
@@ -548,7 +548,7 @@ Bad or old OpenSSL versions.
 
 IO::Socket::SSL uses OpenSSL with the help of the L<Net::SSLeay> library. It
 is recommend to have a recent version of this library, because it has more
-features and usually less known bugs.
+features and usually fewer known bugs.
 
 =back
 
@@ -561,8 +561,8 @@ or connect is to set C<$!> to EAGAIN if the operation can not be completed
 immediately.
 
 With SSL handshakes might occure at any time, even within an established
-connections. In this cases it is necessary to finish the handshake, before
-you can read or write data. This might result in situations, where you want to
+connections. In this cases it is necessary to finish the handshake before
+you can read or write data. This might result in situations where you want to
 read but must first finish the write of a handshake or where you want to write
 but must first finish a read.
 In these cases C<$!> is set to EGAIN like expected, and additionally
@@ -583,7 +583,7 @@ this is that accept on a non-blocking TCP socket (e.g. IO::Socket::IP,
 IO::Socket::INET..) results in a new TCP socket, which does not inherit the
 non-blocking behavior of the master socket. And thus the initial SSL handshake
 on the new socket inside C<IO::Socket::SSL::accept> will be done in a blocking
-way. To work around it you should better do an TCP accept and later upgrade the
+way. To work around this you are safer in doing a TCP accept and later upgrade the
 TCP socket in a non-blocking way with C<start_SSL> and C<accept_SSL>.
 
     my $cl = IO::Socket::SSL->new($dst);
