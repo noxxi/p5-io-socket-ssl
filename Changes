@@ -1,4 +1,8 @@
 - fix documentation bug RT#96765, thanks to Salvatore Bonaccorso.
+- refresh option for peer_certificate, so that it checks if the certificate
+  changed in the mean time (on renegotiation)
+- fix fingerprint checking - now applies only to topmost certificate
+- IO::Socket::SSL::Utils - accept extensions within CERT_create
 1.994 2014/06/22
 - IO::Socket::SSL can now be used as dual-use socket, e.g. start plain, upgrade
   to SSL and downgrade again all with the same object. See documentation of

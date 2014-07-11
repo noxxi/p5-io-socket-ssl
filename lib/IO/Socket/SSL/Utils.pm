@@ -6,7 +6,7 @@ use Carp 'croak';
 use Net::SSLeay;
 use Exporter 'import';
 
-our $VERSION = '0.02';
+our $VERSION = '0.03';
 our @EXPORT = qw(
     PEM_file2cert PEM_string2cert PEM_cert2file PEM_cert2string
     PEM_file2key PEM_string2key PEM_key2file PEM_key2string
@@ -270,6 +270,15 @@ sub CERT_create {
 	    &Net::SSLeay::NID_netscape_cert_type => 'server';
     }
 
+    for my $ext (@{ $args{ext} || [] }) {
+	my $nid = $ext->{nid}
+	    || $ext->{sn} && Net::SSLeay::OBJ_sn2nid($ext->{sn})
+	    || croak "cannot determine NID of extension";
+	my $val = $ext->{data};
+	$val = "critical,$val" if $ext->{critical};
+	push @ext,($nid,$val);
+    }
+
     Net::SSLeay::P_X509_add_extensions($cert, $issuer_cert, @ext);
     Net::SSLeay::X509_set_issuer_name($cert,
 	Net::SSLeay::X509_get_subject_name($issuer_cert));
@@ -423,11 +432,11 @@ The serial number
 
 =item crl_uri
 
-List if URIs for CRL distribution.
+List of URIs for CRL distribution.
 
 =item ocsp_uri
 
-List if URIs for revocation checking using OCSP.
+List of URIs for revocation checking using OCSP.
 
 =item keyusage
 
@@ -502,6 +511,14 @@ The version of the certificate, default 2 (x509v3).
 =item CA true|false
 
 if true declare certificate as CA, defaults to false
+
+=item ext [{ sn => .., data => ... }, ... ]
+
+List of extensions. The type of the extension can be specified as name with
+C<sn> or as NID with C<nid> and the data with C<data>. These data must be in the
+same syntax as expected within openssl.cnf, e.g. something like
+C<OCSP;URI=http://...>. Additionally the critical flag can be set with
+C<critical => 1>.
 
 =item key key
 

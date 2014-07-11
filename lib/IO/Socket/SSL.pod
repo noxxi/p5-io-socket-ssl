@@ -829,8 +829,8 @@ C<get_fingerprint>.
 
 You can specify a list of fingerprints in case you have several acceptable
 certificates.
-If a fingerprint matches no additional verification of the certificate will be
-done.
+If a fingerprint matches the topmost certificate no additional validations
+can make the verification fail.
 
 =item SSL_cert_file | SSL_cert | SSL_key_file | SSL_key
 
@@ -1385,11 +1385,14 @@ Returns a parsable string with select fields from the peer SSL certificate.
 This method directly returns the result of the dump_peer_certificate() method of
 Net::SSLeay.
 
-=item B<peer_certificate($field)>
+=item B<peer_certificate($field;[$refresh])>
 
 If a peer certificate exists, this function can retrieve values from it.
 If no field is given the internal representation of certificate from Net::SSLeay
 is returned.
+If refresh is true it will not used a cached version, but check again in case
+the certificate of the connection has changed due to renegotiation.
+
 The following fields can be queried:
 
 =over 8
