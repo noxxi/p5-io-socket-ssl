@@ -1,3 +1,8 @@
+1.996 2014/07/11
+- move initialization of OpenSSL-internals out of INIT again because this
+  breaks if module is used with require. Since there is no right place to
+  work in all circumstances just document the work-arounds needed for
+  perlcc.
 1.995 2014/07/11
 - RT#95452 - move initialization and creation of OpenSSL-internals into INIT
   section, so they get executed after compilation and perlcc is happy.

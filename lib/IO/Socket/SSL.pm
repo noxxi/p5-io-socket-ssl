@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '1.995';
+our $VERSION = '1.996';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -139,17 +139,22 @@ my %DEFAULT_SSL_CLIENT_ARGS = (
     )
 );
 
+# set values inside _init to work with perlcc, RT#95452
 my %DEFAULT_SSL_SERVER_ARGS;
-# set values inside INIT to work with perlcc, RT#95452
-INIT {
-    %DEFAULT_SSL_SERVER_ARGS = (
-	%DEFAULT_SSL_ARGS,
-	SSL_verify_mode => SSL_VERIFY_NONE,
-	SSL_honor_cipher_order => 1,   # trust server to know the best cipher
-	SSL_dh => do {
-	    my $bio = Net::SSLeay::BIO_new(Net::SSLeay::BIO_s_mem());
-	    # generated with: openssl dhparam 2048
-	    Net::SSLeay::BIO_write($bio,<<'DH');
+
+# Initialization of OpenSSL internals
+# This will be called once during compilation - perlcc users might need to
+# call it again by hand, see RT#95452
+{
+    sub init {
+	%DEFAULT_SSL_SERVER_ARGS = (
+	    %DEFAULT_SSL_ARGS,
+	    SSL_verify_mode => SSL_VERIFY_NONE,
+	    SSL_honor_cipher_order => 1,  # trust server to know the best cipher
+	    SSL_dh => do {
+		my $bio = Net::SSLeay::BIO_new(Net::SSLeay::BIO_s_mem());
+		# generated with: openssl dhparam 2048
+		Net::SSLeay::BIO_write($bio,<<'DH');
 -----BEGIN DH PARAMETERS-----
 MIIBCAKCAQEAr8wskArj5+1VCVsnWt/RUR7tXkHJ7mGW7XxrLSPOaFyKyWf8lZht
 iSY2Lc4oa4Zw8wibGQ3faeQu/s8fvPq/aqTxYmyHPKCMoze77QJHtrYtJAosB9SY
@@ -159,13 +164,21 @@ Ps2vlkxjAHjJcqc3O+OiImKik/X2rtBTZjpKmzN3WWTB0RJZCOWaLlDO81D01o1E
 aZecz3Np9KIYey900f+X7zC2bJxEHp95ywIBAg==
 -----END DH PARAMETERS-----
 DH
-	    my $dh = Net::SSLeay::PEM_read_bio_DHparams($bio);
-	    Net::SSLeay::BIO_free($bio);
-	    $dh or die "no DH";
-	    $dh;
-	},
-	$can_ecdh ? ( SSL_ecdh_curve => 'prime256v1' ):(),
-    );
+		my $dh = Net::SSLeay::PEM_read_bio_DHparams($bio);
+		Net::SSLeay::BIO_free($bio);
+		$dh or die "no DH";
+		$dh;
+	    },
+	    $can_ecdh ? ( SSL_ecdh_curve => 'prime256v1' ):(),
+	);
+
+	Net::SSLeay::load_error_strings();
+	Net::SSLeay::SSLeay_add_ssl_algorithms();
+	Net::SSLeay::OpenSSL_add_all_digests();
+	Net::SSLeay::randomize();
+    }
+    # call it once
+    init();
 }
 
 # global defaults which can be changed using set_defaults
@@ -271,15 +284,6 @@ BEGIN {
 
     #Compatibility
     *ERROR = \$SSL_ERROR;
-}
-
-
-# initialize OpenSSL inside init because of perlcc, RT#95452
-INIT {
-    Net::SSLeay::load_error_strings();
-    Net::SSLeay::SSLeay_add_ssl_algorithms();
-    Net::SSLeay::OpenSSL_add_all_digests();
-    Net::SSLeay::randomize();
 }
 
 
