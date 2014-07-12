@@ -1,8 +1,12 @@
-1.996 2014/07/11
+1.997 2014/07/12
+- thanks to return code 1 from Net::SSLeay::library_init if the library needed
+  initialization and 0 if not we can now clearly distinguish if initialization
+  was needed and do not need any work-arounds for perlcc by the user.
+1.996 2014/07/12
 - move initialization of OpenSSL-internals out of INIT again because this
   breaks if module is used with require. Since there is no right place to
   work in all circumstances just document the work-arounds needed for
-  perlcc.
+  perlcc. RT#97166
 1.995 2014/07/11
 - RT#95452 - move initialization and creation of OpenSSL-internals into INIT
   section, so they get executed after compilation and perlcc is happy.

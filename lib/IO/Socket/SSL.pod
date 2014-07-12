@@ -693,34 +693,6 @@ stop_SSL to talk plain again:
     ... but data exchanged again in plain ...
 
 
-=head2 Use together with perlcc
-
-Perlcc saves the state of the program after compilation, but only the state
-visible from Perl. But, OpenSSL has their own internal data structures, which
-need to be initialized at start of the program.
-Unfortunatly, there is no fixed place where this initialization can be done
-if you are using perlcc, because the real place depends on how you load the
-module, e.g. with C<use> or with C<require>. So in some cases you need to
-initialize it by hand:
-
-    # This works
-    require IO::Socket::SSL;
-    IO::Socket::SSL->import; # if needed
-
-    # This does not work
-    use IO::Socket::SSL;
-
-    # This works again, but should only be used with perlcc
-    use IO::Socket::SSL;
-    IO::Socket::SSL::init(); # but do it only if you use perlcc!
-
-    # This works with and without perlcc, but in latter case only if compiling
-    # process id is different to executing process id
-    use IO::Socket::SSL;
-    BEGIN { $begin_pid = $$ };
-    IO::Socket::SSL::init() if $begin_$pid != $$;
-
-
 =head1 Integration Into Own Modules
 
 IO::Socket::SSL behaves similar to other L<IO::Socket> modules and thus could

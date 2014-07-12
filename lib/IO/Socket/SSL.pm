@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '1.996';
+our $VERSION = '1.997';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -147,6 +147,15 @@ my %DEFAULT_SSL_SERVER_ARGS;
 # call it again by hand, see RT#95452
 {
     sub init {
+	# library_init returns false if the library was already initialized.
+	# This way we can find out if the library needs to be re-initialized
+	# inside code compiled with perlcc
+	Net::SSLeay::library_init() or return; 
+
+	Net::SSLeay::load_error_strings();
+	Net::SSLeay::OpenSSL_add_all_digests();
+	Net::SSLeay::randomize();
+
 	%DEFAULT_SSL_SERVER_ARGS = (
 	    %DEFAULT_SSL_ARGS,
 	    SSL_verify_mode => SSL_VERIFY_NONE,
@@ -171,14 +180,15 @@ DH
 	    },
 	    $can_ecdh ? ( SSL_ecdh_curve => 'prime256v1' ):(),
 	);
-
-	Net::SSLeay::load_error_strings();
-	Net::SSLeay::SSLeay_add_ssl_algorithms();
-	Net::SSLeay::OpenSSL_add_all_digests();
-	Net::SSLeay::randomize();
     }
-    # call it once
-    init();
+    # Call it once at compile time and try it at INIT.
+    # This should catch all cases of including the module, e.g 'use' (INIT) or
+    # 'require' (compile time) and works also with perlcc
+    {
+	no warnings;
+	INIT { init() }
+	init();
+    }
 }
 
 # global defaults which can be changed using set_defaults
