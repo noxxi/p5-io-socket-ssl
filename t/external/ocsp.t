@@ -136,7 +136,7 @@ for my $test (@tests) {
 	my $err = $ocsp_resolver->resolve_blocking(timeout => $timeout);
 	if ($test->{expect_revoked}) {
 	    if ($err =~m/revoked/) {
-		pass("revoked within stapling as expected");
+		pass("revoked with explicit OCSP request as expected");
 		next TEST;
 	    } elsif ( $err =~m/status not yet valid/ ) {
 		pass("temporary server side error with OCSP check: $err");

@@ -1744,6 +1744,7 @@ sub get_ssleay_error {
 sub _internal_error {
     my ($self, $error, $destroy_socket) = @_;
     $SSL_ERROR = dualvar( -1, $error );
+    $DEBUG && DEBUG($error);
     ${*$self}{'_SSL_last_err'} = $SSL_ERROR if (ref($self));
     return;
 }
@@ -1759,6 +1760,7 @@ sub error {
     $error .= ' '.join(' ',@err) if @err;
     if ($error) {
 	$SSL_ERROR = dualvar( -1, $error );
+	$DEBUG && DEBUG($error);
 	${*$self}{'_SSL_last_err'} = $SSL_ERROR if (ref($self));
     }
     return;
