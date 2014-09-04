@@ -59,6 +59,7 @@ t/readline.t
 t/sessions.t
 t/signal-readline.t
 t/sni.t
+t/sni_verify.t
 t/startssl-failed.t
 t/startssl.t
 t/start-stopssl.t

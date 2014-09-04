@@ -2195,13 +2195,14 @@ WARN
 	}
     }
 
+    my %sni;
+
     if ($arg_hash->{'SSL_server'} || $arg_hash->{'SSL_use_cert'}) {
 
 	if ($arg_hash->{'SSL_passwd_cb'}) {
 	    Net::SSLeay::CTX_set_default_passwd_cb($ctx, $arg_hash->{'SSL_passwd_cb'});
 	}
 
-	my %sni;
 	for my $opt (qw(SSL_key SSL_key_file SSL_cert SSL_cert_file)) {
 	    my $val  = $arg_hash->{$opt} or next;
 	    if ( ref($val) eq 'HASH' ) {
@@ -2285,6 +2286,77 @@ WARN
 	    }
 	    $havekey or return
 		IO::Socket::SSL->error("Failed to use private key");
+
+            # configure the SNI context as the main context
+            next if ($snictx == $ctx);
+
+            Net::SSLeay::CTX_set_options($snictx,$ssl_op);
+
+            if ( my $id = $arg_hash->{SSL_session_id_context}
+                || ( $arg_hash->{SSL_verify_mode} & 0x01 ) && "$snictx" ) {
+                Net::SSLeay::CTX_set_session_id_context($snictx,$id,length($id));
+            }
+
+            Net::SSLeay::CTX_set_mode( $snictx,
+                SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER|SSL_MODE_ENABLE_PARTIAL_WRITE);
+
+            if ( my $proto_list = $arg_hash->{SSL_npn_protocols} ) {
+                if($arg_hash->{SSL_server}) {
+                    Net::SSLeay::CTX_set_next_protos_advertised_cb($snictx, $proto_list);
+                } else {
+                    Net::SSLeay::CTX_set_next_proto_select_cb($snictx, $proto_list);
+                }
+            }
+
+            if ( $arg_hash->{SSL_ca}
+                || defined $arg_hash->{SSL_ca_file}
+                || defined $arg_hash->{SSL_ca_path} ) {
+                my $file = $arg_hash->{SSL_ca_file};
+                $file = undef if ref($file) && ! $$file;
+                my $dir = $arg_hash->{SSL_ca_path};
+                $dir = undef if ref($dir) && ! $$dir;
+                if ( $arg_hash->{SSL_ca} ) {
+                    my $store = Net::SSLeay::CTX_get_cert_store($snictx);
+                    for (@{$arg_hash->{SSL_ca}}) {
+                        Net::SSLeay::X509_STORE_add_cert($store,$_) or
+                            return IO::Socket::SSL->error(
+                                "Failed to add certificate to CA store");
+                    }
+                }
+                if ( $file || $dir and ! Net::SSLeay::CTX_load_verify_locations(
+                    $snictx, $file || '', $dir || '')) {
+                    return IO::Socket::SSL->error(
+                        "Invalid certificate authority locations")
+                        if $verify_mode != Net::SSLeay::VERIFY_NONE();
+                }
+            } elsif ( my %ca = IO::Socket::SSL::default_ca()) {
+                if (! Net::SSLeay::CTX_load_verify_locations( $snictx,
+                    $ca{SSL_ca_file} || '',$ca{SSL_ca_path} || '')
+                    && $verify_mode != Net::SSLeay::VERIFY_NONE()) {
+                    return IO::Socket::SSL->error(
+                        "Invalid default certificate authority locations")
+                }
+            }
+
+            if ($arg_hash->{'SSL_check_crl'}) {
+                Net::SSLeay::X509_STORE_set_flags(
+                    Net::SSLeay::CTX_get_cert_store($snictx),
+                    Net::SSLeay::X509_V_FLAG_CRL_CHECK()
+                );
+                if ($arg_hash->{'SSL_crl_file'}) {
+                    my $bio = Net::SSLeay::BIO_new_file($arg_hash->{'SSL_crl_file'}, 'r');
+                    my $crl = Net::SSLeay::PEM_read_bio_X509_CRL($bio);
+                    if ( $crl ) {
+                        Net::SSLeay::X509_STORE_add_crl(Net::SSLeay::CTX_get_cert_store($snictx), $crl);
+                    } else {
+                        return IO::Socket::SSL->error("Invalid certificate revocation list");
+                    }
+                }
+            }
+
+            if ($arg_hash->{'SSL_passwd_cb'}) {
+                Net::SSLeay::CTX_set_default_passwd_cb($snictx, $arg_hash->{'SSL_passwd_cb'});
+            }
 	}
 
 	if ( keys %sni > 1 or ! exists $sni{''} ) {
@@ -2307,18 +2379,22 @@ WARN
 	    });
 	}
 
+	# make sure $ctx is in %sni
+	$sni{''} = $ctx;
+
+        for my $sni (values %sni) {
 	if ( my $f = $arg_hash->{SSL_dh_file} ) {
 	    my $bio = Net::SSLeay::BIO_new_file( $f,'r' )
 		|| return IO::Socket::SSL->error( "Failed to open DH file $f" );
 	    my $dh = Net::SSLeay::PEM_read_bio_DHparams($bio);
 	    Net::SSLeay::BIO_free($bio);
 	    $dh || return IO::Socket::SSL->error( "Failed to read PEM for DH from $f - wrong format?" );
-	    my $rv = Net::SSLeay::CTX_set_tmp_dh( $ctx,$dh );
+	    my $rv = Net::SSLeay::CTX_set_tmp_dh( $sni,$dh );
 	    Net::SSLeay::DH_free( $dh );
 	    $rv || return IO::Socket::SSL->error( "Failed to set DH from $f" );
 	} elsif ( my $dh = $arg_hash->{SSL_dh} ) {
 	    # binary, e.g. DH*
-	    Net::SSLeay::CTX_set_tmp_dh( $ctx,$dh )
+	    Net::SSLeay::CTX_set_tmp_dh( $sni,$dh )
 		|| return IO::Socket::SSL->error( "Failed to set DH from SSL_dh" );
 	}
 
@@ -2335,11 +2411,15 @@ WARN
 	    my $ecdh = Net::SSLeay::EC_KEY_new_by_curve_name($curve) or
 		return IO::Socket::SSL->error(
 		"cannot create curve for NID $curve");
-	    Net::SSLeay::CTX_set_tmp_ecdh($ctx,$ecdh) or
+	    Net::SSLeay::CTX_set_tmp_ecdh($sni,$ecdh) or
 		return IO::Socket::SSL->error(
 		"failed to set ECDH curve context");
 	    Net::SSLeay::EC_KEY_free($ecdh);
 	}
+        }
+    }
+    else {
+        $sni{''} = $ctx;
     }
 
     my $verify_cb = $arg_hash->{SSL_verify_callback};
@@ -2402,12 +2482,15 @@ WARN
 	    return $rv;
 	};
     }
-    Net::SSLeay::CTX_set_verify($ctx, $verify_mode, $verify_callback);
+    for my $sni (values %sni) {
+    Net::SSLeay::CTX_set_verify($sni, $verify_mode, $verify_callback);
+    }
 
     my $staple_callback = $arg_hash->{SSL_ocsp_staple_callback};
     if ( !$is_server && $can_ocsp_staple ) {
 	$self->{ocsp_cache} = $arg_hash->{SSL_ocsp_cache};
-	Net::SSLeay::CTX_set_tlsext_status_cb($ctx,sub {
+        for my $sni (values %sni) {
+	Net::SSLeay::CTX_set_tlsext_status_cb($sni,sub {
 	    my ($ssl,$resp) = @_;
 	    my $iossl = $SSL_OBJECT{$ssl} or
 		die "no IO::Socket::SSL object found for SSL $ssl";
@@ -2485,11 +2568,14 @@ WARN
 	    }
 	    return 1;
 	});
+        }
     }
 
     if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
-	Net::SSLeay::CTX_set_cipher_list($ctx, $cl )
+        for my $sni (values %sni) {
+	Net::SSLeay::CTX_set_cipher_list($sni, $cl )
 	    || return IO::Socket::SSL->error("Failed to set SSL cipher list");
+        }
     }
 
     if ( my $cb = $arg_hash->{SSL_create_ctx_callback} ) {
