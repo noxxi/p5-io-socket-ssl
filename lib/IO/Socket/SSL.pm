@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '1.997';
+our $VERSION = '1.998';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -2108,294 +2108,210 @@ WARN
 	$ver eq 'TLSv1_2' ? 'CTX_tlsv1_2_new' :
 	'CTX_new'
     ) or return IO::Socket::SSL->_internal_error("SSL Version $ver not supported");
-    my $ctx = $ctx_new_sub->() or return
-	IO::Socket::SSL->error("SSL Context init failed");
 
-    # SSL_OP_CIPHER_SERVER_PREFERENCE
-    $ssl_op |= 0x00400000 if $arg_hash->{SSL_honor_cipher_order};
-
-    Net::SSLeay::CTX_set_options($ctx,$ssl_op);
-
-    # if we don't set session_id_context if client certificate is expected
-    # client session caching will fail
-    # if user does not provide explicit id just use the stringification
-    # of the context
-    if ( my $id = $arg_hash->{SSL_session_id_context}
-	|| ( $arg_hash->{SSL_verify_mode} & 0x01 ) && "$ctx" ) {
-	Net::SSLeay::CTX_set_session_id_context($ctx,$id,length($id));
-    }
-
-    # SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER makes syswrite return if at least one
-    # buffer was written and not block for the rest
-    # SSL_MODE_ENABLE_PARTIAL_WRITE can be necessary for non-blocking because we
-    # cannot guarantee, that the location of the buffer stays constant
-    Net::SSLeay::CTX_set_mode( $ctx,
-	SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER|SSL_MODE_ENABLE_PARTIAL_WRITE);
-
-    if ( my $proto_list = $arg_hash->{SSL_npn_protocols} ) {
-	return IO::Socket::SSL->_internal_error("NPN not supported in Net::SSLeay")
-	    if ! $can_npn;
-	if($arg_hash->{SSL_server}) {
-	    # on server side SSL_npn_protocols means a list of advertised protocols
-	    Net::SSLeay::CTX_set_next_protos_advertised_cb($ctx, $proto_list);
-	} else {
-	    # on client side SSL_npn_protocols means a list of preferred protocols
-	    # negotiation algorithm used is "as-openssl-implements-it"
-	    Net::SSLeay::CTX_set_next_proto_select_cb($ctx, $proto_list);
-	}
-    }
-
-    # Try to apply SSL_ca even if SSL_verify_mode is 0, so that they can be
-    # used to verify OCSP responses.
-    # If applying fails complain only if verify_mode != VERIFY_NONE.
-    if ( $arg_hash->{SSL_ca}
-	|| defined $arg_hash->{SSL_ca_file}
-	|| defined $arg_hash->{SSL_ca_path} ) {
-	my $file = $arg_hash->{SSL_ca_file};
-	$file = undef if ref($file) && ! $$file;
-	my $dir = $arg_hash->{SSL_ca_path};
-	$dir = undef if ref($dir) && ! $$dir;
-	if ( $arg_hash->{SSL_ca} ) {
-	    my $store = Net::SSLeay::CTX_get_cert_store($ctx);
-	    for (@{$arg_hash->{SSL_ca}}) {
-		Net::SSLeay::X509_STORE_add_cert($store,$_) or
-		    return IO::Socket::SSL->error(
-			"Failed to add certificate to CA store");
-	    }
-	}
-	if ( $file || $dir and ! Net::SSLeay::CTX_load_verify_locations(
-	    $ctx, $file || '', $dir || '')) {
-	    return IO::Socket::SSL->error(
-		"Invalid certificate authority locations")
-		if $verify_mode != Net::SSLeay::VERIFY_NONE();
-	}
-    } elsif ( my %ca = IO::Socket::SSL::default_ca()) {
-	# no CA path given, continue with system defaults
-	if (! Net::SSLeay::CTX_load_verify_locations( $ctx,
-	    $ca{SSL_ca_file} || '',$ca{SSL_ca_path} || '')
-	    && $verify_mode != Net::SSLeay::VERIFY_NONE()) {
-	    return IO::Socket::SSL->error(
-		"Invalid default certificate authority locations")
-	}
-    }
-
-    if ($arg_hash->{'SSL_check_crl'}) {
-	Net::SSLeay::X509_STORE_set_flags(
-	    Net::SSLeay::CTX_get_cert_store($ctx),
-	    Net::SSLeay::X509_V_FLAG_CRL_CHECK()
-	);
-	if ($arg_hash->{'SSL_crl_file'}) {
-	    my $bio = Net::SSLeay::BIO_new_file($arg_hash->{'SSL_crl_file'}, 'r');
-	    my $crl = Net::SSLeay::PEM_read_bio_X509_CRL($bio);
-	    if ( $crl ) {
-		Net::SSLeay::X509_STORE_add_crl(Net::SSLeay::CTX_get_cert_store($ctx), $crl);
-	    } else {
-		return IO::Socket::SSL->error("Invalid certificate revocation list");
-	    }
-	}
-    }
-
-    my %sni;
-
-    if ($arg_hash->{'SSL_server'} || $arg_hash->{'SSL_use_cert'}) {
-
-	if ($arg_hash->{'SSL_passwd_cb'}) {
-	    Net::SSLeay::CTX_set_default_passwd_cb($ctx, $arg_hash->{'SSL_passwd_cb'});
-	}
-
+    # For SNI in server mode we need a separate context for each certificate.
+    my %ctx;
+    if ($arg_hash->{'SSL_server'}) {
+	my %sni;
 	for my $opt (qw(SSL_key SSL_key_file SSL_cert SSL_cert_file)) {
 	    my $val  = $arg_hash->{$opt} or next;
 	    if ( ref($val) eq 'HASH' ) {
-		# SNI
 		while ( my ($host,$v) = each %$val ) {
 		    $sni{lc($host)}{$opt} = $v;
 		}
+	    }
+	}
+	while (my ($host,$v) = each %sni) {
+	    $ctx{$host} = { %$arg_hash, %$v };
+	}
+    }
+    $ctx{''} = $arg_hash if ! %ctx;
+
+    while (my ($host,$arg_hash) = each %ctx) {
+	# replace value in %ctx with real context
+	my $ctx = $ctx_new_sub->() or return
+	    IO::Socket::SSL->error("SSL Context init failed");
+	$CTX_CREATED_IN_THIS_THREAD{$ctx} = 1;
+
+	# SSL_OP_CIPHER_SERVER_PREFERENCE
+	$ssl_op |= 0x00400000 if $arg_hash->{SSL_honor_cipher_order};
+
+	Net::SSLeay::CTX_set_options($ctx,$ssl_op);
+
+	# if we don't set session_id_context if client certificate is expected
+	# client session caching will fail
+	# if user does not provide explicit id just use the stringification
+	# of the context
+	if ( my $id = $arg_hash->{SSL_session_id_context}
+	    || ( $arg_hash->{SSL_verify_mode} & 0x01 ) && "$ctx" ) {
+	    Net::SSLeay::CTX_set_session_id_context($ctx,$id,length($id));
+	}
+
+	# SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER makes syswrite return if at least one
+	# buffer was written and not block for the rest
+	# SSL_MODE_ENABLE_PARTIAL_WRITE can be necessary for non-blocking because we
+	# cannot guarantee, that the location of the buffer stays constant
+	Net::SSLeay::CTX_set_mode( $ctx,
+	    SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER|SSL_MODE_ENABLE_PARTIAL_WRITE);
+
+	if ( my $proto_list = $arg_hash->{SSL_npn_protocols} ) {
+	    return IO::Socket::SSL->_internal_error("NPN not supported in Net::SSLeay")
+		if ! $can_npn;
+	    if($arg_hash->{SSL_server}) {
+		# on server side SSL_npn_protocols means a list of advertised protocols
+		Net::SSLeay::CTX_set_next_protos_advertised_cb($ctx, $proto_list);
 	    } else {
-		$sni{''}{$opt} = $val;
+		# on client side SSL_npn_protocols means a list of preferred protocols
+		# negotiation algorithm used is "as-openssl-implements-it"
+		Net::SSLeay::CTX_set_next_proto_select_cb($ctx, $proto_list);
 	    }
 	}
 
-	$sni{''}{ctx} = $ctx if exists $sni{''}; # default if no SNI
-	for my $sni (values %sni) {
-	    # we need a new context for each server
-	    my $snictx = $sni->{ctx} ||= $ctx_new_sub->() or return
-		IO::Socket::SSL->error("SSL Context init failed");
-
-	    my ($havekey,$havecert);
-	    if ( my $x509 = $sni->{SSL_cert} ) {
-		# binary, e.g. X509*
-		# we have either a single certificate or a list with
-		# a chain of certificates
-		my @x509 = ref($x509) eq 'ARRAY' ? @$x509: ($x509);
-		my $cert = shift @x509;
-		Net::SSLeay::CTX_use_certificate( $snictx,$cert )
-		    || return IO::Socket::SSL->error("Failed to use Certificate");
-		foreach my $ca (@x509) {
-		    Net::SSLeay::CTX_add_extra_chain_cert( $snictx,$ca )
-			|| return IO::Socket::SSL->error("Failed to use Certificate");
+	# Try to apply SSL_ca even if SSL_verify_mode is 0, so that they can be
+	# used to verify OCSP responses.
+	# If applying fails complain only if verify_mode != VERIFY_NONE.
+	if ( $arg_hash->{SSL_ca}
+	    || defined $arg_hash->{SSL_ca_file}
+	    || defined $arg_hash->{SSL_ca_path} ) {
+	    my $file = $arg_hash->{SSL_ca_file};
+	    $file = undef if ref($file) && ! $$file;
+	    my $dir = $arg_hash->{SSL_ca_path};
+	    $dir = undef if ref($dir) && ! $$dir;
+	    if ( $arg_hash->{SSL_ca} ) {
+		my $store = Net::SSLeay::CTX_get_cert_store($ctx);
+		for (@{$arg_hash->{SSL_ca}}) {
+		    Net::SSLeay::X509_STORE_add_cert($store,$_) or
+			return IO::Socket::SSL->error(
+			    "Failed to add certificate to CA store");
 		}
-		$havecert = 'OBJ';
-	    } elsif ( my $f = $sni->{SSL_cert_file} ) {
-		# try to load chain from PEM or certificate from ASN1
-		if (Net::SSLeay::CTX_use_certificate_chain_file($snictx,$f)) {
-		    $havecert = 'PEM';
-		} elsif (Net::SSLeay::CTX_use_certificate_file($snictx,$f,FILETYPE_ASN1)) {
-		    $havecert = 'DER';
+	    }
+	    if ( $file || $dir and ! Net::SSLeay::CTX_load_verify_locations(
+		$ctx, $file || '', $dir || '')) {
+		return IO::Socket::SSL->error(
+		    "Invalid certificate authority locations")
+		    if $verify_mode != Net::SSLeay::VERIFY_NONE();
+	    }
+	} elsif ( my %ca = IO::Socket::SSL::default_ca()) {
+	    # no CA path given, continue with system defaults
+	    if (! Net::SSLeay::CTX_load_verify_locations( $ctx,
+		$ca{SSL_ca_file} || '',$ca{SSL_ca_path} || '')
+		&& $verify_mode != Net::SSLeay::VERIFY_NONE()) {
+		return IO::Socket::SSL->error(
+		    "Invalid default certificate authority locations")
+	    }
+	}
+
+	if ($arg_hash->{'SSL_check_crl'}) {
+	    Net::SSLeay::X509_STORE_set_flags(
+		Net::SSLeay::CTX_get_cert_store($ctx),
+		Net::SSLeay::X509_V_FLAG_CRL_CHECK()
+	    );
+	    if ($arg_hash->{'SSL_crl_file'}) {
+		my $bio = Net::SSLeay::BIO_new_file($arg_hash->{'SSL_crl_file'}, 'r');
+		my $crl = Net::SSLeay::PEM_read_bio_X509_CRL($bio);
+		if ( $crl ) {
+		    Net::SSLeay::X509_STORE_add_crl(Net::SSLeay::CTX_get_cert_store($ctx), $crl);
 		} else {
-		    # try to load certificate, key and chain from PKCS12 file
-		    my ($key,$cert,@chain) = Net::SSLeay::P_PKCS12_load_file($f,1);
-		    if (!$cert and $arg_hash->{SSL_passwd_cb}
-			and defined( my $pw = $arg_hash->{SSL_passwd_cb}->(0))) {
-			($key,$cert,@chain) = Net::SSLeay::P_PKCS12_load_file($f,1,$pw);
-		    }
-		    PKCS12: while ($cert) {
-			Net::SSLeay::CTX_use_certificate($snictx,$cert) or last;
-			for my $ca (@chain) {
-			    Net::SSLeay::CTX_add_extra_chain_cert($snictx,$ca)
-				or last PKCS12;
-			}
-			last if $key && ! Net::SSLeay::CTX_use_PrivateKey($snictx,$key);
-			$havecert = 'PKCS12';
-			last;
-		    }
-		    $havekey = 'PKCS12' if $key;
-		    Net::SSLeay::X509_free($cert) if $cert;
-		    Net::SSLeay::EVP_PKEY_free($key) if $key;
-		    # don't free @chain, because CTX_add_extra_chain_cert
-		    # did not duplicate the certificates
-		}
-		$havecert or return
-		    IO::Socket::SSL->error("Failed to use certificate file");
-	    }
-
-	    if ($havekey) {
-		# skip SSL_key_*
-	    } elsif ( my $pkey = $sni->{SSL_key} ) {
-		# binary, e.g. EVP_PKEY*
-		Net::SSLeay::CTX_use_PrivateKey($snictx, $pkey)
-		    || return IO::Socket::SSL->error("Failed to use Private Key");
-		$havekey = 'MEM';
-	    } elsif ( my $f = $sni->{SSL_key_file}
-		|| (($havecert eq 'PEM') ? $sni->{SSL_cert_file}:undef) ) {
-		for my $ft ( FILETYPE_PEM, FILETYPE_ASN1 ) {
-		    if (Net::SSLeay::CTX_use_PrivateKey_file($snictx,$f,$ft)) {
-			$havekey = ($ft == FILETYPE_PEM) ? 'PEM':'DER';
-			last;
-		    }
+		    return IO::Socket::SSL->error("Invalid certificate revocation list");
 		}
 	    }
-	    $havekey or return
-		IO::Socket::SSL->error("Failed to use private key");
-
-            # configure the SNI context as the main context
-            next if ($snictx == $ctx);
-
-            Net::SSLeay::CTX_set_options($snictx,$ssl_op);
-
-            if ( my $id = $arg_hash->{SSL_session_id_context}
-                || ( $arg_hash->{SSL_verify_mode} & 0x01 ) && "$snictx" ) {
-                Net::SSLeay::CTX_set_session_id_context($snictx,$id,length($id));
-            }
-
-            Net::SSLeay::CTX_set_mode( $snictx,
-                SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER|SSL_MODE_ENABLE_PARTIAL_WRITE);
-
-            if ( my $proto_list = $arg_hash->{SSL_npn_protocols} ) {
-                if($arg_hash->{SSL_server}) {
-                    Net::SSLeay::CTX_set_next_protos_advertised_cb($snictx, $proto_list);
-                } else {
-                    Net::SSLeay::CTX_set_next_proto_select_cb($snictx, $proto_list);
-                }
-            }
-
-            if ( $arg_hash->{SSL_ca}
-                || defined $arg_hash->{SSL_ca_file}
-                || defined $arg_hash->{SSL_ca_path} ) {
-                my $file = $arg_hash->{SSL_ca_file};
-                $file = undef if ref($file) && ! $$file;
-                my $dir = $arg_hash->{SSL_ca_path};
-                $dir = undef if ref($dir) && ! $$dir;
-                if ( $arg_hash->{SSL_ca} ) {
-                    my $store = Net::SSLeay::CTX_get_cert_store($snictx);
-                    for (@{$arg_hash->{SSL_ca}}) {
-                        Net::SSLeay::X509_STORE_add_cert($store,$_) or
-                            return IO::Socket::SSL->error(
-                                "Failed to add certificate to CA store");
-                    }
-                }
-                if ( $file || $dir and ! Net::SSLeay::CTX_load_verify_locations(
-                    $snictx, $file || '', $dir || '')) {
-                    return IO::Socket::SSL->error(
-                        "Invalid certificate authority locations")
-                        if $verify_mode != Net::SSLeay::VERIFY_NONE();
-                }
-            } elsif ( my %ca = IO::Socket::SSL::default_ca()) {
-                if (! Net::SSLeay::CTX_load_verify_locations( $snictx,
-                    $ca{SSL_ca_file} || '',$ca{SSL_ca_path} || '')
-                    && $verify_mode != Net::SSLeay::VERIFY_NONE()) {
-                    return IO::Socket::SSL->error(
-                        "Invalid default certificate authority locations")
-                }
-            }
-
-            if ($arg_hash->{'SSL_check_crl'}) {
-                Net::SSLeay::X509_STORE_set_flags(
-                    Net::SSLeay::CTX_get_cert_store($snictx),
-                    Net::SSLeay::X509_V_FLAG_CRL_CHECK()
-                );
-                if ($arg_hash->{'SSL_crl_file'}) {
-                    my $bio = Net::SSLeay::BIO_new_file($arg_hash->{'SSL_crl_file'}, 'r');
-                    my $crl = Net::SSLeay::PEM_read_bio_X509_CRL($bio);
-                    if ( $crl ) {
-                        Net::SSLeay::X509_STORE_add_crl(Net::SSLeay::CTX_get_cert_store($snictx), $crl);
-                    } else {
-                        return IO::Socket::SSL->error("Invalid certificate revocation list");
-                    }
-                }
-            }
-
-            if ($arg_hash->{'SSL_passwd_cb'}) {
-                Net::SSLeay::CTX_set_default_passwd_cb($snictx, $arg_hash->{'SSL_passwd_cb'});
-            }
 	}
 
-	if ( keys %sni > 1 or ! exists $sni{''} ) {
-	    # we definitely want SNI support
-	    $can_server_sni or return IO::Socket::SSL->_internal_error(
-		"Server side SNI not supported for this openssl/Net::SSLeay");
-	    $_ = $_->{ctx} for( values %sni);
-	    Net::SSLeay::CTX_set_tlsext_servername_callback($ctx, sub {
-		my $ssl = shift;
-		my $host = Net::SSLeay::get_servername($ssl);
-		$host = '' if ! defined $host;
-		my $snictx = $sni{lc($host)} || $sni{''} or do {
-		    $DEBUG>1 and DEBUG(
-			"cannot get context from servername '$host'");
-		    return 0;
-		};
-		$DEBUG>1 and DEBUG("set context from servername $host");
-		Net::SSLeay::set_SSL_CTX($ssl,$snictx) if $snictx != $ctx;
-		return 1;
-	    });
+	Net::SSLeay::CTX_set_default_passwd_cb($ctx,$arg_hash->{SSL_passwd_cb})
+	    if $arg_hash->{SSL_passwd_cb};
+
+	my ($havekey,$havecert);
+	if ( my $x509 = $arg_hash->{SSL_cert} ) {
+	    # binary, e.g. X509*
+	    # we have either a single certificate or a list with
+	    # a chain of certificates
+	    my @x509 = ref($x509) eq 'ARRAY' ? @$x509: ($x509);
+	    my $cert = shift @x509;
+	    Net::SSLeay::CTX_use_certificate( $ctx,$cert )
+		|| return IO::Socket::SSL->error("Failed to use Certificate");
+	    foreach my $ca (@x509) {
+		Net::SSLeay::CTX_add_extra_chain_cert( $ctx,$ca )
+		    || return IO::Socket::SSL->error("Failed to use Certificate");
+	    }
+	    $havecert = 'OBJ';
+	} elsif ( my $f = $arg_hash->{SSL_cert_file} ) {
+	    # try to load chain from PEM or certificate from ASN1
+	    if (Net::SSLeay::CTX_use_certificate_chain_file($ctx,$f)) {
+		$havecert = 'PEM';
+	    } elsif (Net::SSLeay::CTX_use_certificate_file($ctx,$f,FILETYPE_ASN1)) {
+		$havecert = 'DER';
+	    } else {
+		# try to load certificate, key and chain from PKCS12 file
+		my ($key,$cert,@chain) = Net::SSLeay::P_PKCS12_load_file($f,1);
+		if (!$cert and $arg_hash->{SSL_passwd_cb}
+		    and defined( my $pw = $arg_hash->{SSL_passwd_cb}->(0))) {
+		    ($key,$cert,@chain) = Net::SSLeay::P_PKCS12_load_file($f,1,$pw);
+		}
+		PKCS12: while ($cert) {
+		    Net::SSLeay::CTX_use_certificate($ctx,$cert) or last;
+		    for my $ca (@chain) {
+			Net::SSLeay::CTX_add_extra_chain_cert($ctx,$ca)
+			    or last PKCS12;
+		    }
+		    last if $key && ! Net::SSLeay::CTX_use_PrivateKey($ctx,$key);
+		    $havecert = 'PKCS12';
+		    last;
+		}
+		$havekey = 'PKCS12' if $key;
+		Net::SSLeay::X509_free($cert) if $cert;
+		Net::SSLeay::EVP_PKEY_free($key) if $key;
+		# don't free @chain, because CTX_add_extra_chain_cert
+		# did not duplicate the certificates
+	    }
+	    $havecert or return
+		IO::Socket::SSL->error("Failed to use certificate file");
 	}
 
-	# make sure $ctx is in %sni
-	$sni{''} = $ctx;
+	if (!$havecert || $havekey) {
+	    # skip SSL_key_*
+	} elsif ( my $pkey = $arg_hash->{SSL_key} ) {
+	    # binary, e.g. EVP_PKEY*
+	    Net::SSLeay::CTX_use_PrivateKey($ctx, $pkey)
+		|| return IO::Socket::SSL->error("Failed to use Private Key");
+	    $havekey = 'MEM';
+	} elsif ( my $f = $arg_hash->{SSL_key_file}
+	    || (($havecert eq 'PEM') ? $arg_hash->{SSL_cert_file}:undef) ) {
+	    for my $ft ( FILETYPE_PEM, FILETYPE_ASN1 ) {
+		if (Net::SSLeay::CTX_use_PrivateKey_file($ctx,$f,$ft)) {
+		    $havekey = ($ft == FILETYPE_PEM) ? 'PEM':'DER';
+		    last;
+		}
+	    }
+	}
+	if ($havecert && !$havekey) {
+	    return IO::Socket::SSL->error("Failed to use private key");
+	}
 
-        for my $sni (values %sni) {
+	# replace arg_hash with created context
+	$ctx{$host} = $ctx;
+    }
+
+    if ($arg_hash->{'SSL_server'} || $arg_hash->{'SSL_use_cert'}) {
+
 	if ( my $f = $arg_hash->{SSL_dh_file} ) {
 	    my $bio = Net::SSLeay::BIO_new_file( $f,'r' )
 		|| return IO::Socket::SSL->error( "Failed to open DH file $f" );
 	    my $dh = Net::SSLeay::PEM_read_bio_DHparams($bio);
 	    Net::SSLeay::BIO_free($bio);
 	    $dh || return IO::Socket::SSL->error( "Failed to read PEM for DH from $f - wrong format?" );
-	    my $rv = Net::SSLeay::CTX_set_tmp_dh( $sni,$dh );
+	    my $rv;
+	    for (values (%ctx)) {
+		$rv = Net::SSLeay::CTX_set_tmp_dh( $_,$dh ) or last;
+	    }
 	    Net::SSLeay::DH_free( $dh );
 	    $rv || return IO::Socket::SSL->error( "Failed to set DH from $f" );
 	} elsif ( my $dh = $arg_hash->{SSL_dh} ) {
 	    # binary, e.g. DH*
-	    Net::SSLeay::CTX_set_tmp_dh( $sni,$dh )
-		|| return IO::Socket::SSL->error( "Failed to set DH from SSL_dh" );
+
+	    for( values %ctx ) {
+		Net::SSLeay::CTX_set_tmp_dh( $_,$dh ) || return 
+		    IO::Socket::SSL->error( "Failed to set DH from SSL_dh" );
+	    }
 	}
 
 	if ( my $curve = $arg_hash->{SSL_ecdh_curve} ) {
@@ -2411,15 +2327,13 @@ WARN
 	    my $ecdh = Net::SSLeay::EC_KEY_new_by_curve_name($curve) or
 		return IO::Socket::SSL->error(
 		"cannot create curve for NID $curve");
-	    Net::SSLeay::CTX_set_tmp_ecdh($sni,$ecdh) or
-		return IO::Socket::SSL->error(
-		"failed to set ECDH curve context");
+	    for( values %ctx ) {
+		Net::SSLeay::CTX_set_tmp_ecdh($_,$ecdh) or
+		    return IO::Socket::SSL->error(
+		    "failed to set ECDH curve context");
+	    }
 	    Net::SSLeay::EC_KEY_free($ecdh);
 	}
-        }
-    }
-    else {
-        $sni{''} = $ctx;
     }
 
     my $verify_cb = $arg_hash->{SSL_verify_callback};
@@ -2482,15 +2396,13 @@ WARN
 	    return $rv;
 	};
     }
-    for my $sni (values %sni) {
-    Net::SSLeay::CTX_set_verify($sni, $verify_mode, $verify_callback);
-    }
+    Net::SSLeay::CTX_set_verify($_, $verify_mode, $verify_callback)
+	for (values %ctx);
 
     my $staple_callback = $arg_hash->{SSL_ocsp_staple_callback};
     if ( !$is_server && $can_ocsp_staple ) {
 	$self->{ocsp_cache} = $arg_hash->{SSL_ocsp_cache};
-        for my $sni (values %sni) {
-	Net::SSLeay::CTX_set_tlsext_status_cb($sni,sub {
+	my $status_cb = sub {
 	    my ($ssl,$resp) = @_;
 	    my $iossl = $SSL_OBJECT{$ssl} or
 		die "no IO::Socket::SSL object found for SSL $ssl";
@@ -2567,19 +2479,40 @@ WARN
 		${*$iossl}{_SSL_ocsp_verify} = $results[0];
 	    }
 	    return 1;
-	});
-        }
+	};
+	Net::SSLeay::CTX_set_tlsext_status_cb($_,$status_cb) for (values %ctx);
     }
 
     if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
-        for my $sni (values %sni) {
-	Net::SSLeay::CTX_set_cipher_list($sni, $cl )
-	    || return IO::Socket::SSL->error("Failed to set SSL cipher list");
-        }
+	for (values %ctx) {
+	    Net::SSLeay::CTX_set_cipher_list($_, $cl ) || return 
+		IO::Socket::SSL->error("Failed to set SSL cipher list");
+	}
+    }
+
+    # Main context is default context or any other if no default context.
+    my $ctx = $ctx{''} || (values %ctx)[0];
+    if (keys(%ctx) > 1 || ! exists $ctx{''}) {
+	$can_server_sni or return IO::Socket::SSL->_internal_error(
+	    "Server side SNI not supported for this openssl/Net::SSLeay");
+
+	Net::SSLeay::CTX_set_tlsext_servername_callback($ctx, sub {
+	    my $ssl = shift;
+	    my $host = Net::SSLeay::get_servername($ssl);
+	    $host = '' if ! defined $host;
+	    my $snictx = $ctx{lc($host)} || $ctx{''} or do {
+		$DEBUG>1 and DEBUG(
+		    "cannot get context from servername '$host'");
+		return 0;
+	    };
+	    $DEBUG>1 and DEBUG("set context from servername $host");
+	    Net::SSLeay::set_SSL_CTX($ssl,$snictx) if $snictx != $ctx;
+	    return 1;
+	});
     }
 
     if ( my $cb = $arg_hash->{SSL_create_ctx_callback} ) {
-	$cb->($ctx);
+	$cb->($_) for values (%ctx);
     }
 
     $self->{context} = $ctx;
@@ -2589,7 +2522,6 @@ WARN
 	$self->{verify_mode} ? IO::Socket::SSL::SSL_OCSP_TRY_STAPLE() :
 	0;
     $DEBUG>=3 && DEBUG( "new ctx $ctx" );
-    $CTX_CREATED_IN_THIS_THREAD{$ctx} = 1;
 
     if ( my $cache = $arg_hash->{SSL_session_cache} ) {
 	# use predefined cache

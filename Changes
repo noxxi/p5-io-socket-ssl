@@ -1,3 +1,8 @@
+1.998 2014/09/07
+- make client authentication work at the server side when SNI is in by use
+  having CA path and other settings in all SSL contexts instead of only the main
+  one.  Based on code from lundstrom[DOT]jerry[AT]gmail[DOT]com,
+  https://github.com/noxxi/p5-io-socket-ssl/pull/15
 1.997 2014/07/12
 - thanks to return code 1 from Net::SSLeay::library_init if the library needed
   initialization and 0 if not we can now clearly distinguish if initialization
@@ -453,7 +458,7 @@ v1.71 2012.05.09
 - 1.70 done right. Also don't disable SSLv2 ciphers, SSLv2 support is better
   disabled by the default SSL_version of 'SSLv23:!SSLv2'
 v1.70 2012.05.08
-- make it possible to disable protols using SSL_version, make SSL_version
+- make it possible to disable protocols using SSL_version, make SSL_version
   default to 'SSLv23:!SSLv2'
 v1.69 2012.05.08
 - re-added workaround in t/dhe.t
