@@ -27,6 +27,7 @@ my $capath;
 my $all_ciphers;
 my $show_chain;
 my $dump_chain;
+my %conf;
 GetOptions(
     'h|help' => sub { usage() },
     'v|verbose:1' => \$verbose,
@@ -40,6 +41,9 @@ GetOptions(
 	($stls,$stls_arg) = $_[1] =~m{^(\w+)(?::(.*))?$};
 	usage("invalid starttls $stls") if ! $starttls{$stls};
     },
+    'cert=s' => \$conf{SSL_cert_file},
+    'key=s'  => \$conf{SSL_key_file},
+    'name=s' => \$conf{SSL_hostname},
 );
 @ARGV or usage("no hosts given");
 my %default_ca =
@@ -50,6 +54,12 @@ my %default_ca =
 die "need Net::SSLeay>=1.58 for showing chain" if $show_chain
     && ! defined &IO::Socket::SSL::peer_certificates;
 
+$conf{SSL_verifycn_name} ||= $conf{SSL_hostname} if $conf{SSL_hostname};
+if ($conf{SSL_cert_file}) {
+    $conf{SSL_key_file} ||= $conf{SSL_cert_file};
+    $conf{SSL_use_cert} = 1;
+}
+
 
 sub usage {
     print STDERR "ERROR: @_\n" if @_;
@@ -59,15 +69,25 @@ Analyze SSL connectivity for problems.
 Usage: $0 [options] (host|host:port)+
 Options:
   -h|--help              - this screen
-  -v|--verbose level     - verbose output
   -d|--debug level       - IO::Socket::SSL/Net::SSLeay debugging
-  --CApath file|dir      - use given dir|file instead of system default CA store
-  --all-ciphers          - find out all supported ciphers
-  --show-chain           - show certificate chain
-  --dump_chain           - dump certificate chain, e.g. all certificates as PEM
+
+  # how to connect
   --starttls proto[:arg] - start plain and upgrade to SSL with starttls protocol
 			   (imap,smtp,http_upgrade,http_proxy,pop,ftp,postgresql)
   -T|--timeout T         - use timeout (default 10)
+
+  # SSL specific settings
+  --CApath file|dir      - use given dir|file instead of system default CA store
+  --cert cert            - use given certificate for client authentication
+  --key  key             - use given key for client authentication (default: cert)
+  --name name            - use given name as server name in verification and SNI 
+                           instead of host (useful if target is given as IP)
+
+  # what to show
+  -v|--verbose level     - verbose output
+  --all-ciphers          - find out all supported ciphers
+  --show-chain           - show certificate chain
+  --dump_chain           - dump certificate chain, e.g. all certificates as PEM
 
 Examples:
 
@@ -92,7 +112,7 @@ for my $host (@ARGV) {
 	$ip = $host;
 	$host = undef;
     }
-    push @tests, [ $host||$ip,$port,$host,$st->[1],$st->[2] || 'default' ];
+    push @tests, [ $host||$ip,$port,$conf{SSL_hostname}||$host,$st->[1],$st->[2] || 'default' ];
 }
 
 my $ioclass = IO::Socket::SSL->can_ipv6 || 'IO::Socket::INET';
@@ -137,6 +157,7 @@ for my $test (@tests) {
 	for my $ciphers ( '','HIGH:ALL' ) {
 	    my $cl = &$tcp_connect;
 	    if ( IO::Socket::SSL->start_SSL($cl,
+		%conf,
 		SSL_version => $v,
 		SSL_verify_mode => 0,
 		SSL_hostname => '',
@@ -165,7 +186,7 @@ for my $test (@tests) {
 	die "$host failed basic SSL connect: $SSL_ERROR\n";
     }
 
-    my %conf = ( SSL_version => $version, SSL_cipher_list => $cipher );
+    %conf = ( %conf, SSL_version => $version, SSL_cipher_list => $cipher );
 
     # check if host accepts SNI
     my $sni_status;
@@ -326,6 +347,7 @@ for my $test (@tests) {
 	while ($all_ciphers || @ciphers<2 ) {
 	    my $cl = &$tcp_connect;
 	    if ( IO::Socket::SSL->start_SSL($cl, 
+		%conf,
 		SSL_verify_mode => 0,
 		SSL_version => $conf{SSL_version},
 		SSL_cipher_list => $c,
@@ -349,6 +371,7 @@ for my $test (@tests) {
 	for( "$ciphers[0][1]:$ciphers[1][1]","$ciphers[1][1]:$ciphers[0][1]" ) {
 	    my $cl = &$tcp_connect;
 	    if ( IO::Socket::SSL->start_SSL($cl,
+		%conf,
 		SSL_version => $use_version,
 		SSL_verify_mode => 0,
 		SSL_hostname => '',

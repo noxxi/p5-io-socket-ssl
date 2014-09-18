@@ -592,13 +592,13 @@ sub connect_SSL {
 	    $DEBUG>=2 && DEBUG("not using SNI because openssl is too old");
 	}
 
-	$arg_hash->{PeerAddr} || $self->_update_peer;
+	$arg_hash->{PeerAddr} || $arg_hash->{PeerHost} || $self->_update_peer;
 	if ( $ctx->{verify_name_ref} ) {
 	    # need target name for update
 	    my $host = $arg_hash->{SSL_verifycn_name}
 		|| $arg_hash->{SSL_hostname};
 	    if ( ! defined $host ) {
-		if ( $host = $arg_hash->{PeerHost} || $arg_hash->{PeerAddr} ) {
+		if ( $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} ) {
 		    $host =~s{:[a-zA-Z0-9_\-]+$}{};
 		}
 	    }
@@ -620,7 +620,10 @@ sub connect_SSL {
 
 	my $session = $ctx->session_cache( $arg_hash->{SSL_session_key} ?
 	    ( $arg_hash->{SSL_session_key},1 ) :
-	    ( $arg_hash->{PeerAddr}, $arg_hash->{PeerPort} )
+	    ( 
+		$arg_hash->{PeerAddr} || $arg_hash->{PeerHost}, 
+		$arg_hash->{PeerPort} || $arg_hash->{PeerService}
+	    )
 	);
 	Net::SSLeay::set_session($ssl, $session) if ($session);
     }
@@ -733,10 +736,13 @@ sub connect_SSL {
     if ( $ctx->has_session_cache
 	and my $session = Net::SSLeay::get1_session($ssl)) {
 	my $arg_hash = ${*$self}{'_SSL_arguments'};
-	$arg_hash->{PeerAddr} || $self->_update_peer;
+	$arg_hash->{PeerAddr} || $arg_hash->{PeerHost} || $self->_update_peer;
 	$ctx->session_cache( $arg_hash->{SSL_session_key} ?
 	    ( $arg_hash->{SSL_session_key},1 ) :
-	    ( $arg_hash->{PeerAddr},$arg_hash->{PeerPort} ),
+	    ( 
+		$arg_hash->{PeerAddr} || $arg_hash->{PeerHost},
+		$arg_hash->{PeerPort} || $arg_hash->{PeerService}
+	    ),
 	    $session
 	);
     }

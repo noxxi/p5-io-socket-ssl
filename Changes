@@ -1,3 +1,10 @@
+- make sure that PeerHost is checked on all places where PeerAddr is
+  checked, because these are synonyms and IO::Socket::IP prefers PeerHost
+  while others prefer PeerAddr. Also accept PeerService additionally to
+  PeerPort.
+  See https://github.com/noxxi/p5-io-socket-ssl/issues/16 for details.
+- add ability to use client certificates and to overwrite hostname with
+  util/analyze-ssl.pl.
 1.998 2014/09/07
 - make client authentication work at the server side when SNI is in by use
   having CA path and other settings in all SSL contexts instead of only the main

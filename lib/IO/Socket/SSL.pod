@@ -640,8 +640,10 @@ series, but only with 1.0 a bug was fixed when the server could not decide about
 its hostname. Therefore client side SNI is only supported with OpenSSL 1.0 or
 higher in IO::Socket::SSL.
 With a supported version, SNI is used automatically on the client side, if it
-can determine the hostname from C<PeerAddr> or C<PeerHost>. On unsupported
-OpenSSL versions it will silently not use SNI.
+can determine the hostname from C<PeerAddr> or C<PeerHost> (which are synonyms
+in the underlying IO::Socket:: classes and thus should never be set both or at
+least not to different values).
+On unsupported OpenSSL versions it will silently not use SNI.
 The hostname can also be given explicitly given with C<SSL_hostname>, but in
 this case it will throw in error, if SNI is not supported.
 To check for support you might call C<IO::Socket::SSL->can_client_sni()>.
