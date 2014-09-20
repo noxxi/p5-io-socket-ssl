@@ -179,6 +179,7 @@ sub from_file {
 	die "failed to open $file: $!";
     }
     my %tree;
+    local $/ = "\n";
     while ( my $line = <$fh>) {
 	$line =~s{//.*}{};
 	$line =~s{\s+$}{};
@@ -306,6 +307,7 @@ sub update_self_from_url {
     -w $dst or die "cannot write $dst";
     open( my $fh,'<',$dst ) or die "open $dst: $!";
     my $code = '';
+    local $/ = "\n";
     while (<$fh>) {
 	$code .= $_;
 	$code =~m{\A__DATA__\r?\n\Z} and last;

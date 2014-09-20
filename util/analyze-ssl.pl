@@ -44,7 +44,7 @@ GetOptions(
     'cert=s' => \$conf{SSL_cert_file},
     'key=s'  => \$conf{SSL_key_file},
     'name=s' => \$conf{SSL_hostname},
-);
+) or usage("bad usage");
 @ARGV or usage("no hosts given");
 my %default_ca =
     ! $capath ? () :
