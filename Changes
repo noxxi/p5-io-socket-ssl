@@ -1,3 +1,5 @@
+1.999 2014/10/09
+- make sure we don't use version 0.30 of IO::Socket::IP
 - make sure that PeerHost is checked on all places where PeerAddr is
   checked, because these are synonyms and IO::Socket::IP prefers PeerHost
   while others prefer PeerAddr. Also accept PeerService additionally to
