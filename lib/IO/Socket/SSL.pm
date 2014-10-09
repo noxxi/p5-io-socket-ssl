@@ -265,7 +265,10 @@ BEGIN {
     if ( $ip6 ) {
 	# if we have IO::Socket::IP >= 0.20 we will use this in preference
 	# because it can handle both IPv4 and IPv6
-	if ( eval { require IO::Socket::IP; IO::Socket::IP->VERSION(0.20); } ) {
+	if ( eval { 
+	    require IO::Socket::IP; 
+	    IO::Socket::IP->VERSION(0.20) && IO::Socket::IP->VERSION != 0.30; 
+	}) {
 	    @ISA = qw(IO::Socket::IP);
 	    constant->import( CAN_IPV6 => "IO::Socket::IP" );
 	    $IOCLASS = "IO::Socket::IP";
