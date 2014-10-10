@@ -1,3 +1,5 @@
+- skip tests which require fork on non-default windows setups without proper
+  fork. Thanks to SHAY for https://github.com/noxxi/p5-io-socket-ssl/pull/18
 1.999 2014/10/09
 - make sure we don't use version 0.30 of IO::Socket::IP
 - make sure that PeerHost is checked on all places where PeerAddr is
