@@ -14,7 +14,11 @@ if ( ! eval "use 5.006; use IO::Select; return 1" ) {
     print "1..0 # Skipped: no support for nonblocking sockets\n";
     exit;
 }
-if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
+
+unless ( $Config::Config{d_fork} || $Config::Config{d_pseudofork} ||
+        (($^O eq 'MSWin32' || $^O eq 'NetWare') and
+         $Config::Config{useithreads} and
+         $Config::Config{ccflags} =~ /-DPERL_IMPLICIT_SYS/) ) {
     print "1..0 # Skipped: fork not implemented on this platform\n";
     exit
 }

@@ -4,8 +4,12 @@ use Test::More;
 use IO::Socket::SSL;
 use File::Temp 'tempfile';
 
-plan skip_all => "fork not implemented on this platform"
-    if grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos );
+unless ( $Config::Config{d_fork} || $Config::Config{d_pseudofork} ||
+        (($^O eq 'MSWin32' || $^O eq 'NetWare') and
+         $Config::Config{useithreads} and
+         $Config::Config{ccflags} =~ /-DPERL_IMPLICIT_SYS/) ) {
+    plan skip_all => "fork not implemented on this platform";
+}
 
 my $srv = IO::Socket::INET->new(
     LocalAddr => '127.0.0.1',

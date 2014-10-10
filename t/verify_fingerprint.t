@@ -5,9 +5,14 @@ use IO::Socket::SSL;
 use IO::Socket::SSL::Utils;
 use File::Temp 'tempfile';
 
+unless ( $Config::Config{d_fork} || $Config::Config{d_pseudofork} ||
+        (($^O eq 'MSWin32' || $^O eq 'NetWare') and
+         $Config::Config{useithreads} and
+         $Config::Config{ccflags} =~ /-DPERL_IMPLICIT_SYS/) ) {
+    plan skip_all => "fork not implemented on this platform";
+}
+
 plan tests => 12;
-plan skip_all => "fork not implemented on this platform"
-    if $^O =~m{MacOS|VOS|vmesa|riscos|amigaos};
 
 my ($ca1,$cakey1) = CERT_create( CA => 1, subject => { CN => 'ca1' });
 my ($cert1,$key1) = CERT_create( 

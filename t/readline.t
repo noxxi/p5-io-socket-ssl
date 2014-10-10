@@ -17,7 +17,10 @@ use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 
-if ( grep { $^O =~m{$_} } qw( MacOS VOS vmesa riscos amigaos ) ) {
+unless ( $Config::Config{d_fork} || $Config::Config{d_pseudofork} ||
+        (($^O eq 'MSWin32' || $^O eq 'NetWare') and
+         $Config::Config{useithreads} and
+         $Config::Config{ccflags} =~ /-DPERL_IMPLICIT_SYS/) ) {
     print "1..0 # Skipped: fork not implemented on this platform\n";
     exit
 }
