@@ -108,7 +108,8 @@ my %usable_ca;
     }
 }
 
-my $xt = prompt( "Should I do external tests?\n".
+my $xt = $ENV{NO_NETWORK_TESTING} && 'n';
+$xt ||= prompt( "Should I do external tests?\n".
     "These test will detect if there are network problems and fail soft,\n".
     "so please disable them only if you definitely don't want to have any\n".
     "network traffic to external sites.   ".

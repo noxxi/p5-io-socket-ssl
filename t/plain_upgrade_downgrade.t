@@ -3,13 +3,7 @@ use warnings;
 use IO::Socket::SSL;
 use IO::Socket::SSL::Utils;
 use Test::More;
-
-unless ( $Config::Config{d_fork} || $Config::Config{d_pseudofork} ||
-        (($^O eq 'MSWin32' || $^O eq 'NetWare') and
-         $Config::Config{useithreads} and
-         $Config::Config{ccflags} =~ /-DPERL_IMPLICIT_SYS/) ) {
-    plan skip_all => "fork not implemented on this platform";
-}
+do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 # create listener
 IO::Socket::SSL::default_ca('certs/my-ca.pem');

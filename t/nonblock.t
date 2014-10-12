@@ -10,19 +10,14 @@ use Socket;
 use IO::Socket::SSL;
 use IO::Select;
 use Errno qw( EAGAIN EINPROGRESS EPIPE ECONNRESET );
+do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 if ( ! eval "use 5.006; use IO::Select; return 1" ) {
     print "1..0 # Skipped: no support for nonblocking sockets\n";
     exit;
 }
 
-unless ( $Config::Config{d_fork} || $Config::Config{d_pseudofork} ||
-        (($^O eq 'MSWin32' || $^O eq 'NetWare') and
-         $Config::Config{useithreads} and
-         $Config::Config{ccflags} =~ /-DPERL_IMPLICIT_SYS/) ) {
-    print "1..0 # Skipped: fork not implemented on this platform\n";
-    exit
-}
+
 
 if ( $^O =~m{mswin32}i ) {
     print "1..0 # Skipped: nonblocking does not work on Win32\n";

@@ -8,16 +8,9 @@ use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 use Errno 'EAGAIN';
+do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 $|=1;
-
-unless ( $Config::Config{d_fork} || $Config::Config{d_pseudofork} ||
-        (($^O eq 'MSWin32' || $^O eq 'NetWare') and
-         $Config::Config{useithreads} and
-         $Config::Config{ccflags} =~ /-DPERL_IMPLICIT_SYS/) ) {
-    print "1..0 # Skipped: fork not implemented on this platform\n";
-    exit
-}
 
 my $CAN_NONBLOCK = $^O =~m{mswin32}i ? 0 : eval "use 5.006; use IO::Select; 1";
 my $CAN_PEEK = &Net::SSLeay::OPENSSL_VERSION_NUMBER >= 0x0090601f;
