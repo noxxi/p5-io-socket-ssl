@@ -904,24 +904,29 @@ For convenience it is also set if it was not given but a cert was given for use
 =item SSL_version
 
 Sets the version of the SSL protocol used to transmit data.
-'SSLv23' auto-negotiates between SSLv2 and SSLv3, while 'SSLv2', 'SSLv3',
-'TLSv1', 'TLSv1_1' or 'TLSv1_2' restrict the protocol to the specified version.
+'SSLv23' uses a handshake compatible with SSL2.0, SSL3.0 and TLS1.x, while
+'SSLv2', 'SSLv3', 'TLSv1', 'TLSv1_1' or 'TLSv1_2' restrict handshake and
+protocol to the specified version.
 All values are case-insensitive.  Instead of 'TLSv1_1' and 'TLSv1_2' one can
 also use 'TLSv11' and 'TLSv12'.  Support for 'TLSv1_1' and 'TLSv1_2' requires
 recent versions of Net::SSLeay and openssl.
 
-You can limit to set of supported protocols by adding !version separated by ':'.
+Indipendend from the handshake format you can limit to set of accepted SSL
+versions by adding !version separated by ':'.
 
-The default SSL_version is 'SSLv23:!SSLv2' which means, that SSLv2, SSLv3 and
-TLSv1 are supported for initial protocol handshakes, but SSLv2 will not be
-accepted, leaving only SSLv3 and TLSv1. You can also use !TLSv1_1 and !TLSv1_2
-to disable TLS versions 1.1 and 1.2 while allowing TLS version 1.0.
+The default SSL_version is 'SSLv23:!SSLv3:!SSLv2' which means, that the
+handshake format is compatible to SSL2.0 and higher, but that the successful
+handshake is limited to TLS1.0 and higher, that is no SSL2.0 or SSL3.0 because
+both of these versions have serious security issues and should not be used
+anymore.
+You can also use !TLSv1_1 and !TLSv1_2 to disable TLS versions 1.1 and 1.2 while
+still allowing TLS version 1.0.
 
-Setting the version instead to 'TLSv1' will probably break interaction with
-lots of clients which start with SSLv2 and then upgrade to TLSv1. On the other
+Setting the version instead to 'TLSv1' might break interaction with older
+clients, which need and SSL2.0 compatible handshake. On the other
 side some clients just close the connection when they receive a TLS version 1.1
-request. In this case setting the version to 'SSLv23:!SSLv2:!TLSv1_1:!TLSv1_2'
-might help.
+request. In this case setting the version to
+'SSLv23:!SSLv2:!SSLv3:!TLSv1_1:!TLSv1_2' might help.
 
 =item SSL_cipher_list
 

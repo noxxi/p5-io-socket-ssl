@@ -1,3 +1,4 @@
+2.000 2014/10/15
 - consider SSL3.0 as broken because of POODLE and disable it by default.
 - Skip live tests without asking if environment NO_NETWORK_TESTING is set.
   Thanks to ntyni[AT]debian[DOT]org for suggestion.
