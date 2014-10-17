@@ -911,7 +911,7 @@ All values are case-insensitive.  Instead of 'TLSv1_1' and 'TLSv1_2' one can
 also use 'TLSv11' and 'TLSv12'.  Support for 'TLSv1_1' and 'TLSv1_2' requires
 recent versions of Net::SSLeay and openssl.
 
-Indipendend from the handshake format you can limit to set of accepted SSL
+Independend from the handshake format you can limit to set of accepted SSL
 versions by adding !version separated by ':'.
 
 The default SSL_version is 'SSLv23:!SSLv3:!SSLv2' which means, that the
