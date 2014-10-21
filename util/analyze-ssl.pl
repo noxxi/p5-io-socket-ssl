@@ -145,9 +145,12 @@ for my $test (@tests) {
 
     my @problems;
 
-    # basic connects without verification or any TLS extensions (SNI, OCSP)
-    # find out usable version and ciphers
+    # basic connects without verification or any TLS extensions (OCSP)
+    # find out usable version and ciphers. Because some hosts (like cloudflare)
+    # behave differently if SNI is used we try to use it and only fall back if
+    # it fails.
     my ($use_version,$version,$cipher);
+    my $sni = $name;
     BASE: for my $v (qw(
 	SSLv23:!TLSv1_2:!TLSv1_1:!TLSv1
 	SSLv23:!TLSv1_2:!TLSv1_1
@@ -160,7 +163,7 @@ for my $test (@tests) {
 		%conf,
 		SSL_version => $v,
 		SSL_verify_mode => 0,
-		SSL_hostname => '',
+		SSL_hostname => $sni,
 		SSL_cipher_list => $ciphers,
 	    )) {
 		$use_version = $v;
@@ -181,32 +184,29 @@ for my $test (@tests) {
 	}
     }
     if ($version) {
-	VERBOSE(1,"successful connect with $version cipher=$cipher and no TLS extensions");
+	VERBOSE(1,"successful connect with $version cipher=$cipher, sni=$sni and no other TLS extensions");
+    } elsif ($sni) {
+	$sni = '';
+	goto BASE;
     } else {
 	die "$host failed basic SSL connect: $SSL_ERROR\n";
     }
 
-    %conf = ( %conf, SSL_version => $version, SSL_cipher_list => $cipher );
-
-    # check if host accepts SNI
+    %conf = ( %conf, SSL_version => $use_version, SSL_cipher_list => $cipher );
     my $sni_status;
-    if ( $name && $version !~m{^TLS} ) {
-	VERBOSE(1,"disabling SNI because SSL version $version too low");
-    } elsif ($name) {
-	my $cl = &$tcp_connect;
-	if ( IO::Socket::SSL->start_SSL($cl, %conf,
-	    SSL_verify_mode => 0,
-	    SSL_hostname => $name,
-	)) {
-	    VERBOSE(1,"SNI success");
-	    $sni_status = 'ok';
-	    $conf{SSL_hostname} = $name;
-	} else {
+    if (!$sni) {
+	if ($version =~m{^TLS}) {
 	    VERBOSE(1,"SNI FAIL!");
-	    $sni_status = "FAIL: $SSL_ERROR";
-	    push @problems, "using SNI (default) -> $SSL_ERROR";
+	    push @problems, "using SNI (default)";
+	    $sni_status = 'FAIL';
+	    $conf{SSL_hostname} = '';
 	}
+    } else {
+	VERBOSE(1,"SNI success");
+	$conf{SSL_hostname} = $name;
+	$sni_status = 'ok';
     }
+
 
     # get chain info
     my (@cert_chain,@cert_chain_nosni);
@@ -214,7 +214,9 @@ for my $test (@tests) {
 	for(
 	    [ \%conf, \@cert_chain ],
 	    ! $conf{SSL_hostname} ? () 
-		: ([ { %conf, SSL_hostname => '' }, \@cert_chain_nosni ])
+		# cloudflare has different cipher list without SNI, so don't
+		# enforce the existing one
+		: ([ { %conf, SSL_cipher_list => undef, SSL_hostname => '' }, \@cert_chain_nosni ])
 	) {
 	    my ($conf,$chain) = @$_;
 	    my $cl = &$tcp_connect;
