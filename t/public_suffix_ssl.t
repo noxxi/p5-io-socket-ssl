@@ -11,6 +11,8 @@ my @tests = qw(
     fail:googleapis.com|*.com
     ok:googleapis.com|googleapis.com
     ok:ajax.googleapis.com|*.googleapis.com
+    ok:s3.amazonaws.com|s3.amazonaws.com
+    ok:foo.s3.amazonaws.com|*.s3.amazonaws.com
     fail:google.com|*.com
     ok:google.com|google.com
     ok:www.google.com|*.google.com
