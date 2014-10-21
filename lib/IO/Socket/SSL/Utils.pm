@@ -4,7 +4,10 @@ use strict;
 use warnings;
 use Carp 'croak';
 use Net::SSLeay;
-use Exporter 'import';
+
+# old versions of Exporter do not export 'import' yet
+require Exporter;
+*import = \&Exporter::import;
 
 our $VERSION = '0.03';
 our @EXPORT = qw(

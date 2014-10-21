@@ -221,10 +221,10 @@ sub public_suffix {
     @$name or return;
     $_ = lc($_) for(@$name);
 
-    my (%wild,%host,%xcept,@stack);
+    my (%wild,%host,%xcept,@stack,$choices);
     my $p = $self->{tree};
     for( my $i=0; $i<@$name; $i++ ) {
-	my $choices = [];
+	$choices = [];
 	if ( my $px = $p->{ $name->[$#$name-$i] } ) {
 	    # name match, continue with next path element
 	    push @$choices,$px;
