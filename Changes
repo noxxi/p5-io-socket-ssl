@@ -1,3 +1,11 @@
+2.002 2014/10/21
+- fix check for (invalid) IPv4 when validating hostname against certificate. Do
+  not use inet_aton any longer because it can cause DNS lookups for malformed
+  IP. RT#99448, thanks to justincase[AT]yopmail[DOT]com.
+- Update PublicSuffix with latest version from publicsuffix.org - lots of new
+  top level domains.
+- Add exception to PublicSuffix for s3.amazonaws.com - RT#99702, thanks to
+  cpan[AT]cpanel[DOT]net.
 2.001 2014/10/21
 - Add SSL_OP_SINGLE_(DH|ECDH)_USE to default options to increase PFS security.
   Thanks to Heikki Vatiainen for suggesting.
