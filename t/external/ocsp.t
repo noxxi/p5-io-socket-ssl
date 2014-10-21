@@ -14,14 +14,14 @@ my @tests = (
 	# this should give us OCSP stapling
 	host => 'www.live.com',
 	port => 443,
-	fingerprint => 'sha1$10c56ee9e2acaf2e77caeb7072bf6522dd7422b8',
+	fingerprint => 'sha1$69e85345bfa05c1beb1352dad0b8c61abe42f26c',
 	ocsp_staple => 1,
     },
     {
 	# no OCSP stapling yet
 	host => 'www.google.com',
 	port => 443,
-	fingerprint => 'sha1$007a5ab302f14446e2ea24d3a829de22ba1bf950',
+	fingerprint => 'sha1$93125bb97d02aa4536b4ec9a7ca01ad8927314db',
     },
     {
 	# this is revoked

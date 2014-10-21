@@ -13,13 +13,13 @@ for( qw( IO::Socket::IP IO::Socket::INET6  )) {
 
 # host:port fingerprint_cert subject_hash_ca
 my @tests = qw(
-    www.google.com:443 sha1$c0019e434cc04dc9086a6e63c8ecf74781e4f4a0 578d5c04
-    www.yahoo.com:443 sha1$6b52651caf7b1f306050179d27570d4d5c5bfd24 415660c1
-    www.comdirect.de:443 sha1$0d9626705b9984b19bca19f8ceb18885b103d0e9 415660c1
-    meine.deutsche-bank.de:443 sha1$ba54c47dd5493db54cd0f76a120cac11cdfb76f8 415660c1
-    www.twitter.com:443 sha1$813fd89d264cc9a5bb650d0b2d2bb0d63259bcaa b204d74a
-    www.facebook.com:443 sha1$bd012a89b2cc9e49f81f47bfbd52de48a04ed3ab 244b5494
-    www.live.com:443 sha1$10c56ee9e2acaf2e77caeb7072bf6522dd7422b8 415660c1
+    www.google.com:443 sha1$93125bb97d02aa4536b4ec9a7ca01ad8927314db 578d5c04
+    www.yahoo.com:443 sha1$71167492535fbdaa3ab6fec242ce183930d27603 415660c1
+    www.comdirect.de:443 sha1$ca16159c49de301ab1ae69ef1d3c0205f54ebaaa 415660c1
+    meine.deutsche-bank.de:443 sha1$1331596b6ecfe54f2018b6d16046c7046dc84048 415660c1
+    www.twitter.com:443 sha1$add53f6680fe66e383cbac3e60922e3b4c412bed b204d74a
+    www.facebook.com:443 sha1$45bfee628eec0ba06dfb860c865ffdb71502a541 244b5494
+    www.live.com:443 sha1$69e85345bfa05c1beb1352dad0b8c61abe42f26c b204d74a
 );
 
 
