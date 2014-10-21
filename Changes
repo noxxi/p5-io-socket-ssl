@@ -1,3 +1,8 @@
+2.001 2014/10/21
+- Add SSL_OP_SINGLE_(DH|ECDH)_USE to default options to increase PFS security.
+  Thanks to Heikki Vatiainen for suggesting.
+- Update external tests with currently expected fingerprints of hosts.
+- Some fixes to make it still work on 5.8.1.
 2.000 2014/10/15
 - consider SSL3.0 as broken because of POODLE and disable it by default.
 - Skip live tests without asking if environment NO_NETWORK_TESTING is set.
