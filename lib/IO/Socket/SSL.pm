@@ -1568,8 +1568,10 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	if ( CAN_IPV6 and $identity =~m{:} ) {
 	    # no IPv4 or hostname have ':'  in it, try IPv6.
 	    $ipn = inet_pton(AF_INET6,$identity) or return; # invalid name
-	} elsif ( $identity =~m{^\d[\d\.]*\.\d+$} ) {
-	    $ipn = inet_aton($identity) or return; # invalid name
+	} elsif ( my @ip = $identity =~m{^(\d+)(?:\.(\d+)\.(\d+)\.(\d+)|[\d\.]*)$} ) {
+	    # check for invalid IP/hostname
+	    return if 4 != @ip or 4 != grep { defined($_) && $_<256 } @ip; 
+	    $ipn = pack("CCCC",@ip);
 	} else {
 	    # assume hostname, check for umlauts etc
 	    if ( $identity =~m{[^a-zA-Z0-9_.\-]} ) {
