@@ -1,3 +1,6 @@
+- Use only the ICAN part of the default public suffix list and not the
+  private domains. This makes existing exceptions for s3.amazonaws.com and
+  googleapis.com obsolete. Thanks to Gervase Markham from mozilla.org.
 2.002 2014/10/21
 - fix check for (invalid) IPv4 when validating hostname against certificate. Do
   not use inet_aton any longer because it can cause DNS lookups for malformed

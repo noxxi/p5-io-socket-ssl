@@ -293,10 +293,8 @@ sub public_suffix {
     sub _default_data {
 	if ( ! defined $data ) {
 	    $data = do { local $/; <DATA> };
-	    # known exceptions of behavior of SSL certificates from PSL
-	    $data .= "!googleapis.com\n";
-	    $data .= "!s3.amazonaws.com\n"; # RT#99702
-
+	    $data =~s{^// ===END ICANN DOMAINS.*}{}ms
+		or die "cannot find END ICANN DOMAINS";
 	}
 	return $data;
     }

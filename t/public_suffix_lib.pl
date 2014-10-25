@@ -30,7 +30,7 @@ sub run_with_lib {
 
     require IO::Socket::SSL::PublicSuffix;
 
-    plan tests => 83;
+    plan tests => 79;
 
 
     # all one-level, but co.uk two-level
@@ -117,10 +117,14 @@ sub run_with_lib {
     is public_suffix('example.com'), 'com';
     is public_suffix('b.example.com'), 'com';
     is public_suffix('a.b.example.com'), 'com';
-    is public_suffix('uk.com'), 'uk.com';
-    is public_suffix('example.uk.com'), 'uk.com';
-    is public_suffix('b.example.uk.com'), 'uk.com';
-    is public_suffix('a.b.example.uk.com'), 'uk.com';
+
+    # uk.com is not in the ICANN part of the list
+    if(0) {
+	is public_suffix('uk.com'), 'uk.com';
+	is public_suffix('example.uk.com'), 'uk.com';
+	is public_suffix('b.example.uk.com'), 'uk.com';
+	is public_suffix('a.b.example.uk.com'), 'uk.com';
+    }
     is public_suffix('test.ac'), 'ac';
 
     # TLD with only one (wildcard) rule:
