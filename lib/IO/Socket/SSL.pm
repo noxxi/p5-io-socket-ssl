@@ -13,13 +13,13 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.005';
+our $VERSION = '2.005_1';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
 use IO::Socket::SSL::PublicSuffix;
 use Exporter ();
-use Errno qw( EAGAIN ETIMEDOUT );
+use Errno qw( EWOULDBLOCK ETIMEDOUT EINTR );
 use Carp;
 use strict;
 
@@ -233,7 +233,7 @@ use vars qw(@ISA $SSL_ERROR @EXPORT);
 {
     # These constants will be used in $! at return from SSL_connect,
     # SSL_accept, _generic_(read|write), thus notifying the caller
-    # the usual way of problems. Like with EAGAIN, EINPROGRESS..
+    # the usual way of problems. Like with EWOULDBLOCK, EINPROGRESS..
     # these are especially important for non-blocking sockets
 
     my $x = Net::SSLeay::ERROR_WANT_READ();
@@ -519,7 +519,7 @@ sub _skip_rw_error {
     } else {
 	return $err;
     }
-    $! ||= EAGAIN;
+    $! ||= EWOULDBLOCK;
     ${*$self}{'_SSL_last_err'} = $SSL_ERROR if ref($self);
     Net::SSLeay::ERR_clear_error();
     return 0;
@@ -1019,7 +1019,7 @@ sub _generic_write {
     }
     if ( !defined($written) ) {
 	if ( my $err = $self->_skip_rw_error( $ssl,-1 )) {
-	    $self->error("SSL write error");
+	    $self->error("SSL write error ($err)");
 	}
 	return;
     }
@@ -1074,9 +1074,9 @@ sub readline {
 	while (1) {
 	    my $rv = $self->sysread($buf,2**16,length($buf));
 	    if ( ! defined $rv ) {
-		next if $!{EINTR};                     # retry
-		last if $!{EAGAIN} || $!{EWOULDBLOCK}; # use everything so far
-		return;                                # return error
+		next if $! == EINTR;       # retry
+		last if $! == EWOULDBLOCK; # use everything so far
+		return;                    # return error
 	    } elsif ( ! $rv ) {
 		last
 	    }
@@ -1104,9 +1104,9 @@ sub readline {
 	while ( $size>length($buf)) {
 	    my $rv = $self->sysread($buf,$size-length($buf),length($buf));
 	    if ( ! defined $rv ) {
-		next if $!{EINTR};                     # retry
-		last if $!{EAGAIN} || $!{EWOULDBLOCK}; # use everything so far
-		return;                                # return error
+		next if $! == EINTR;       # retry
+		last if $! == EWOULDBLOCK; # use everything so far
+		return;                    # return error
 	    } elsif ( ! $rv ) {
 		last
 	    }
@@ -1125,7 +1125,7 @@ sub readline {
 	# wait until we have more data or eof
 	my $poke = Net::SSLeay::peek($ssl,1);
 	if ( ! defined $poke or $poke eq '' ) {
-	    next if $!{EINTR};
+	    next if $! == EINTR;
 	}
 
 	my $skip = 0;
@@ -1163,7 +1163,7 @@ sub readline {
 		$skip -= length($p);
 		next;
 	    }
-	    $!{EINTR} or last;
+	    $! == EINTR or last;
 	}
 
 	if ( $eod and ( $delim1 eq '' or $eod < length($buf))) {

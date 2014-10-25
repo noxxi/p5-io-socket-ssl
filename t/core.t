@@ -7,12 +7,12 @@ use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-use Errno 'EAGAIN';
+use Errno 'EWOULDBLOCK';
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 $|=1;
 
-my $CAN_NONBLOCK = $^O =~m{mswin32}i ? 0 : eval "use 5.006; use IO::Select; 1";
+my $CAN_NONBLOCK = eval "use 5.006; use IO::Select; 1";
 my $CAN_PEEK = &Net::SSLeay::OPENSSL_VERSION_NUMBER >= 0x0090601f;
 
 my $numtests = 40;
@@ -332,7 +332,7 @@ if ($CAN_NONBLOCK) {
     $client = $server->accept;
     while ( ! $client ) {
 	#DEBUG( "$!,$SSL_ERROR" );
-	if ( $! == EAGAIN ) {
+	if ( $! == EWOULDBLOCK ) {
 	    if ( $SSL_ERROR == SSL_WANT_WRITE ) {
 		IO::Select->new( $server->opening )->can_write(30);
 	    } else {

@@ -1,3 +1,7 @@
+2.005_1 2014/11/15
+- Use EWOULDBLOCK instead of EAGAIN. While this is the same on UNIX it is
+  different on Windows and socket operations return there (WSA)EWOULDBLOCK and
+  not EAGAIN. Enable non-blocking tests on Windows too.
 2.005 2014/11/15
 - next try to fix t/protocol_version.t for OpenSSL w/o SSLv3 support
 2.004 2014/11/15

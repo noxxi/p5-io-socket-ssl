@@ -8,7 +8,6 @@ use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 use IO::Select;
-use Errno qw(EAGAIN EINPROGRESS );
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 if ( ! eval "use 5.006; use IO::Select; return 1" ) {

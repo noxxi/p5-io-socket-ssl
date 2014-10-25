@@ -9,19 +9,12 @@ use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 use IO::Select;
-use Errno qw( EAGAIN EINPROGRESS EPIPE ECONNRESET );
+use Errno qw( EWOULDBLOCK EINPROGRESS EPIPE ECONNRESET );
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 if ( ! eval "use 5.006; use IO::Select; return 1" ) {
     print "1..0 # Skipped: no support for nonblocking sockets\n";
     exit;
-}
-
-
-
-if ( $^O =~m{mswin32}i ) {
-    print "1..0 # Skipped: nonblocking does not work on Win32\n";
-    exit
 }
 
 $SIG{PIPE} = 'IGNORE'; # use EPIPE not signal handler
@@ -73,7 +66,7 @@ if ( $pid == 0 ) {
 		IO::Select->new( $to_server )->can_write(30) && next;
 		print "not ";
 		last;
-	    } elsif ( $!{EALREADY} ) {
+	    } elsif ( $!{EWOULDBLOCK} ) {
 		diag( 'connect not yet completed');
 		# just wait
 		select(undef,undef,undef,0.1);
@@ -101,7 +94,7 @@ if ( $pid == 0 ) {
 	while ( $pmsg ne '' ) {
 	    my $w = syswrite( $to_server,$pmsg );
 	    if ( ! defined $w ) {
-		if ( ! $!{EAGAIN} ) {
+		if ( ! $!{EWOULDBLOCK} ) {
 		    diag("syswrite failed with $!");
 		    print "not ";
 		    last;
@@ -167,7 +160,7 @@ if ( $pid == 0 ) {
 	# we send up to 500000 bytes, server reads first 10 bytes and then sleeps
 	# before reading more. In total server only reads 30000 bytes
 	# the sleep will cause the internal buffers to fill up so that the syswrite
-	# should return with EAGAIN+SSL_WANT_WRITE.
+	# should return with EWOULDBLOCK+SSL_WANT_WRITE.
 	# the socket close should cause EPIPE or ECONNRESET
 
 	my $msg = "1234567890";
@@ -204,7 +197,7 @@ if ( $pid == 0 ) {
 		my $n = syswrite( $to_server,$msg,length($msg)-$offset,$offset );
 		if ( !defined($n) ) {
 		    diag( "\$!=$! \$SSL_ERROR=$SSL_ERROR send=$bytes_send" );
-		    if ( $! == EAGAIN ) {
+		    if ( $! == EWOULDBLOCK ) {
 			if ( $SSL_ERROR == SSL_WANT_WRITE ) {
 			    diag( 'wait for write' );
 			    $can = 'can_write';
@@ -215,11 +208,8 @@ if ( $pid == 0 ) {
 			} else {
 			    $can = 'can_write';
 			}
-		    } elsif ( ( $! == EPIPE || $! == ECONNRESET ) && $bytes_send > 30000 ) {
-			diag( "connection closed hard" );
-			last WRITE;
-		    } else {
-			print "not ";
+		    } elsif ( $bytes_send > 30000 ) {
+			diag( "connection closed" );
 			last WRITE;
 		    }
 		    next;
@@ -283,7 +273,7 @@ if ( $pid == 0 ) {
 	my $buf = '';
 	while ( length($buf) <9 ) {
 	    sysread( $from_client, $buf,9-length($buf),length($buf) ) && next;
-	    die "sysread failed: $!" if $! != EAGAIN;
+	    die "sysread failed: $!" if $! != EWOULDBLOCK;
 	    IO::Select->new( $from_client )->can_read(30);
 	}
 	$buf eq 'plaintext' || print "not ";
@@ -338,7 +328,7 @@ if ( $pid == 0 ) {
 
 	# reading 10 bytes
 	# then sleeping so that buffers from client to server gets
-	# filled up and clients receives EAGAIN+SSL_WANT_WRITE
+	# filled up and clients receives EWOULDBLOCK+SSL_WANT_WRITE
 
 	IO::Select->new( $from_client )->can_read(30);
 	( sysread( $from_client, $buf,10 ) == 10 ) || print "not ";
@@ -360,7 +350,7 @@ if ( $pid == 0 ) {
 	    my $n = sysread( $from_client,my $buf,$diff );
 	    if ( !defined($n) ) {
 		diag( "\$!=$! \$SSL_ERROR=$SSL_ERROR" );
-		if ( $! == EAGAIN ) {
+		if ( $! == EWOULDBLOCK ) {
 		    if ( $SSL_ERROR == SSL_WANT_READ ) {
 			$attempts++;
 			$can = 'can_read';

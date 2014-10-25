@@ -8,7 +8,6 @@ use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 use IO::Select;
-use Errno qw(EAGAIN EINPROGRESS );
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 if ( grep { $^O =~m{$_}i } qw( MacOS VOS vmesa riscos amigaos mswin32) ) {

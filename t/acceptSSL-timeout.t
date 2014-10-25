@@ -21,10 +21,7 @@ print "1..15\n";
 }
 
 # then try bad non-SSL client
-if ( $^O =~m{mswin32}i ) {
-    # skip
-    ok( 1, "skip - TODO on win32" ) for(1..7);
-} else {
+{
     my ($server,$saddr) = create_listen_socket();
     ok(1, "listening \@$saddr" );
     my $srv = fork_sub( 'server',$server );

@@ -61,7 +61,7 @@ sub _ssl_accept {
 	# setup the client
 	${*$fdc}{rbuf} =  ${*$fdc}{wbuf} = '';
 	event_new( $fdc, EV_READ, \&_client_read_header )->add;
-    } elsif ( $! != EAGAIN ) {
+    } elsif ( $! != EWOULDBLOCK ) {
 	die "new client failed: $!|$SSL_ERROR";
     } else {
 	DEBUG( "new client need to retry accept: $SSL_ERROR" );
@@ -88,7 +88,7 @@ sub _client_read_header {
     my $rbuf_ref = \${*$fdc}{rbuf};
     my $n = sysread( $fdc,$$rbuf_ref,8192,length($$rbuf_ref));
     if ( !defined($n)) {
-	die $! if $! != EAGAIN;
+	die $! if $! != EWOULDBLOCK;
 	DEBUG( $SSL_ERROR );
 	if ( $SSL_ERROR == SSL_WANT_WRITE ) {
 	    # retry read once I can write
@@ -130,7 +130,7 @@ sub _client_write_response {
     my $fdc = $event->fh;
     my $wbuf_ref = \${*$fdc}{wbuf};
     my $n = syswrite( $fdc,$$wbuf_ref );
-    if ( !defined($n) && $! == EAGAIN) {
+    if ( !defined($n) && $! == EWOULDBLOCK) {
 	# retry
 	DEBUG( $SSL_ERROR );
 	if ( $SSL_ERROR == SSL_WANT_READ ) {

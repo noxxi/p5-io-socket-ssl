@@ -22,10 +22,7 @@ print "1..16\n";
     fd_grep_ok( 'Hi!', $cl );
 }
 
-if ( $^O =~m{mswin32}i ) {
-    # skip
-    ok( 1, "skip - TODO on win32" ) for(1..7);
-} else {
+{
     # then try bad non-SSL client
     my ($server,$saddr) = create_listen_socket();
     ok( 1, "listening \@$saddr" );

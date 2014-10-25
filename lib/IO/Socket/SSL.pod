@@ -557,8 +557,9 @@ features and usually fewer known bugs.
 =head1 Using Non-Blocking Sockets
 
 If you have a non-blocking socket, the expected behavior on read, write, accept
-or connect is to set C<$!> to EAGAIN if the operation can not be completed
-immediately.
+or connect is to set C<$!> to EWOULDBLOCK if the operation can not be completed
+immediately. Note that EWOULDBLOCK is the same as EAGAIN on UNIX systems, but
+is different on Windows.
 
 With SSL handshakes might occure at any time, even within an established
 connections. In this cases it is necessary to finish the handshake before
@@ -567,7 +568,7 @@ read but must first finish the write of a handshake or where you want to write
 but must first finish a read.
 In these cases C<$!> is set to EGAIN like expected, and additionally
 C<$SSL_ERROR> is set to either SSL_WANT_READ or SSL_WANT_WRITE.
-Thus if you get EAGAIN on a SSL socket you must check C<$SSL_ERROR> for
+Thus if you get EWOULDBLOCK on a SSL socket you must check C<$SSL_ERROR> for
 SSL_WANT_* and adapt your event mask accordingly.
 
 Using readline on non-blocking sockets does not make much sense and I would
@@ -606,7 +607,7 @@ TCP socket in a non-blocking way with C<start_SSL> and C<accept_SSL>.
 	# next frame.
 	my $n = sysread( $cl,my $buf,1);
 	if ( ! defined $n ) {
-	    die $! if not ${EAGAIN};
+	    die $! if not ${EWOULDBLOCK};
 	    next if $SSL_ERROR == SSL_WANT_READ;
 	    if ( $SSL_ERROR == SSL_WANT_WRITE ) {
 		# need to write data on renegotiation
@@ -1605,7 +1606,7 @@ gets the same arguments as close(), in fact close() calls stop_SSL() (but
 without downgrading the class).
 
 Will return true if it succeeded and undef if failed. This might be the case for
-non-blocking sockets. In this case $! is set to EAGAIN and the ssl error to
+non-blocking sockets. In this case $! is set to EWOULDBLOCK and the ssl error to
 SSL_WANT_READ or SSL_WANT_WRITE. In this case the call should be retried again
 with the same arguments once the socket is ready.
 
@@ -1621,8 +1622,8 @@ These functions should be used to do the relevant handshake, if the socket got
 created with C<new> or upgraded with C<start_SSL> and C<SSL_startHandshake> was
 set to false.
 They will return undef until the handshake succeeded or an error got thrown.
-As long as the function returns undef and $! is set to EAGAIN one could retry
-the call after the socket got readable (SSL_WANT_READ) or writeable
+As long as the function returns undef and $! is set to EWOULDBLOCK one could
+retry the call after the socket got readable (SSL_WANT_READ) or writeable
 (SSL_WANT_WRITE).
 
 =item B<ocsp_resolver>
