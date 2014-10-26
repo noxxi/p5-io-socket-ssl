@@ -489,7 +489,7 @@ sub configure_SSL {
 
     # create context
     # this will fill in defaults in $arg_hash
-    $ctx ||= IO::Socket::SSL::SSL_Context->new($arg_hash);
+    $ctx ||= IO::Socket::SSL::SSL_Context->new($arg_hash) || return;
 
     ${*$self}{'_SSL_arguments'} = $arg_hash;
     ${*$self}{'_SSL_ctx'} = $ctx;
