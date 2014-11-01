@@ -16,8 +16,11 @@ do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 # itself if it is available
 unless( IO::Socket::SSL->CAN_IPV6 eq "IO::Socket::IP" ) {
     # not available or IO::Socket::SSL forgot to load it
-    if ( ! eval { require IO::Socket::IP; IO::Socket::IP->VERSION(0.20) } ) {
-	print "1..0 # Skipped: no IO::Socket::IP 0.20 available\n";
+    if ( ! eval { 
+	require IO::Socket::IP; 
+	IO::Socket::IP->VERSION(0.20) && IO::Socket::IP->VERSION != 0.30; 
+    }) {
+	print "1..0 # Skipped: usuable IO::Socket::IP is not available\n";
     } else {
 	print "1..1\nnot ok # automatic use of IO::Socket::IP\n";
     }
