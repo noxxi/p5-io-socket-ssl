@@ -28,6 +28,7 @@ my $all_ciphers;
 my $show_chain;
 my $dump_chain;
 my %conf;
+my $max_cipher = 'HIGH:ALL';
 GetOptions(
     'h|help' => sub { usage() },
     'v|verbose:1' => \$verbose,
@@ -44,6 +45,7 @@ GetOptions(
     'cert=s' => \$conf{SSL_cert_file},
     'key=s'  => \$conf{SSL_key_file},
     'name=s' => \$conf{SSL_hostname},
+    'max-cipher=s' => \$max_cipher,
 ) or usage("bad usage");
 @ARGV or usage("no hosts given");
 my %default_ca =
@@ -82,6 +84,9 @@ Options:
   --key  key             - use given key for client authentication (default: cert)
   --name name            - use given name as server name in verification and SNI 
                            instead of host (useful if target is given as IP)
+  --max-cipher set       - maximum cipher set to try, default HIGH:ALL.
+                           Some servers or middleboxes have problems with this set
+			   so it can be reduced.
 
   # what to show
   -v|--verbose level     - verbose output
@@ -104,8 +109,9 @@ USAGE
 my @tests;
 for my $host (@ARGV) {
     my ($ip,$port);
-    $host =~m{^(?:\[(.+)\]|([^:]+))(?::(\w+))?$} or die "invalid dst: $host";
-    $host = $1||$2;
+    $host =~m{^(?:\[(\w\.\-\:+)\]|([\w\.\-]+)):(\w+)$|^([\w\.\-:]+)$} 
+	or die "invalid dst: $host";
+    $host = $1||$2||$4;
     my $st = $starttls{$stls ||''};
     $port = $3 || $st->[0] || 443;
     if ( $host =~m{:|^[\d\.]+$} ) {
@@ -114,6 +120,7 @@ for my $host (@ARGV) {
     }
     push @tests, [ $host||$ip,$port,$conf{SSL_hostname}||$host,$st->[1],$st->[2] || 'default' ];
 }
+
 
 my $ioclass = IO::Socket::SSL->can_ipv6 || 'IO::Socket::INET';
 for my $test (@tests) {
@@ -157,7 +164,7 @@ for my $test (@tests) {
 	SSLv23:!TLSv1_2
 	SSLv23
     )) {
-	for my $ciphers ( '','HIGH:ALL' ) {
+	for my $ciphers ( '',$max_cipher ) {
 	    my $cl = &$tcp_connect;
 	    if ( IO::Socket::SSL->start_SSL($cl,
 		%conf,
@@ -345,7 +352,7 @@ for my $test (@tests) {
     # check out all supported ciphers
     my @ciphers;
     {
-	my $c = 'HIGH:ALL:eNULL';
+	my $c = "$max_cipher:eNULL";
 	while ($all_ciphers || @ciphers<2 ) {
 	    my $cl = &$tcp_connect;
 	    if ( IO::Socket::SSL->start_SSL($cl, 
