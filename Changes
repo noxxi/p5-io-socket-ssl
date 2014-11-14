@@ -1,3 +1,7 @@
+2.003 2014/11/14
+- make SSLv3 available even if the SSL library disables it by default in
+  SSL_CTX_new (like done in LibreSSL). Default will stay to disable SSLv3,
+  so this will be only done when setting SSL_version explicitly.
 - fix possible segmentation fault when trying to use an invalid certificate,
   reported by Nick Andrew.
 - Use only the ICANN part of the default public suffix list and not the

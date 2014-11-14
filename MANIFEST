@@ -50,6 +50,7 @@ t/mitm.t
 t/nonblock.t
 t/npn.t
 t/plain_upgrade_downgrade.t
+t/protocol_version.t
 t/public_suffix_lib_encode_idn.t
 t/public_suffix_lib_libidn.t
 t/public_suffix_lib.pl

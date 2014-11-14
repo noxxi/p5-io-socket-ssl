@@ -1,0 +1,112 @@
+#!perl
+
+use strict;
+use warnings;
+use Test::More;
+use IO::Socket::SSL;
+do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
+
+$|=1;
+
+my $XDEBUG = 0;
+my @versions = qw(SSLv3 TLSv1 TLSv1_1 TLSv1_2);
+
+my $server = IO::Socket::SSL->new(
+    LocalAddr => '127.0.0.1',
+    LocalPort => 0,
+    Listen => 2,
+    SSL_server => 1,
+    SSL_startHandshake => 0,
+    SSL_version => 'SSLv23', # allow SSLv3 too
+    SSL_cert_file => 'certs/server-cert.pem',
+    SSL_key_file  => 'certs/server-key.pem',
+) or BAIL_OUT("cannot listen on localhost: $!");
+print "not ok\n", exit if !$server;
+my $saddr = $server->sockhost().':'.$server->sockport();
+$XDEBUG && diag("server at $saddr");
+
+defined( my $pid = fork() ) or BAIL_OUT("fork failed: $!");
+if ($pid == 0) {
+    close($server);
+    my $check = sub {
+	my ($ver,$expect) = @_;
+	$XDEBUG && diag("try $ver, expect $expect");
+	my $cl = IO::Socket::SSL->new(
+	    PeerAddr => $saddr,
+	    SSL_startHandshake => 0,
+	    SSL_verify_mode => 0,
+	    SSL_version => $ver,
+	) or die "TCP connection failed to server: $!";
+	$XDEBUG && diag("TCP connected");
+	print $cl "starttls $ver $expect\n";
+	<$cl>;
+	if (!$cl->connect_SSL) {
+	    $XDEBUG && diag("SSL upgrade failed with $ver: $SSL_ERROR");
+	    return;
+	}
+	$XDEBUG && diag("SSL connect done");
+	return $cl->get_sslversion();
+    };
+    my $stop = sub {
+	my $cl = IO::Socket::INET->new($saddr) or return;
+	print $cl "quit\n";
+    };
+
+    # find out the best protocol version the server can
+    my %supported;
+    my $ver = $check->('SSLv23','') or die "connect to server failed: $!";
+    $XDEBUG && diag("best protocol version: $ver");
+    for (@versions, 'foo') {
+	$supported{$_} = 1;
+	$ver eq $_ and last;
+    }
+    die "best protocol version server supports is $ver" if $supported{foo};
+
+    for my $ver (@versions) {
+	next if ! $supported{$ver};
+	# requesting only this version should be done with this version
+	$check->($ver,$ver);
+	# requesting SSLv23 and disallowing anything better should give $ver too
+	my $sslver = "SSLv23";
+	for(reverse grep { $supported{$_} } @versions) {
+	    last if $_ eq $ver;
+	    $sslver .= ":!$_";
+	}
+	$check->($sslver,$ver);
+    }
+
+    $stop->();
+    exit(0);
+}
+
+vec( my $vs = '',fileno($server),1) = 1;
+while (select( my $rvs = $vs,undef,undef,15 )) {
+    $XDEBUG && diag("got read event");
+    my $cl = $server->accept or do {
+	$XDEBUG && diag("accept failed: $!");
+	next;
+    };
+    $XDEBUG && diag("TCP accept done");
+    my $cmd = <$cl>;
+    $XDEBUG && diag("got command $cmd");
+    my ($ver,$expect) = $cmd =~m{^starttls (\S+) (\S*)} or do {
+	$XDEBUG && diag("finish");
+	done_testing() if $cmd =~m/^quit/;
+	last;
+    };
+    print $cl "ok\n";
+    $cl->accept_SSL() or do {
+	$XDEBUG && diag("accept_SSL failed: $SSL_ERROR");
+	fail("accept $ver");
+	next;
+    };
+    $XDEBUG && diag("SSL accept done");
+    if ($expect) {
+	is($expect,$cl->get_sslversion,"accept $ver with $expect");
+    } else {
+	pass("accept $ver with any, got ".$cl->get_sslversion);
+    }
+    close($cl);
+}
+
+wait;

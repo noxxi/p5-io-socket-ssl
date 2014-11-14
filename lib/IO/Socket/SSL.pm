@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.002';
+our $VERSION = '2.003';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -215,6 +215,16 @@ for(qw( SSLv2 SSLv3 TLSv1 TLSv1_1 TLSv11:TLSv1_1 TLSv1_2 TLSv12:TLSv1_2 )) {
     my ($k,$op) = m{:} ? split(m{:},$_,2) : ($_,$_);
     my $sub = "Net::SSLeay::OP_NO_$op";
     $SSL_OP_NO{$k} = eval { no strict 'refs'; &$sub } || 0;
+}
+
+# Make SSL_CTX_clear_options accessible through SSL_CTX_ctrl unless it is
+# already implemented in Net::SSLeay
+if (!defined &Net::SSLeay::CTX_clear_options) {
+    *Net::SSLeay::CTX_clear_options = sub {
+	my ($ctx,$opt) = @_;
+	# 77 = SSL_CTRL_CLEAR_OPTIONS
+	Net::SSLeay::CTX_ctrl($ctx,77,$opt,0);
+    };
 }
 
 our $DEBUG;
@@ -2148,6 +2158,13 @@ WARN
 
 	# SSL_OP_CIPHER_SERVER_PREFERENCE
 	$ssl_op |= 0x00400000 if $arg_hash->{SSL_honor_cipher_order};
+
+	if ($ver eq 'SSLv23' && !($ssl_op & $SSL_OP_NO{SSLv3})) {
+	    # At least LibreSSL disables SSLv3 by default in SSL_CTX_new.
+	    # If we really want SSL3.0 we need to explicitly allow it with
+	    # SSL_CTX_clear_options.
+	    Net::SSLeay::CTX_clear_options($ctx,$SSL_OP_NO{SSLv3});
+	}
 
 	Net::SSLeay::CTX_set_options($ctx,$ssl_op);
 
