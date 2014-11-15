@@ -56,11 +56,18 @@ if ($pid == 0) {
     my %supported;
     my $ver = $check->('SSLv23','') or die "connect to server failed: $!";
     $XDEBUG && diag("best protocol version: $ver");
+
     for (@versions, 'foo') {
 	$supported{$_} = 1;
 	$ver eq $_ and last;
     }
     die "best protocol version server supports is $ver" if $supported{foo};
+
+    # Check if the OpenSSL was compiled without SSLv3 support
+    if ( ! $check->('SSLv3','SSLv3')) {
+	diag("looks like OpenSSL was compiled without SSLv3 support");
+	delete $supported{SSLv3};
+    }
 
     for my $ver (@versions) {
 	next if ! $supported{$ver};

@@ -1,3 +1,6 @@
+2.004 2014/11/15
+- only test fix: fix t/protocol_version.t to deal with OpenSSL installations
+  which are compiled without SSLv3 support.
 2.003 2014/11/14
 - make SSLv3 available even if the SSL library disables it by default in
   SSL_CTX_new (like done in LibreSSL). Default will stay to disable SSLv3,
