@@ -1,3 +1,5 @@
+2.005 2014/11/15
+- next try to fix t/protocol_version.t for OpenSSL w/o SSLv3 support
 2.004 2014/11/15
 - only test fix: fix t/protocol_version.t to deal with OpenSSL installations
   which are compiled without SSLv3 support.

@@ -64,7 +64,7 @@ if ($pid == 0) {
     die "best protocol version server supports is $ver" if $supported{foo};
 
     # Check if the OpenSSL was compiled without SSLv3 support
-    if ( ! $check->('SSLv3','SSLv3')) {
+    if ( ! $check->('SSLv3','')) {
 	diag("looks like OpenSSL was compiled without SSLv3 support");
 	delete $supported{SSLv3};
     }
@@ -104,7 +104,11 @@ while (select( my $rvs = $vs,undef,undef,15 )) {
     print $cl "ok\n";
     $cl->accept_SSL() or do {
 	$XDEBUG && diag("accept_SSL failed: $SSL_ERROR");
-	fail("accept $ver");
+	if ($expect) {
+	    fail("accept $ver");
+	} else {
+	    diag("failed to accept $ver");
+	}
 	next;
     };
     $XDEBUG && diag("SSL accept done");
