@@ -292,7 +292,7 @@ sub public_suffix {
     my $data;
     sub _default_data {
 	if ( ! defined $data ) {
-	    $data = do { local $/; <DATA> };
+	    $data = _builtin_data();
 	    $data =~s{^// ===END ICANN DOMAINS.*}{}ms
 		or die "cannot find END ICANN DOMAINS";
 	}
@@ -309,8 +309,15 @@ sub update_self_from_url {
     local $/ = "\n";
     while (<$fh>) {
 	$code .= $_;
-	$code =~m{\A__DATA__\r?\n\Z} and last;
+	m{<<'END_BUILTIN_DATA'} and last;
     }
+    my $tail;
+    while (<$fh>) {
+	m{\AEND_BUILTIN_DATA\r?\n} or next;
+	$tail = $_;
+	last;
+    }
+    $tail .= do { local $/; <$fh> };
     close($fh);
 
     require LWP::UserAgent;
@@ -335,11 +342,10 @@ sub update_self_from_url {
     }
 
     open( $fh,'>:utf8',$dst ) or die "open $dst: $!";
-    print $fh $code;
+    print $fh $code.$tail;
 }
 
-1;
-__DATA__
+sub _builtin_data { return <<'END_BUILTIN_DATA' }
 // This Source Code Form is subject to the terms of the Mozilla Public
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
@@ -9154,3 +9160,6 @@ za.net
 za.org
 
 // ===END PRIVATE DOMAINS===
+
+END_BUILTIN_DATA
+1;
