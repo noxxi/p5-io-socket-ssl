@@ -1,3 +1,7 @@
+2.007 2014/11/26
+- make getline/readline fall back to super class if class is not sslified yet,
+  i.e. behave the same as sysread, syswrite etc.
+  This fixes RT#100529
 2.006 2014/11/22
 - Make (hopefully) non-blocking work on windows by using EWOULDBLOCK instead of
   EAGAIN. While this is the same on UNIX it is different on Windows and socket

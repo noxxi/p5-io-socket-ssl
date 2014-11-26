@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.006';
+our $VERSION = '2.007';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -1066,6 +1066,7 @@ sub getc {
 
 sub readline {
     my $self = shift;
+    ${*$self}{_SSL_object} or return $self->SUPER::getline;
 
     if ( not defined $/ or wantarray) {
 	# read all and split
