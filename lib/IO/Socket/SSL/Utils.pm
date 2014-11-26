@@ -339,13 +339,13 @@ IO::Socket::SSL::Utils -- loading, storing, creating certificates and keys
 =head1 SYNOPSIS
 
     use IO::Socket::SSL::Utils;
-    my $cert = PEM_file2cert('cert.pem');
-    my $string = PEM_cert2string($cert);
-    CERT_free($cert);
+    my $cert = PEM_file2cert('cert.pem');  # load certificate from file
+    my $string = PEM_cert2string($cert);   # convert certificate to PEM string
+    CERT_free($cert);                      # free memory within OpenSSL
 
-    my $key = KEY_create_rsa(2048);
-    PEM_string2file($key);
-    KEY_free($key);
+    my $key = KEY_create_rsa(2048);        # create new 2048-bit RSA key
+    PEM_string2file($key,"key.pem");       # and write it to file
+    KEY_free($key);                        # free memory within OpenSSL
 
 
 =head1 DESCRIPTION
