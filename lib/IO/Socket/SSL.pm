@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.007';
+our $VERSION = '2.008';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -911,7 +911,7 @@ sub accept_SSL {
 	    redo;
 
 	} elsif ( $rv == 0 ) {
-	    $socket->error("SSL connect accept failed because of handshake problems" );
+	    $socket->error("SSL accept attempt failed because of handshake problems" );
 	    delete ${*$self}{'_SSL_opening'};
 	    ${*$socket}{'_SSL_opened'} = -1;
 	    return $socket->fatal_ssl_error();

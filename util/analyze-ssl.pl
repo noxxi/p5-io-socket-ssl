@@ -151,6 +151,7 @@ for my $test (@tests) {
     };
 
     my @problems;
+    my @protocols;
 
     # basic connects without verification or any TLS extensions (OCSP)
     # find out usable version and ciphers. Because some hosts (like cloudflare)
@@ -177,6 +178,11 @@ for my $test (@tests) {
 		$version = $cl->get_sslversion();
 		$cipher = $cl->get_cipher();
 		VERBOSE(2,"version $v no verification, ciphers=$ciphers, no TLS extensions -> $version,$cipher");
+		if (@protocols && $protocols[-1][0] eq $version) {
+		    push @{$protocols[-1]},$cipher if $protocols[-1][-1] ne $cipher;
+		} else {
+		    push @protocols, [ $version, $cipher ];
+		}
 	    } else {
 		VERBOSE(2,"version $v, no verification, ciphers=$ciphers, no TLS extensions -> FAIL! $SSL_ERROR");
 		if ( ! $ciphers && $v eq 'SSLv23' ) {
@@ -405,7 +411,10 @@ for my $test (@tests) {
     print "-- $host port $port".($stls? " starttls $stls":"")."\n";
     print " ! $_\n" for(@problems);
     print " * maximum SSL version  : $version ($use_version)\n";
-    print " * preferred cipher     : $cipher\n";
+    print " * supported SSL versions with preferred cipher:\n";
+    for(@protocols) {
+	printf "   * %7s %s\n",$_->[0], join(" ",@{$_}[1..$#$_]);
+    }
     print " * cipher order by      : ".(
 	! defined $server_cipher_order ? "unknown\n" :
 	$server_cipher_order ? "server\n" : "client\n"

@@ -1,3 +1,8 @@
+2.008 2014/12/16
+- work around recent OCSP verification errors for revoked.grc.com (badly signed
+  OCSP response, Firefox also complains about it) in test t/external/ocsp.t.
+- util/analyze.pl - report more details about preferred cipher for specific TLS
+  versions
 2.007 2014/11/26
 - make getline/readline fall back to super class if class is not sslified yet,
   i.e. behave the same as sysread, syswrite etc.
