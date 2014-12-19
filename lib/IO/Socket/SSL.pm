@@ -1557,7 +1557,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	my $publicsuffix = shift;
 	if ( ! ref($scheme) ) {
 	    $DEBUG>=3 && DEBUG( "scheme=$scheme cert=$cert" );
-	    $scheme = $scheme{$scheme} or croak "scheme $scheme not defined";
+	    $scheme = $scheme{$scheme} || croak("scheme $scheme not defined");
 	}
 
 	return 1 if ! %$scheme; # 'none'
