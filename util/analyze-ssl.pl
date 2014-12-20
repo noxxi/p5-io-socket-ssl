@@ -1,3 +1,9 @@
+#!/usr/bin/perl
+#
+# Copyright 2013..2014 Steffen Ullrich <sullr@cpan.org>
+#   This program is free software; you can redistribute it and/or
+#   modify it under the same terms as Perl itself.
+
 use strict;
 use warnings;
 use Socket;
@@ -82,10 +88,10 @@ Options:
   --CApath file|dir      - use given dir|file instead of system default CA store
   --cert cert            - use given certificate for client authentication
   --key  key             - use given key for client authentication (default: cert)
-  --name name            - use given name as server name in verification and SNI 
-                           instead of host (useful if target is given as IP)
+  --name name            - use given name as server name in verification and SNI
+			   instead of host (useful if target is given as IP)
   --max-cipher set       - maximum cipher set to try, default HIGH:ALL.
-                           Some servers or middleboxes have problems with this set
+			   Some servers or middleboxes have problems with this set
 			   so it can be reduced.
 
   # what to show
@@ -109,7 +115,7 @@ USAGE
 my @tests;
 for my $host (@ARGV) {
     my ($ip,$port);
-    $host =~m{^(?:\[(\w\.\-\:+)\]|([\w\.\-]+)):(\w+)$|^([\w\.\-:]+)$} 
+    $host =~m{^(?:\[(\w\.\-\:+)\]|([\w\.\-]+)):(\w+)$|^([\w\.\-:]+)$}
 	or die "invalid dst: $host";
     $host = $1||$2||$4;
     my $st = $starttls{$stls ||''};
@@ -150,21 +156,18 @@ for my $test (@tests) {
 	$cl or die $error;
     };
 
+    my @handshakes;
     my @problems;
-    my @protocols;
 
     # basic connects without verification or any TLS extensions (OCSP)
     # find out usable version and ciphers. Because some hosts (like cloudflare)
     # behave differently if SNI is used we try to use it and only fall back if
     # it fails.
-    my ($use_version,$version,$cipher);
+    my ($version,$cipher);
     my $sni = $name;
-    BASE: for my $v (qw(
-	SSLv23:!TLSv1_2:!TLSv1_1:!TLSv1
-	SSLv23:!TLSv1_2:!TLSv1_1
-	SSLv23:!TLSv1_2
-	SSLv23
-    )) {
+    my $try_sslversion = sub {
+	my $v = shift;
+	my (@protocols,@err);
 	for my $ciphers ( '',$max_cipher ) {
 	    my $cl = &$tcp_connect;
 	    if ( IO::Socket::SSL->start_SSL($cl,
@@ -174,28 +177,41 @@ for my $test (@tests) {
 		SSL_hostname => $sni,
 		SSL_cipher_list => $ciphers,
 	    )) {
-		$use_version = $v;
 		$version = $cl->get_sslversion();
 		$cipher = $cl->get_cipher();
-		VERBOSE(2,"version $v no verification, ciphers=$ciphers, no TLS extensions -> $version,$cipher");
-		if (@protocols && $protocols[-1][0] eq $version) {
-		    push @{$protocols[-1]},$cipher if $protocols[-1][-1] ne $cipher;
-		} else {
-		    push @protocols, [ $version, $cipher ];
+		if (!@protocols) {
+		    push @protocols, ($version, $cipher);
+		} elsif ($protocols[-1] ne $cipher) {
+		    push @protocols, $cipher;
 		}
+		VERBOSE(2,"version $v no verification, ciphers=$ciphers, no TLS extensions -> $version,$cipher");
 	    } else {
 		VERBOSE(2,"version $v, no verification, ciphers=$ciphers, no TLS extensions -> FAIL! $SSL_ERROR");
-		if ( ! $ciphers && $v eq 'SSLv23' ) {
-		    push @problems, "using default SSL_version $v, default ciphers -> $SSL_ERROR";
-		} elsif ( ! $ciphers ) {
-		    push @problems, "using SSL_version $v, default ciphers -> $SSL_ERROR";
-		} else {
-		    push @problems, "using SSL_version $v, ciphers $ciphers -> $SSL_ERROR";
-		}
-		last BASE if $version;
+		push @err, $SSL_ERROR if ! @err || $err[-1] ne $SSL_ERROR;
 	    }
 	}
+	return (\@protocols,\@err);
+    };
+
+    my $use_version;
+    for(
+	# most compatible handshake - should better be supported by all
+	'SSLv23',
+	# version specific handshakes - some hosts fail instead of downgrading
+	defined &Net::SSLeay::CTX_tlsv1_2_new ? ('TLSv1_2'):(),
+	defined &Net::SSLeay::CTX_tlsv1_1_new ? ('TLSv1_1'):(),
+	defined &Net::SSLeay::CTX_tlsv1_new   ? ('TLSv1')  :(),
+	defined &Net::SSLeay::CTX_v3_new      ? ('SSLv3')  :(),
+    ) {
+	my ($protocols,$err) = $try_sslversion->($_);
+	if (@$protocols) {
+	    $use_version ||= $_;
+	    push @handshakes, [ $_, @$protocols ];
+	} else {
+	    push @handshakes, [ $_,\"@$err" ];
+	}
     }
+
     if ($version) {
 	VERBOSE(1,"successful connect with $version cipher=$cipher, sni=$sni and no other TLS extensions");
     } elsif ($sni) {
@@ -226,7 +242,7 @@ for my $test (@tests) {
     if ($show_chain || $dump_chain) {
 	for(
 	    [ \%conf, \@cert_chain ],
-	    ! $conf{SSL_hostname} ? () 
+	    ! $conf{SSL_hostname} ? ()
 		# cloudflare has different cipher list without SNI, so don't
 		# enforce the existing one
 		: ([ { %conf, SSL_cipher_list => undef, SSL_hostname => '' }, \@cert_chain_nosni ])
@@ -264,7 +280,7 @@ for my $test (@tests) {
 	    }
 	}
 	# if same certificate ignore nosni
-	if (@cert_chain_nosni 
+	if (@cert_chain_nosni
 	    && $cert_chain_nosni[0][3] eq $cert_chain[0][3]) {
 	    VERBOSE(2,"same certificate in without SNI");
 	    @cert_chain_nosni = ();
@@ -361,7 +377,7 @@ for my $test (@tests) {
 	my $c = "$max_cipher:eNULL";
 	while ($all_ciphers || @ciphers<2 ) {
 	    my $cl = &$tcp_connect;
-	    if ( IO::Socket::SSL->start_SSL($cl, 
+	    if ( IO::Socket::SSL->start_SSL($cl,
 		%conf,
 		SSL_verify_mode => 0,
 		SSL_version => $conf{SSL_version},
@@ -411,9 +427,15 @@ for my $test (@tests) {
     print "-- $host port $port".($stls? " starttls $stls":"")."\n";
     print " ! $_\n" for(@problems);
     print " * maximum SSL version  : $version ($use_version)\n";
-    print " * supported SSL versions with preferred cipher:\n";
-    for(@protocols) {
-	printf "   * %7s %s\n",$_->[0], join(" ",@{$_}[1..$#$_]);
+    print " * supported SSL versions with handshake used and preferred cipher(s):\n";
+    printf "   * %-9s %-9s %s\n",qw(handshake protocols ciphers);
+    for(@handshakes) {
+	printf("   * %-9s %-9s %s\n",
+	    $_->[0],
+	    ref($_->[1])
+		? ("FAILED: ${$_->[1]}","")
+		: ($_->[1], join(" ",@{$_}[2..$#$_]))
+	);
     }
     print " * cipher order by      : ".(
 	! defined $server_cipher_order ? "unknown\n" :
@@ -437,7 +459,7 @@ for my $test (@tests) {
     print " * OCSP stapling        : $ocsp_staple\n" if $ocsp_staple;
     print " * OCSP status          : $ocsp_status\n" if $ocsp_status;
     if ($all_ciphers) {
-	print " * supported ciphers\n";
+	print " * supported ciphers with $use_version handshake\n";
 	for(@ciphers) {
 	    printf "   * %6s %s\n",@$_;
 	}
