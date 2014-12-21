@@ -194,6 +194,7 @@ for my $test (@tests) {
     };
 
     my $use_version;
+    TRY_PROTOCOLS:
     for(
 	# most compatible handshake - should better be supported by all
 	'SSLv23',
@@ -216,7 +217,8 @@ for my $test (@tests) {
 	VERBOSE(1,"successful connect with $version cipher=$cipher, sni=$sni and no other TLS extensions");
     } elsif ($sni) {
 	$sni = '';
-	goto BASE;
+	# retry without SNI
+	goto TRY_PROTOCOLS;
     } else {
 	die "$host failed basic SSL connect: $SSL_ERROR\n";
     }
