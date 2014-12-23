@@ -10,6 +10,7 @@ use Socket;
 use IO::Socket::SSL 1.984;
 use IO::Socket::SSL::Utils;
 use Getopt::Long qw(:config posix_default bundling);
+use Data::Dumper;
 
 
 my $can_ocsp = IO::Socket::SSL->can_ocsp;
@@ -163,7 +164,7 @@ for my $test (@tests) {
     # find out usable version and ciphers. Because some hosts (like cloudflare)
     # behave differently if SNI is used we try to use it and only fall back if
     # it fails.
-    my ($version,$cipher);
+    my ($version,$cipher,$good_conf);
     my $sni = $name;
     my $try_sslversion = sub {
 	my $v = shift;
@@ -184,9 +185,15 @@ for my $test (@tests) {
 		} elsif ($protocols[-1] ne $cipher) {
 		    push @protocols, $cipher;
 		}
-		VERBOSE(2,"version $v no verification, ciphers=$ciphers, no TLS extensions -> $version,$cipher");
+		$good_conf ||= { 
+		    %conf, 
+		    SSL_version => $v, 
+		    SSL_hostname => $sni, 
+		    SSL_cipher_list => $ciphers 
+		};
+		VERBOSE(2,"version $v no verification, ciphers=$ciphers -> $version,$cipher");
 	    } else {
-		VERBOSE(2,"version $v, no verification, ciphers=$ciphers, no TLS extensions -> FAIL! $SSL_ERROR");
+		VERBOSE(2,"version $v, no verification, ciphers=$ciphers -> FAIL! $SSL_ERROR");
 		push @err, $SSL_ERROR if ! @err || $err[-1] ne $SSL_ERROR;
 	    }
 	}
@@ -194,6 +201,7 @@ for my $test (@tests) {
     };
 
     my $use_version;
+    my $best_version;
     TRY_PROTOCOLS:
     for(
 	# most compatible handshake - should better be supported by all
@@ -207,14 +215,15 @@ for my $test (@tests) {
 	my ($protocols,$err) = $try_sslversion->($_);
 	if (@$protocols) {
 	    $use_version ||= $_;
+	    $best_version ||= $protocols->[0];
 	    push @handshakes, [ $_, @$protocols ];
 	} else {
 	    push @handshakes, [ $_,\"@$err" ];
 	}
     }
 
-    if ($version) {
-	VERBOSE(1,"successful connect with $version cipher=$cipher, sni=$sni and no other TLS extensions");
+    if ($best_version) {
+	VERBOSE(1,"successful connect with $best_version, cipher=$cipher, sni=$sni and no other TLS extensions");
     } elsif ($sni) {
 	$sni = '';
 	# retry without SNI
@@ -223,18 +232,15 @@ for my $test (@tests) {
 	die "$host failed basic SSL connect: $SSL_ERROR\n";
     }
 
-    %conf = ( %conf, SSL_version => $use_version, SSL_cipher_list => $cipher );
     my $sni_status;
     if (!$sni) {
 	if ($version =~m{^TLS}) {
 	    VERBOSE(1,"SNI FAIL!");
 	    push @problems, "using SNI (default)";
 	    $sni_status = 'FAIL';
-	    $conf{SSL_hostname} = '';
 	}
     } else {
 	VERBOSE(1,"SNI success");
-	$conf{SSL_hostname} = $name;
 	$sni_status = 'ok';
     }
 
@@ -243,15 +249,15 @@ for my $test (@tests) {
     my (@cert_chain,@cert_chain_nosni);
     if ($show_chain || $dump_chain) {
 	for(
-	    [ \%conf, \@cert_chain ],
-	    ! $conf{SSL_hostname} ? ()
+	    [ $good_conf, \@cert_chain ],
+	    ! $good_conf->{SSL_hostname} ? ()
 		# cloudflare has different cipher list without SNI, so don't
 		# enforce the existing one
-		: ([ { %conf, SSL_cipher_list => undef, SSL_hostname => '' }, \@cert_chain_nosni ])
+		: ([ { %$good_conf, SSL_cipher_list => undef, SSL_hostname => '' }, \@cert_chain_nosni ])
 	) {
 	    my ($conf,$chain) = @$_;
 	    my $cl = &$tcp_connect;
-	    if ( IO::Socket::SSL->start_SSL($cl, %$conf,
+	    if ( IO::Socket::SSL->start_SSL($cl, %$good_conf,
 		SSL_verify_mode => 0
 	    )) {
 		for my $cert ( $cl->peer_certificates ) {
@@ -292,17 +298,21 @@ for my $test (@tests) {
     # check verification against given/builtin CA w/o OCSP
     my $verify_status;
     my $cl = &$tcp_connect;
-    if ( IO::Socket::SSL->start_SSL($cl, %conf,
+    if ( IO::Socket::SSL->start_SSL($cl, %$good_conf,
 	SSL_verify_mode => SSL_VERIFY_PEER,
 	SSL_ocsp_mode => SSL_OCSP_NO_STAPLE,
 	SSL_verifycn_scheme => 'none',
 	%default_ca
     )) {
-	%conf = ( %conf, SSL_verify_mode => SSL_VERIFY_PEER, %default_ca );
-	if ( $cl->verify_hostname( $name,$scheme )) {
+	%conf = ( %$good_conf, SSL_verify_mode => SSL_VERIFY_PEER, %default_ca );
+	if (!$cl->peer_certificate) {
+	    VERBOSE(1,"no peer certificate (anonymous authentication)");
+	    %conf = %$good_conf;
+	    $verify_status = 'anon';
+	} elsif ( $cl->verify_hostname( $name,$scheme )) {
 	    VERBOSE(1,"certificate verify success");
 	    $verify_status = 'ok';
-	    %conf = ( %conf,
+	    %conf = %$good_conf = ( %conf,
 		SSL_verifycn_scheme => $scheme,
 		SSL_verifycn_name => $name,
 	    );
@@ -317,7 +327,7 @@ for my $test (@tests) {
 		" SAN=".join(",",@san)
 	    );
 	    $verify_status = 'name-mismatch';
-	    %conf = ( %conf, SSL_verifycn_scheme => 'none');
+	    %conf = %$good_conf = ( %conf, SSL_verifycn_scheme => 'none');
 	}
 
     } else {
@@ -428,7 +438,7 @@ for my $test (@tests) {
     # summary
     print "-- $host port $port".($stls? " starttls $stls":"")."\n";
     print " ! $_\n" for(@problems);
-    print " * maximum SSL version  : $version ($use_version)\n";
+    print " * maximum SSL version  : $best_version ($use_version)\n";
     print " * supported SSL versions with handshake used and preferred cipher(s):\n";
     printf "   * %-9s %-9s %s\n",qw(handshake protocols ciphers);
     for(@handshakes) {
