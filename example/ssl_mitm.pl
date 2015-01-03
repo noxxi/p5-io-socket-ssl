@@ -55,12 +55,14 @@ while (1) {
     vec($readmask,fileno($toc),1) = 1;
     while (1) {
 	select( my $can_read = $readmask,undef,undef,undef ) >0 or die $!;
+	# try to read the maximum frame size of SSL to avoid issues
+	# with pending data
 	if ( vec($can_read,fileno($tos),1)) {
-	    sysread($tos,my $buf,100) or last;
+	    sysread($tos,my $buf,16384) or last;
 	    print $toc $buf;
 	}
 	if ( vec($can_read,fileno($toc),1)) {
-	    sysread($toc,my $buf,100) or last;
+	    sysread($toc,my $buf,16384) or last;
 	    print $tos $buf;
 	}
     }

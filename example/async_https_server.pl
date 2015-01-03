@@ -86,7 +86,7 @@ sub _client_read_header {
     my $fdc = $event->fh;
     DEBUG( "reading header" );
     my $rbuf_ref = \${*$fdc}{rbuf};
-    my $n = sysread( $fdc,$$rbuf_ref,8192,length($$rbuf_ref));
+    my $n = sysread( $fdc,$$rbuf_ref,16384,length($$rbuf_ref));
     if ( !defined($n)) {
 	die $! if $! != EWOULDBLOCK;
 	DEBUG( $SSL_ERROR );
