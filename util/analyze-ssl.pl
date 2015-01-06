@@ -60,8 +60,8 @@ my %default_ca =
     -d $capath ? ( SSL_ca_path => $capath, SSL_ca_file => '' ) :
     -f $capath ? ( SSL_ca_file => $capath, SSL_ca_path => '' ) :
     die "no such file or dir: $capath";
-die "need Net::SSLeay>=1.58 for showing chain" if $show_chain
-    && ! defined &IO::Socket::SSL::peer_certificates;
+my $peer_certificates = IO::Socket::SSL->can('peer_certificates')
+    || sub {};
 
 $conf{SSL_verifycn_name} ||= $conf{SSL_hostname} if $conf{SSL_hostname};
 if ($conf{SSL_cert_file}) {
@@ -257,10 +257,41 @@ for my $test (@tests) {
 	) {
 	    my ($conf,$chain) = @$_;
 	    my $cl = &$tcp_connect;
+	    my %verify_chain;
 	    if ( IO::Socket::SSL->start_SSL($cl, %$good_conf,
-		SSL_verify_mode => 0
+		SSL_verify_callback => sub {
+		    my ($valid,$store,$str,$err,$cert,$depth) = @_;
+		    # Since this only a temporary reference we should convert it
+		    # directly to PEM.
+
+		    my ($subject,$bits);
+		    $subject = Net::SSLeay::X509_NAME_oneline(
+			Net::SSLeay::X509_get_subject_name($cert));
+		    if (!$depth) {
+			my @san = $cl->peer_certificate('subjectAltNames');
+			for( my $i=0;$i<@san;$i++) {
+			    $san[$i] = 'DNS' if $san[$i] == 2;
+			    $san[$i] .= ":".splice(@san,$i+1,1);
+			}
+			$subject .= " SAN=".join(",",@san) if @san;
+		    }
+		    if (my $pkey = Net::SSLeay::X509_get_pubkey($cert)) {
+			$bits = eval { Net::SSLeay::EVP_PKEY_bits($pkey) };
+			Net::SSLeay::EVP_PKEY_free($pkey);
+		    }
+		    my $pem = PEM_cert2string($cert);
+		    $verify_chain{$pem} = [
+			$bits||'???',
+			$subject,
+			join('|', grep { $_ } @{ CERT_asHash($cert)->{ocsp_uri} || []}),
+			$pem,
+			$depth,
+			'-'
+		    ];
+		    return 1;
+		},
 	    )) {
-		for my $cert ( $cl->peer_certificates ) {
+		for my $cert ( $peer_certificates->($cl) ) {
 		    my ($subject,$bits);
 		    $subject = Net::SSLeay::X509_NAME_oneline(
 			Net::SSLeay::X509_get_subject_name($cert));
@@ -276,12 +307,23 @@ for my $test (@tests) {
 			$bits = eval { Net::SSLeay::EVP_PKEY_bits($pkey) };
 			Net::SSLeay::EVP_PKEY_free($pkey);
 		    }
+		    my $pem = PEM_cert2string($cert);
+		    my $vc = delete $verify_chain{$pem};
+		    if (!$vc) {
+			push @problems, "server sent unused chain certificate ".
+			    "'$subject'";
+		    }
 		    push @$chain,[
 			$bits||'???',
 			$subject,
 			join('|', grep { $_ } @{ CERT_asHash($cert)->{ocsp_uri} || []}),
-			PEM_cert2string($cert),
+			$pem,
+			$vc ? $vc->[4] : '-', # depth
+			$#$chain+1,
 		    ],
+		}
+		for (sort { $a->[4] <=> $b->[4] } values %verify_chain) {
+		    push @$chain,$_;
 		}
 	    } else {
 		die "failed to connect with previously successful config: $SSL_ERROR";
@@ -458,13 +500,13 @@ for my $test (@tests) {
     if ($show_chain) {
 	for(my $i=0;$i<@cert_chain;$i++) {
 	    my $c = $cert_chain[$i];
-	    print "   * [$i] bits=$c->[0], ocsp_uri=$c->[2], $c->[1]\n"
+	    print "   * [$c->[5]/$c->[4]] bits=$c->[0], ocsp_uri=$c->[2], $c->[1]\n"
 	}
 	if (@cert_chain_nosni) {
 	    print " * chain without SNI\n";
 	    for(my $i=0;$i<@cert_chain_nosni;$i++) {
 		my $c = $cert_chain_nosni[$i];
-		print "   * [$i] bits=$c->[0], ocsp_uri=$c->[2], $c->[1]\n"
+		print "   * [$c->[5]/$c->[4]] bits=$c->[0], ocsp_uri=$c->[2], $c->[1]\n"
 	    }
 	}
     }

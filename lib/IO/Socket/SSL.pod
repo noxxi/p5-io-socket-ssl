@@ -1016,6 +1016,9 @@ a string containing any errors encountered (0 if no errors).
 a C-style memory address of the peer's own certificate (convertible to
 PEM form with Net::SSLeay::PEM_get_string_X509()).
 
+=item 6.
+The depth of the certificate in the chain. Depth 0 is the leaf certificate.
+
 =back
 
 The function should return 1 or 0, depending on whether it thinks the
