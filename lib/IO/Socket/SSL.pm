@@ -719,7 +719,10 @@ sub connect_SSL {
     # ssl connect successful
     delete ${*$self}{'_SSL_opening'};
     ${*$self}{'_SSL_opened'}=1;
-    $self->blocking(1) if defined($timeout); # was blocking before
+    if (defined($timeout)) {
+	$self->blocking(1); # reset back to blocking
+	$! = undef; # reset errors from non-blocking
+    }
 
     $ctx ||= ${*$self}{'_SSL_ctx'};
 
@@ -868,7 +871,7 @@ sub accept_SSL {
     }
 
     my $start = defined($timeout) && time();
-    for my $dummy (1) {
+    {
 	my $rv = Net::SSLeay::accept($ssl);
 	$DEBUG>=3 && DEBUG( "Net::SSLeay::accept -> $rv" );
 	if ( $rv < 0 ) {
@@ -889,7 +892,7 @@ sub accept_SSL {
 		my $vec = '';
 		vec($vec,$socket->fileno,1) = 1;
 		$rv =
-		    $SSL_ERROR == SSL_WANT_READ ? select( $vec,undef,undef,$timeout) :
+		    $SSL_ERROR == SSL_WANT_READ  ? select( $vec,undef,undef,$timeout) :
 		    $SSL_ERROR == SSL_WANT_WRITE ? select( undef,$vec,undef,$timeout) :
 		    undef;
 	    } else {
@@ -922,7 +925,10 @@ sub accept_SSL {
     # socket opened
     delete ${*$self}{'_SSL_opening'};
     ${*$socket}{'_SSL_opened'} = 1;
-    $socket->blocking(1) if defined($timeout); # was blocking before
+    if (defined($timeout)) {
+	$socket->blocking(1); # reset back to blocking
+	$! = undef; # reset errors from non-blocking
+    }
 
     tie *{$socket}, "IO::Socket::SSL::SSL_HANDLE", $socket;
 
