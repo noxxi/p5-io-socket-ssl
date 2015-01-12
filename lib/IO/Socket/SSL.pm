@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.008';
+our $VERSION = '2.009';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -49,7 +49,8 @@ use constant SSL_OCSP_TRY_STAPLE  => 0b10000;
 # capabilities of underlying Net::SSLeay/openssl
 my $can_client_sni;  # do we support SNI on the client side
 my $can_server_sni;  # do we support SNI on the server side
-my $can_npn;         # do we support NPN
+my $can_npn;         # do we support NPN (obsolete)
+my $can_alpn;        # do we support ALPN
 my $can_ecdh;        # do we support ECDH key exchange
 my $can_ocsp;        # do we support OCSP
 my $can_ocsp_staple; # do we support OCSP stapling
@@ -57,6 +58,7 @@ BEGIN {
     $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x01000000;
     $can_server_sni = defined &Net::SSLeay::get_servername;
     $can_npn        = defined &Net::SSLeay::P_next_proto_negotiated;
+    $can_alpn       = defined &Net::SSLeay::CTX_set_alpn_protos;
     $can_ecdh       = defined &Net::SSLeay::CTX_set_tmp_ecdh &&
 	# There is a regression with elliptic curves on 1.0.1d with 64bit
 	# http://rt.openssl.org/Ticket/Display.html?id=2975
@@ -89,6 +91,7 @@ my %DEFAULT_SSL_ARGS = (
     SSL_verifycn_publicsuffix => undef,  # fallback default list verification
     #SSL_verifycn_name => undef,   # use from PeerAddr/PeerHost - do not override in set_args_filter_hack 'use_defaults'
     SSL_npn_protocols => undef,    # meaning depends whether on server or client side
+    SSL_alpn_protocols => undef,   # list of protocols we'll accept/send, for example ['http/1.1','spdy/3.1']
     SSL_cipher_list =>
 	'EECDH+AESGCM+ECDSA EECDH+AESGCM EECDH+ECDSA +AES256 EECDH EDH+AESGCM '.
 	'EDH ALL +SHA +3DES +RC4 !LOW !EXP !eNULL !aNULL !DES !MD5 !PSK !SRP',
@@ -1797,6 +1800,7 @@ sub error {
 sub can_client_sni { return $can_client_sni }
 sub can_server_sni { return $can_server_sni }
 sub can_npn        { return $can_npn }
+sub can_alpn       { return $can_alpn }
 sub can_ecdh       { return $can_ecdh }
 sub can_ipv6       { return CAN_IPV6 }
 sub can_ocsp       { return $can_ocsp }
@@ -1894,6 +1898,13 @@ sub next_proto_negotiated {
     return $self->_internal_error("NPN not supported in Net::SSLeay") if ! $can_npn;
     my $ssl = $self->_get_ssl_object || return;
     return Net::SSLeay::P_next_proto_negotiated($ssl);
+}
+
+sub alpn_selected {
+    my $self = shift;
+    return $self->_internal_error("ALPN not supported in Net::SSLeay") if ! $can_alpn;
+    my $ssl = $self->_get_ssl_object || return;
+    return Net::SSLeay::P_alpn_selected($ssl);
 }
 
 sub opened {
@@ -2201,6 +2212,16 @@ WARN
 		# on client side SSL_npn_protocols means a list of preferred protocols
 		# negotiation algorithm used is "as-openssl-implements-it"
 		Net::SSLeay::CTX_set_next_proto_select_cb($ctx, $proto_list);
+	    }
+	}
+
+	if ( my $proto_list = $arg_hash->{SSL_alpn_protocols} ) {
+	    return IO::Socket::SSL->_internal_error("ALPN not supported in Net::SSLeay")
+		if ! $can_alpn;
+	    if($arg_hash->{SSL_server}) {
+		Net::SSLeay::CTX_set_alpn_select_cb($ctx, $proto_list);
+	    } else {
+		Net::SSLeay::CTX_set_alpn_protos($ctx, $proto_list);
 	    }
 	}
 

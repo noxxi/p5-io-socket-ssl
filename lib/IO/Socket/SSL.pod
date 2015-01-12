@@ -1252,11 +1252,28 @@ On the client side it specifies the protocols offered by the client for NPN
 as an array ref.
 See also method C<next_proto_negotiated>.
 
-Next Protocol Negotioation (NPN) is available with Net::SSLeay 1.46+ and
+Next Protocol Negotiation (NPN) is available with Net::SSLeay 1.46+ and
 openssl-1.0.1+.
 To check support you might call C<IO::Socket::SSL->can_npn()>.
 If you use this option with an unsupported Net::SSLeay/OpenSSL it will
 throw an error.
+
+=item SSL_alpn_protocols
+
+If used on the server side it specifies list of protocols supported by the SSL
+server as an array ref, e.g. ['http/2.0', 'spdy/3.1','http/1.1'].
+On the client side it specifies the protocols advertised by the client for ALPN
+as an array ref.
+See also method C<alpn_selected>.
+
+Application-Layer Protocol Negotiation (ALPN) is available with Net::SSLeay
+1.56+ and openssl-1.0.2+. More details about the extension are in RFC7301.  To
+check support you might call C< IO::Socket::SSL->can_alpn() >.  If you use this
+option with an unsupported Net::SSLeay/OpenSSL it will throw an error.
+
+Note that some client implementations may encounter problems if both NPN and
+ALPN are specified. Since ALPN is intended as a replacement for NPN, try
+providing ALPN protocols then fall back to NPN if that fails.
 
 =back
 
@@ -1559,6 +1576,14 @@ for both client and server side of SSL connection.
 
 NPN support is available with Net::SSLeay 1.46+ and openssl-1.0.1+.
 To check support you might call C<IO::Socket::SSL->can_npn()>.
+
+=item B<alpn_selected()>
+
+Returns the protocol negotiated via ALPN as a string, e.g. 'http/1.1',
+'http/2.0' or 'spdy/3.1'.
+
+ALPN support is available with Net::SSLeay 1.56+ and openssl-1.0.2+.
+To check support, use C<IO::Socket::SSL->can_alpn()>.
 
 =item B<errstr()>
 

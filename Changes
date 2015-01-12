@@ -1,3 +1,8 @@
+2.009 2014/01/12
+- remove util/analyze.pl. This tool is now together with other SSL tools in
+  https://github.com/noxxi/p5-ssl-tools
+- added ALPN support (needs OpenSSL1.02, Net::SSLeay 1.56+) thanks to TEAM,
+  RT#101452
 2.008 2014/12/16
 - work around recent OCSP verification errors for revoked.grc.com (badly signed
   OCSP response, Firefox also complains about it) in test t/external/ocsp.t.

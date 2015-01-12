@@ -33,6 +33,7 @@ README
 README.Win32
 t/01loadmodule.t
 t/acceptSSL-timeout.t
+t/alpn.t
 t/auto_verify_hostname.t
 t/cert_formats.t
 t/cert_no_file.t
@@ -69,4 +70,3 @@ t/testlib.pl
 t/verify_fingerprint.t
 t/verify_hostname_standalone.t
 t/verify_hostname.t
-util/analyze-ssl.pl
