@@ -818,6 +818,13 @@ If you really don't want to set a CA set SSL_ca_file or SSL_ca_path to
 C<\undef> or SSL_ca to an empty list. (unfortunatly C<''> is used by some
 modules using IO::Socket::SSL when CA is not exlicitly given).
 
+=item SSL_client_ca | SSL_client_ca_file
+
+If verify_mode is VERIFY_PEER on the server side these options can be used to
+set the list of acceptable CAs for the client. This way the client can select
+they required certificate from a list of certificates.
+The value for these options is similar to C<SSL_ca> and C<SSL_ca_file>.
+
 =item SSL_fingerprint
 
 Sometimes you have a self-signed certificate or a certificate issued by an

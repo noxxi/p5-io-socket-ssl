@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.009';
+our $VERSION = '2.010';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -2256,6 +2256,24 @@ WARN
 		&& $verify_mode != Net::SSLeay::VERIFY_NONE()) {
 		return IO::Socket::SSL->error(
 		    "Invalid default certificate authority locations")
+	    }
+	}
+
+	if ($arg_hash->{SSL_server}
+	    && ($verify_mode & Net::SSLeay::VERIFY_PEER())) {
+	    if ($arg_hash->{SSL_client_ca}) {
+		for (@{$arg_hash->{SSL_client_ca}}) {
+		    return IO::Socket::SSL->error(
+			"Failed to add certificate to client CA list") if
+			! Net::SSLeay::CTX_add_client_CA($ctx,$_);
+		}
+	    }
+	    if ($arg_hash->{SSL_client_ca_file}) {
+		my $list = Net::SSLeay::load_client_CA_file(
+		    $arg_hash->{SSL_client_ca_file}) or
+		    return IO::Socket::SSL->error(
+		    "Failed to load certificate to client CA list");
+		Net::SSLeay::CTX_set_client_CA_list($ctx,$list);
 	    }
 	}
 

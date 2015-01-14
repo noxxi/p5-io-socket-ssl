@@ -1,3 +1,6 @@
+2.009 2014/01/14
+- new options SSL_client_ca_file and SSL_client_ca to let the server send
+  the list of acceptable CAs for the client certificate.
 - t/protocol_version.t - fix in case SSLv3 is not supported in Net::SSLeay. 
   RT#101485, thanks to TEAM.
 2.009 2014/01/12
