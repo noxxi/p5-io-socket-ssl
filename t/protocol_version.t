@@ -31,12 +31,25 @@ if ($pid == 0) {
     my $check = sub {
 	my ($ver,$expect) = @_;
 	$XDEBUG && diag("try $ver, expect $expect");
+	# Hoping that this isn't necessary, but just in case we get a TCP
+	# failure rather than SSL failure, wiping the previous value here
+	# seems like it might be a useful precaution:
+	$SSL_ERROR = '';
+
 	my $cl = IO::Socket::SSL->new(
 	    PeerAddr => $saddr,
 	    SSL_startHandshake => 0,
 	    SSL_verify_mode => 0,
 	    SSL_version => $ver,
-	) or die "TCP connection failed to server: $!";
+	) or do {
+	    # Might bail out before the starttls if we provide a known-unsupported
+	    # version, for example SSLv3 on openssl 1.0.2+
+	    if($SSL_ERROR =~ /$ver not supported/) {
+	        $XDEBUG && diag("SSL connect failed with $ver: $SSL_ERROR");
+	        return;
+	    }
+	    die "TCP connection failed to server: $! (SSL error: $SSL_ERROR)";
+	};
 	$XDEBUG && diag("TCP connected");
 	print $cl "starttls $ver $expect\n";
 	<$cl>;

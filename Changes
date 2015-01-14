@@ -1,3 +1,5 @@
+- t/protocol_version.t - fix in case SSLv3 is not supported in Net::SSLeay. 
+  RT#101485, thanks to TEAM.
 2.009 2014/01/12
 - remove util/analyze.pl. This tool is now together with other SSL tools in
   https://github.com/noxxi/p5-ssl-tools
