@@ -1,3 +1,5 @@
+- removed RC4 from default cipher suites on the server site
+  https://github.com/noxxi/p5-io-socket-ssl/issues/22
 2.009 2014/01/14
 - new options SSL_client_ca_file and SSL_client_ca to let the server send
   the list of acceptable CAs for the client certificate.
