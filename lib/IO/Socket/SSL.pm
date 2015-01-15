@@ -94,7 +94,7 @@ my %DEFAULT_SSL_ARGS = (
     SSL_alpn_protocols => undef,   # list of protocols we'll accept/send, for example ['http/1.1','spdy/3.1']
     SSL_cipher_list =>
 	'EECDH+AESGCM+ECDSA EECDH+AESGCM EECDH+ECDSA +AES256 EECDH EDH+AESGCM '.
-	'EDH ALL +SHA +3DES +RC4 !LOW !EXP !eNULL !aNULL !DES !MD5 !PSK !SRP',
+	'EDH ALL +SHA +3DES !RC4 !LOW !EXP !eNULL !aNULL !DES !MD5 !PSK !SRP',
 );
 
 my %DEFAULT_SSL_CLIENT_ARGS = (
