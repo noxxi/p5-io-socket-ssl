@@ -1,3 +1,4 @@
+- added purpose client for non-CA certificates in Utils::CERT_create
 - removed RC4 from default cipher suites on the server site
   https://github.com/noxxi/p5-io-socket-ssl/issues/22
 2.009 2014/01/14
