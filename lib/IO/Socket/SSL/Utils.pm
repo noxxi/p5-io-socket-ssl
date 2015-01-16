@@ -270,7 +270,7 @@ sub CERT_create {
 	    &Net::SSLeay::NID_key_usage => 'critical,digitalSignature,keyEncipherment',
 	    &Net::SSLeay::NID_basic_constraints => 'CA:FALSE',
 	    &Net::SSLeay::NID_ext_key_usage => 'serverAuth,clientAuth',
-	    &Net::SSLeay::NID_netscape_cert_type => 'server';
+	    &Net::SSLeay::NID_netscape_cert_type => 'server,client';
     }
 
     for my $ext (@{ $args{ext} || [] }) {

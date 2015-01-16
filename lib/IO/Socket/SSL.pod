@@ -499,9 +499,10 @@ information from Net::SSLeay.
 
 =back
 
-Also, C<util/analyze-ssl.pl> in the distribution might be a helpful tool when
-debugging SSL problems, as do the C<openssl> command line tool and a check with
-a different SSL implementation (e.g. a web browser).
+Also, C<analyze-ssl.pl> from the ssl-tools repository at
+https://github.com/noxxi/p5-ssl-tools  might be a helpful tool when debugging
+SSL problems, as do the C<openssl> command line tool and a check with a
+different SSL implementation (e.g. a web browser).
 
 The following problems are not uncommon:
 
@@ -509,7 +510,7 @@ The following problems are not uncommon:
 
 =item *
 
-Bad server setup: missing imtermediate certificates.
+Bad server setup: missing intermediate certificates.
 
 It is a regular problem that administrators fail to include all necessary
 certificates into their server setup, e.g. everything needed to build the trust
@@ -549,6 +550,15 @@ Bad or old OpenSSL versions.
 IO::Socket::SSL uses OpenSSL with the help of the L<Net::SSLeay> library. It
 is recommend to have a recent version of this library, because it has more
 features and usually fewer known bugs.
+
+=item *
+
+Validation of client certificates fails.
+
+Make sure that the purpose of the certificate allows use as ssl client (check
+with C<< openssl x509 -purpose >>, that the necessary root certificate is in the
+path specified by C<SSL_ca*> (or the default path) and that any intermediate
+certificates needed to build the trust chain are sent by the client.
 
 =back
 
