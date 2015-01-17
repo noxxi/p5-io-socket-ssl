@@ -260,18 +260,89 @@ sub CERT_create {
     my $is = delete $args{issuer};
     my $issuer_cert = delete $args{issuer_cert} || $is && $is->[0] || $cert;
     my $issuer_key  = delete $args{issuer_key}  || $is && $is->[1] || $key;
-    if ( delete $args{CA} ) {
-	push @ext,
-	    &Net::SSLeay::NID_basic_constraints => 'critical,CA:TRUE',
-	    &Net::SSLeay::NID_key_usage => 'critical,digitalSignature,keyCertSign',
-	    &Net::SSLeay::NID_netscape_cert_type => 'sslCA,emailCA,objCA';
-    } else {
-	push @ext,
-	    &Net::SSLeay::NID_key_usage => 'critical,digitalSignature,keyEncipherment',
-	    &Net::SSLeay::NID_basic_constraints => 'CA:FALSE',
-	    &Net::SSLeay::NID_ext_key_usage => 'serverAuth,clientAuth',
-	    &Net::SSLeay::NID_netscape_cert_type => 'server,client';
+
+    my %purpose;
+    if (my $p = delete $args{purpose}) {
+	if (!ref($p)) {
+	    $purpose{lc($2)} = (!$1 || $1 eq '+') ? 1:0
+		while $p =~m{([+-]?)(\w+)}g;
+	} elsif (ref($p) eq 'ARRAY') {
+	    for(@$p) {
+		m{^([+-]?)(\w+)$} or die "invalid entry in purpose: $_";
+		$purpose{lc($2)} = (!$1 || $1 eq '+') ? 1:0
+	    }
+	} else {
+	    while( my ($k,$v) = each %$p) {
+		$purpose{lc($k)} = ($v && $v ne '-')?1:0;
+	    }
+	}
     }
+    if (defined( my $ca = delete $args{CA})) {
+	# add defaults
+	if ($ca) {
+	    %purpose = (
+		ca => 1, sslca => 1, emailca => 1, objca => 1,
+		%purpose
+	    );
+	} else {
+	    %purpose = (
+		server => 1, client => 1,
+		%purpose
+	    );
+	}
+    } elsif (!%purpose) {
+	%purpose = (server => 1, client => 1);
+    }
+
+    my (%key_usage,%ext_key_usage,%cert_type,%basic_constraints);
+
+    my %dS = ( digitalSignature => \%key_usage );
+    my %kE = ( keyEncipherment => \%key_usage );
+    my %CA = ( 'CA:TRUE' => \%basic_constraints, %dS, keyCertSign => \%key_usage );
+    for(
+	[ client  => { %dS, %kE, clientAuth => \%ext_key_usage, client  => \%cert_type } ],
+	[ server  => { %dS, %kE, serverAuth => \%ext_key_usage, server  => \%cert_type } ],
+	[ email   => { %dS, %kE, emailProtection => \%ext_key_usage, email => \%cert_type } ],
+	[ objsign => { %dS, %kE, codeSigning => \%ext_key_usage, objsign => \%cert_type } ],
+
+	[ CA      => { %CA }],
+	[ sslCA   => { %CA, sslCA => \%cert_type }],
+	[ emailCA => { %CA, emailCA => \%cert_type }],
+	[ objCA   => { %CA, objCA => \%cert_type }],
+
+	[ emailProtection  => { %dS, %kE, emailProtection => \%ext_key_usage, email => \%cert_type } ],
+	[ codeSigning      => { %dS, %kE, codeSigning => \%ext_key_usage, objsign => \%cert_type } ],
+
+	[ timeStamping     => { timeStamping => \%ext_key_usage } ],
+	[ digitalSignature => { digitalSignature => \%key_usage } ],
+	[ nonRepudiation   => { nonRepudiation => \%key_usage } ],
+	[ keyEncipherment  => { keyEncipherment => \%key_usage } ],
+	[ dataEncipherment => { dataEncipherment => \%key_usage } ],
+	[ keyAgreement     => { keyAgreement => \%key_usage } ],
+	[ keyCertSign      => { keyCertSign => \%key_usage } ],
+	[ cRLSign          => { cRLSign => \%key_usage } ],
+	[ encipherOnly     => { encipherOnly => \%key_usage } ],
+	[ decipherOnly     => { decipherOnly => \%key_usage } ],
+    ) {
+	delete $purpose{lc($_->[0])} or next;
+	while (my($k,$h) = each %{$_->[1]}) {
+	    $h->{$k} = 1;
+	}
+    }
+    die "unknown purpose ".join(",",keys %purpose) if %purpose;
+
+    if (%basic_constraints) {
+	push @ext,&Net::SSLeay::NID_basic_constraints,
+	    => join(",",'critical', sort keys %basic_constraints);
+    } else {
+	push @ext, &Net::SSLeay::NID_basic_constraints => 'CA:FALSE';
+    }
+    push @ext,&Net::SSLeay::NID_key_usage
+	=> join(",",'critical', sort keys %key_usage) if %key_usage;
+    push @ext,&Net::SSLeay::NID_netscape_cert_type
+	=> join(",",sort keys %cert_type) if %cert_type;
+    push @ext,&Net::SSLeay::NID_ext_key_usage
+	=> join(",",sort keys %ext_key_usage) if %ext_key_usage;
 
     for my $ext (@{ $args{ext} || [] }) {
 	my $nid = $ext->{nid}
@@ -513,7 +584,59 @@ The version of the certificate, default 2 (x509v3).
 
 =item CA true|false
 
-if true declare certificate as CA, defaults to false
+If true declare certificate as CA, defaults to false.
+
+=item purpose string|array|hash
+
+Set the purpose of the certificate.
+The different purposes can be given as a string separated by non-word character,
+as array or hash. With string or array each purpose can be prefixed with '+'
+(enable) or '-' (disable) and same can be done with the value when given as a
+hash. By default enabling the purpose is assumed.
+
+If the CA option is given and true the defaults "ca,sslca,emailca,objca" are
+assumed, but can be overridden with explicit purpose.
+If the CA option is given and false the defaults "server,client" are assumed.
+If no CA option and no purpose is given it defaults to "server,client".
+
+Purpose affects basicConstraints, keyUsage, extKeyUsage and netscapeCertType.
+The following purposes are defined (case is not important):
+
+    client
+    server
+    email
+    objsign
+
+    CA
+    sslCA
+    emailCA
+    objCA
+
+    emailProtection
+    codeSigning
+    timeStamping
+
+    digitalSignature
+    nonRepudiation
+    keyEncipherment
+    dataEncipherment
+    keyAgreement
+    keyCertSign
+    cRLSign
+    encipherOnly
+    decipherOnly
+
+Examples:
+
+     # root-CA for SSL certificates
+     purpose => 'sslCA'   # or CA => 1
+
+     # server certificate and CA (typically self-signed)
+     purpose => 'sslCA,server'
+
+     # client certificate
+     purpose => 'client',
+
 
 =item ext [{ sn => .., data => ... }, ... ]
 
