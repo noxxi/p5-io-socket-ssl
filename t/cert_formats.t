@@ -23,27 +23,27 @@ close($fh);
 
 my @tests = (
     'PEM' => {
-	SSL_cert_file => 'certs/server-cert.pem',
-	SSL_key_file => 'certs/server-key.pem',
+        SSL_cert_file => 'certs/server-cert.pem',
+        SSL_key_file => 'certs/server-key.pem',
     },
     'PEM_one_file' => {
-	SSL_cert_file => $pemfile,
+        SSL_cert_file => $pemfile,
     },
     'PEM_keyenc' => {
-	SSL_cert_file => 'certs/server-cert.pem',
-	SSL_key_file => 'certs/server-key.enc',
-	SSL_passwd_cb => sub { "bluebell" },
+        SSL_cert_file => 'certs/server-cert.pem',
+        SSL_key_file => 'certs/server-key.enc',
+        SSL_passwd_cb => sub { "bluebell" },
     },
     'DER' => {
-	SSL_cert_file => 'certs/server-cert.der',
-	SSL_key_file => 'certs/server-key.der',
+        SSL_cert_file => 'certs/server-cert.der',
+        SSL_key_file => 'certs/server-key.der',
     },
     'PKCS12' => {
-	SSL_cert_file => 'certs/server.p12',
+        SSL_cert_file => 'certs/server.p12',
     },
     'PKCS12_enc' => {
-	SSL_cert_file => 'certs/server_enc.p12',
-	SSL_passwd_cb => sub { "bluebell" },
+        SSL_cert_file => 'certs/server_enc.p12',
+        SSL_passwd_cb => sub { "bluebell" },
     },
 );
 plan tests => @tests/2;
@@ -62,15 +62,15 @@ while (my ($name,$sslargs) = splice(@tests,0,2)) {
 	}
 	exit(0);
     } else {
-	# parent = client
-	my $cl = IO::Socket::INET->new($saddr) or die "connect: $!";
-	if (!IO::Socket::SSL->start_SSL($cl,
-	    SSL_verify_mode => 0
-	)) {
-	    fail("[$name] ssl connect failed: $SSL_ERROR");
-	} else {
-	    pass("[$name] ssl connect sucess");
-	}
-	wait;
+        # parent = client
+        my $cl = IO::Socket::INET->new($saddr) or die "connect: $!";
+        if (!IO::Socket::SSL->start_SSL($cl,
+                                        SSL_verify_mode => 0
+            )) {
+            fail("[$name] ssl connect failed: $SSL_ERROR");
+        } else {
+            pass("[$name] ssl connect sucess");
+        }
+        wait;
     }
 }
