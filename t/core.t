@@ -8,16 +8,19 @@ use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 use Errno 'EWOULDBLOCK';
-do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
-$|=1;
+use Test::More;
+Test::More->builder->use_numbers(0);
+Test::More->builder->no_ending(1);
 
 my $CAN_NONBLOCK = eval "use 5.006; use IO::Select; 1";
 my $CAN_PEEK = &Net::SSLeay::OPENSSL_VERSION_NUMBER >= 0x0090601f;
 
-my $numtests = 40;
+my $numtests = 41;
 $numtests+=5 if $CAN_NONBLOCK;
 $numtests+=3 if $CAN_PEEK;
+
+plan tests => $numtests;
 
 my $expected_peer = do {
     my $us = IO::Socket::INET->new( LocalAddr => '127.0.0.1', Proto => 'udp' );
@@ -31,9 +34,6 @@ my $expected_peer = do {
     };
     $uc->sockhost,
 };
-
-print "1..$numtests\n";
-
 
 my $error_trapped = 0;
 my $server = IO::Socket::SSL->new(
@@ -59,13 +59,11 @@ my $server = IO::Socket::SSL->new(
 );
 
 if (!$server) {
-    print "not ok\n";
-    exit;
+    plan skip_all => "Server creation failed";
 }
-&ok("Server Initialization");
+ok( $server, "Server Initialization");
 
-print "not " if (!defined fileno($server));
-&ok("Server Fileno Check");
+ok( fileno( $server), "Server Fileno Check");
 
 my $saddr = $server->sockhost.':'.$server->sockport;
 
@@ -74,8 +72,8 @@ unless (fork) {
     close $server;
     my $client = IO::Socket::INET->new($saddr);
     print $client "Test\n";
-    (<$client> eq "This server is SSL only") || print "not ";
-    &ok("Client non-SSL connection");
+    like( <$client>, qr/This server is SSL only/, "Client non-SSL connection" );
+    ok( $client, "Client non-SSL connection");
     close $client;
 
     $client = IO::Socket::SSL->new(
@@ -95,37 +93,32 @@ unless (fork) {
     sub verify_sub {
 	my ($ok, $ctx_store, $cert, $error) = @_;
 	unless ($ok && $ctx_store && $cert && !$error)
-	{ print("not ok #client failure\n") && exit; }
-	($cert =~ /IO::Socket::SSL Demo CA/) || print "not";
-	&ok("Client Verify-sub Check");
+    { plan skip_all => "not ok #client failure\n"; }
+    like( $cert, qr/IO::Socket::SSL Demo CA/, "Client Verify-sub Check");
 	return 1;
     }
 
 
     $client || (print("not ok #client failure\n") && exit);
-    &ok("Client Initialization");
+    ok( $client, "Client Initialization");
 
     $client->fileno() || print "not ";
-    &ok("Client Fileno Check");
+    ok( $client->fileno(), "Client Fileno Check");
 
 #    $client->untaint() if ($HAVE_SCALAR_UTIL);  # In the future...
 
-    $client->dump_peer_certificate() || print "not ";
-    &ok("Client Peer Certificate Check");
+    ok( $client->dump_peer_certificate(), "Client Peer Certificate Check");
 
-    $client->peer_certificate("issuer") || print "not ";
-    &ok("Client Peer Certificate Issuer Check");
+    ok( $client->peer_certificate("issuer"), "Client Peer Certificate Issuer Check");
 
-    $client->get_cipher() || print "not ";
-    &ok("Client Cipher Check");
+    ok( $client->get_cipher(), "Client Cipher Check");
 
     $client->syswrite('00waaaanf00', 7, 2);
 
     if ($CAN_PEEK) {
 	my $buffer;
 	$client->read($buffer,2);
-	print "not " if ($buffer ne 'ok');
-	&ok("Client Peek Check");
+       like( $buffer, qr/ok/, "Client Peek Check");
     }
 
     $client->print("Test\n");
@@ -134,8 +127,7 @@ unless (fork) {
 
     my $buffer="\0\0aaaaaaaaaaaaaaaaaaaa";
     $client->sysread($buffer, 7, 2);
-    print "not " if ($buffer ne "\0\0waaaanf");
-    &ok("Client Sysread Check");
+    like( $buffer, qr/\0\0waaaanf/, "Client Sysread Check");
 
 
 ## The future...
@@ -145,45 +137,36 @@ unless (fork) {
 #    }
 
     my @array = $client->getline();
-    print "not "  if (@array != 1 or $array[0] ne "Test\n");
-    &ok("Client Getline Check");
+    like( $array[ 0 ], qr/Test\n/, "Client Getline Check");
 
-    print "not " if ($client->getc ne "\$");
-    &ok("Client Getc Check");
+    like( $client->getc, qr/\$/, "Client Getc Check");
 
     @array = $client->getlines;
-    print "not " if (@array != 6);
-    &ok("Client Getlines Check 1");
+    is( scalar @array, 6, "Client Getlines Check 1");
 
-    print "not " if ($array[0] != "1.04\n");
-    &ok("Client Getlines Check 2");
+    like( $array[ 0 ], qr/1\.04\n/, "Client Getlines Check 2");
 
-    print "not " if ($array[1] ne "4\n");
-    &ok("Client Getlines Check 3");
+    like( $array[ 1 ], qr/4\n/, "Client Getlines Check 3");
 
-    print "not " if ($array[2] ne "y\n");
-    &ok("Client Getlines Check 4");
+    like( $array[ 2 ], qr/y\n/, "Client Getlines Check 4");
 
-    print "not " if (join("", @array[3..5]) ne "Test\nBeaver\nBeaver\n");
-    &ok("Client Getlines Check 5");
+    like( join("", @array[3..5]),
+          qr/Test\nBeaver\nBeaver\n/,
+          "Client Getlines Check 5");
 
-    print "not " if (defined(<$client>));
-    &ok("Client Finished Reading Check");
+    ok( !<$client>, "Client Finished Reading Check");
 
     $client->close(SSL_no_shutdown => 1);
 
     my $client_2 = IO::Socket::INET->new($saddr);
-    print "not " if (!$client_2);
-    &ok("Second Client Initialization");
+    ok( $client_2, "Second Client Initialization");
 
     $client_2 = IO::Socket::SSL->new_from_fd($client_2->fileno, '+<>',
 					     SSL_reuse_ctx => $client);
-    print "not " if (!$client_2);
-    &ok("Client Init from Fileno Check");
+    ok( $client_2, "Client Init from Fileno Check");
     $buffer = <$client_2>;
 
-    print "not " unless ($buffer eq "Boojums\n");
-    &ok("Client (fileno) Readline Check");
+    like( $buffer, qr/Boojums\n/, "Client (fileno) Readline Check");
     $client_2->close(SSL_ctx_free => 1);
 
     if ($CAN_NONBLOCK) {
@@ -200,8 +183,7 @@ unless (fork) {
 	    Blocking => 0,
 	);
 
-	print "not " if (!$client_3);
-	&ok("Client Nonblocking Check 1");
+       ok( $client_3, "Client Nonblocking Check 1");
 	close $client_3;
 
 	my $client_4 = IO::Socket::SSL->new(
@@ -209,8 +191,7 @@ unless (fork) {
 	    SSL_reuse_ctx => $client_3,
 	    Blocking => 0
 	);
-	print "not " if (!$client_4);
-	&ok("Client Nonblocking Check 2");
+       ok( $client_4, "Client Nonblocking Check 2");
 	$client_3->close(SSL_ctx_free => 1);
     }
 
@@ -219,76 +200,52 @@ unless (fork) {
 
 my $client = $server->accept;
 
-$error_trapped or print "not ";
-&ok("Server non-SSL Client Check");
+ok( $error_trapped, "Server non-SSL Client Check");
 
 if ($client && $client->opened) {
-    print "not ok # client stayed alive!\n";
-    exit;
+    plan skip_all => "client stayed alive";
 }
-&ok("Server Kill-client Check");
+ok( !$client, "Server Kill-client Check");
 
 ($client, my $peer) = $server->accept;
 if (!$client) {
-    print "not ok # no client\n";
-    exit;
+    plan skip_all => "not ok # no client";
 }
-&ok("Server Client Accept Check");
+ok( $client, "Server Client Accept Check");
 
-print "not " unless defined $peer;
-&ok("Accept returning peer address check.");
+ok( $peer, "Accept returning peer address check.");
 
-
-fileno($client) || print "not ";
-&ok("Server Client Fileno Check");
+ok( fileno($client), "Server Client Fileno Check");
 
 my $buffer;
 
 if ($CAN_PEEK) {
     $client->peek($buffer, 7, 2);
-    print "not " if ($buffer ne "\0\0waaaanf");
-    &ok("Server Peek Check");
+    like( $buffer, qr/\0\0waaaanf/,"Server Peek Check");
 
-    print "not " if ($client->pending() != 7);
-    &ok("Server Pending Check");
+    is( $client->pending(), 7, "Server Pending Check");
 
     print $client "ok";
 }
 
-
-
-
-
 sysread($client, $buffer, 7, 2);
-print "not " if ($buffer ne "\0\0waaaanf");
-&ok("Server Sysread Check");
-
+like( $buffer, qr/\0\0waaaanf/, "Server Sysread Check");
 
 my @array = scalar <$client>;
-print "not "  if ($array[0] ne "Test\n");
-&ok("Server Getline Check");
+like( $array[ 0 ], qr/Test\n/, "Server Getline Check");
 
-
-print "not " if (getc($client) ne "\$");
-&ok("Server Getc Check");
-
+like( getc($client), qr/\$/, "Server Getc Check");
 
 @array = <$client>;
-print "not " if (@array != 6);
-&ok("Server Getlines Check 1");
+is( scalar @array, 6, "Server Getlines Check 1");
 
-print "not " if ($array[0] != "1.04\n");
-&ok("Server Getlines Check 2");
+like( $array[ 0 ], qr/1\.04\n/, "Server Getlines Check 2");
 
-print "not " if ($array[1] ne "4\n");
-&ok("Server Getlines Check 3");
+like( $array[ 1 ], qr/4\n/, "Server Getlines Check 3");
 
-print "not " if ($array[2] ne "y\n");
-&ok("Server Getlines Check 4");
+like( $array[ 2 ], qr/y\n/, "Server Getlines Check 4");
 
-print "not " if (join("", @array[3..5]) ne "Test\nBeaver\nBeaver\n");
-&ok("Server Getlines Check 5");
-
+like( join("", @array[3..5]), qr/Test\nBeaver\nBeaver\n/, "Server Getlines Check 5");
 
 syswrite($client, '00waaaanf00', 7, 2);
 print($client "Test\n");
@@ -297,68 +254,54 @@ printf $client "\$%.2f\n%d\n%c\n%s", (1.0444442342, 4.0, ord("y"), "Test\nBeaver
 close $client;
 
 ($client, $peer) = $server->accept;
-&bail unless $client;
-print "not " unless (inet_ntoa((unpack_sockaddr_in($peer))[1]) eq $expected_peer);
-&ok("Peer address check");
+plan skip_all => "client creation failed" unless $client;
+is( inet_ntoa((unpack_sockaddr_in($peer))[1]), $expected_peer, "Peer address check");
 
 if ($CAN_NONBLOCK) {
     $client->blocking(0);
     $client->read($buffer, 20, 0);
-    print "not " if $SSL_ERROR != SSL_WANT_READ;
-    &ok("Server Nonblocking Check 1");
+    is( $SSL_ERROR, SSL_WANT_READ, "Server Nonblocking Check 1");
 }
 
-print "not " unless ($client->opened);
-&ok("Server Client Opened Check 1");
+ok( $client->opened, "Server Client Opened Check 1");
 
 print $client "Boojums\n";
 
 close($client);
 
 ${*$client}{'_SSL_opened'} = 1;
-print "not " if ($client->opened);
-&ok("Server Client Opened Check 2");
+ok( !$client->opened, "Server Client Opened Check 2");
 ${*$client}{'_SSL_opened'} = 0;
-
 
 if ($CAN_NONBLOCK) {
     $client = $server->accept;
-    print "not " if (!$client->opened);
-    &ok("Server Nonblocking Check 2");
+    ok( $client->opened, "Server Nonblocking Check 2");
     close $client;
 
     $server->blocking(0);
     IO::Select->new($server)->can_read(30);
     $client = $server->accept;
     while ( ! $client ) {
-	#DEBUG( "$!,$SSL_ERROR" );
-	if ( $! == EWOULDBLOCK ) {
-	    if ( $SSL_ERROR == SSL_WANT_WRITE ) {
-		IO::Select->new( $server->opening )->can_write(30);
-	    } else {
-		IO::Select->new( $server->opening )->can_read(30);
-	    }
-	} else {
-	    last
-	}
-	$client = $server->accept;
+        #DEBUG( "$!,$SSL_ERROR" );
+        if ( $! == EWOULDBLOCK ) {
+            if ( $SSL_ERROR == SSL_WANT_WRITE ) {
+                IO::Select->new( $server->opening )->can_write(30);
+            } else {
+                IO::Select->new( $server->opening )->can_read(30);
+            }
+        } else {
+            last
+        }
+        $client = $server->accept;
     }
 
-    print "not " unless ($client && $client->opened);
-    &ok("Server Nonblocking Check 3");
+    ok( $client->opened, "Server Nonblocking Check 3");
     close $client;
 }
 
 $server->close(SSL_ctx_free => 1);
 wait;
 
-sub ok {
-    print "ok #$_[0]\n";
-}
-
-sub bail {
-	print "Bail Out! $IO::Socket::SSL::ERROR";
-}
 
 ## The future....
 #sub is_tainted {

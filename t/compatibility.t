@@ -6,13 +6,13 @@ use strict;
 use warnings;
 use IO::Socket::SSL;
 use Socket;
-do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
-$|=1;
+use Test::More tests => 9;
+Test::More->builder->use_numbers(0);
+Test::More->builder->no_ending(1);
 
 $SIG{'CHLD'} = "IGNORE";
 
-print "1..9\n";
 IO::Socket::SSL::context_init(SSL_verify_mode => 0x01, SSL_version => 'TLSv1' );
 
 
@@ -21,13 +21,12 @@ my $server = IO::Socket::INET->new(
     LocalPort => 0,
     Listen => 1,
 ) or do {
-    print "Bail out! ";
-    print("Setup of test IO::Socket::INET client and server failed.  All the rest of ",
-	  "the tests in this suite will fail also unless you change the values in ",
-	  "ssl_settings.req in the t/ directory.");
-    exit;
+    plan skip_all => "Bail out!".
+      "Setup of test IO::Socket::INET client and server failed.  All the rest of".
+	  "the tests in this suite will fail also unless you change the values in".
+	  "ssl_settings.req in the t/ directory.";
 };
-print "ok # server create\n";
+ok(1, "server create");
 
 {
     package MyClass;
@@ -39,40 +38,28 @@ my $saddr = $server->sockhost.':'.$server->sockport;
 unless (fork) {
     close $server;
     my $client = IO::Socket::INET->new($saddr);
-    MyClass->start_SSL($client, SSL_verify_mode => 0) || print "not ";
-    print "ok # ssl upgrade\n";
-    (ref($client) eq "MyClass") || print "not ";
-    print "ok # class MyClass\n";
-    $client->issuer_name || print "not ";
-    print "ok # issuer_name\n";
-    $client->subject_name || print "not ";
-    print "ok # subject_name\n";
-    $client->opened || print "not ";
-    print "ok # opened\n";
+    ok( MyClass->start_SSL($client, SSL_verify_mode => 0), "ssl upgrade");
+    like( ref( $client ), qr/MyClass/, "class MyClass");
+    ok( $client->issuer_name, "issuer_name");
+    ok( $client->subject_name, "subject_name");
+    ok( $client->opened, "opened");
     print $client "Ok to close\n";
     close $client;
     exit(0);
 }
 
 my $contact = $server->accept;
-IO::Socket::SSL::socketToSSL($contact, {
+my $socket_to_ssl = IO::Socket::SSL::socketToSSL($contact, {
     SSL_server => 1,
     SSL_verify_mode => 0,
     SSL_cert_file => 'certs/server-cert.pem',
     SSL_key_file => 'certs/server-key.pem',
-}) || print "not ";
-print "ok # socketToSSL\n";
+});
+ok( $socket_to_ssl, "socketToSSL");
 <$contact>;
 close $contact;
 close $server;
 
 bless $contact, "MyClass";
-print "not " if IO::Socket::SSL::socket_to_SSL($contact, SSL_server => 1);
-print "ok # socket_to_SSL\n";
-
-print "not " unless (ref($contact) eq "MyClass");
-print "ok # upgrade is MyClass\n";
-
-sub bail {
-    print "Bail Out! $IO::Socket::SSL::ERROR";
-}
+ok( !IO::Socket::SSL::socket_to_SSL($contact, SSL_server => 1), "socket_to_SSL");
+like( ref($contact), qr/MyClass/, "upgrade is MyClass");

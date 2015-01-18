@@ -16,10 +16,10 @@ use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
-$|=1;
-print "1..9\n";
+use Test::More tests => 9;
+Test::More->builder->use_numbers(0);
+Test::More->builder->no_ending(1);
 
 my $ID = 'server';
 my %server_args = (
@@ -55,12 +55,12 @@ foreach my $test ( 1,2,3 ) {
 
     # create server
     my $server = IO::Socket::SSL->new( %args ) || do {
-	notok( "$spec: $!" );
+       fail( "$spec: $!" );
 	next;
     };
 
     my $saddr = $server->sockhost.':'.$server->sockport;
-    ok("Server Initialization $spec");
+    ok(1, "Server Initialization $spec");
     push @server,$server;
 
     # then connect to it from a child
@@ -74,27 +74,24 @@ foreach my $test ( 1,2,3 ) {
 	    SSL_verify_mode => 0x00,
 	);
 	if ( $test == 3 ) {
-	    notok( "$spec: connect succeeded" ) if $to_server;
-	    ok( "$spec: connect failed" );
-	    exit;
+	    ok( !$to_server, "$spec: connect succeeded" );
+        exit;
 	} elsif ( ! $to_server ) {
-	    notok( "connect failed: $!" );
-	    exit
+	    plan skip_all => "connect failed: $!";
 	};
-	ok( "client connected $spec" );
+	ok( 1, "client connected $spec" );
 	<$to_server>; # wait for close from parent
 	exit;
     }
 
     my $to_client = $server->accept;
     if ( $test == 3 ) {
-	notok( "$spec: accept succeeded" ) if $to_client;
-	ok( "$spec: accept failed" );
+	ok( !$to_client, "$spec: accept succeeded" );
     } elsif ( ! $to_client ) {
-	notok( "$spec: accept failed: $!" );
 	kill(9,$pid);
+	plan skip_all => "$spec: accept failed: $!";
     } else {
-	ok( "Server accepted $spec" );
+	ok(1, "Server accepted $spec" );
 	# save the X509 certificate from the server
 	$x509 ||= Net::SSLeay::get_certificate($to_client->_get_ssl_object);
     }
@@ -103,7 +100,3 @@ foreach my $test ( 1,2,3 ) {
     wait;
 }
 
-
-
-sub ok { print "ok # [$ID] @_\n"; }
-sub notok { print "not ok # [$ID] @_\n"; }
