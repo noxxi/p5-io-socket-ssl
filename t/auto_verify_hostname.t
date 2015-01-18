@@ -44,10 +44,10 @@ IO::Socket::SSL::default_ca('certs/test-ca.pem');
 for( my $i=0;$i<@tests;$i+=3 ) {
     my ($name,$scheme,$result) = @tests[$i,$i+1,$i+2];
     my $cl = IO::Socket::SSL->new(
-	PeerAddr => $saddr,
-	SSL_verify_mode => 1,
-	SSL_verifycn_scheme => $scheme,
-	SSL_verifycn_name => $name,
+        PeerAddr => $saddr,
+        SSL_verify_mode => 1,
+        SSL_verifycn_scheme => $scheme,
+        SSL_verifycn_name => $name,
     );
     if ( $result eq 'FAIL' ) {
        ok( !$cl, "connection to $name/$scheme failed" );
@@ -61,14 +61,14 @@ for( my $i=0;$i<@tests;$i+=3 ) {
 for( my $i=0;$i<@tests;$i+=3 ) {
     my ($name,$scheme,$result) = @tests[$i,$i+1,$i+2];
     my $cl = IO::Socket::INET->new(
-	PeerAddr => $saddr,
-    ) || print "not ";
+        PeerAddr => $saddr,
+        ) || print "not ";
     ok( $cl, "tcp connect" );
     $cl = IO::Socket::SSL->start_SSL( $cl,
-	SSL_verify_mode => 1,
-	SSL_verifycn_scheme => $scheme,
-	SSL_verifycn_name => $name,
-    );
+                                      SSL_verify_mode => 1,
+                                      SSL_verifycn_scheme => $scheme,
+                                      SSL_verifycn_name => $name,
+        );
     if ( $result eq 'FAIL' ) {
         ok( !$cl, "ssl upgrade of connection to $name/$scheme failed" );
     } else {

@@ -15,16 +15,15 @@ $SIG{'CHLD'} = "IGNORE";
 
 IO::Socket::SSL::context_init(SSL_verify_mode => 0x01, SSL_version => 'TLSv1' );
 
-
 my $server = IO::Socket::INET->new(
     LocalAddr => '127.0.0.1',
     LocalPort => 0,
     Listen => 1,
 ) or do {
     plan skip_all => "Bail out!".
-      "Setup of test IO::Socket::INET client and server failed.  All the rest of".
-	  "the tests in this suite will fail also unless you change the values in".
-	  "ssl_settings.req in the t/ directory.";
+        "Setup of test IO::Socket::INET client and server failed.  All the rest of".
+        "the tests in this suite will fail also unless you change the values in".
+        "ssl_settings.req in the t/ directory.";
 };
 ok(1, "server create");
 
