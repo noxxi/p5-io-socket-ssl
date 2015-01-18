@@ -9,7 +9,7 @@ use Net::SSLeay;
 require Exporter;
 *import = \&Exporter::import;
 
-our $VERSION = '0.03';
+our $VERSION = '0.031';
 our @EXPORT = qw(
     PEM_file2cert PEM_string2cert PEM_cert2file PEM_cert2string
     PEM_file2key PEM_string2key PEM_key2file PEM_key2string
