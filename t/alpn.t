@@ -30,7 +30,7 @@ my $server = IO::Socket::SSL->new(
 ) || do {
     plan skip_all => "$!";
 };
-ok(1,"Server Initialization at $addr");
+pass("Server Initialization at $addr");
 
 # add server port to addr
 $addr = "$addr:".$server->sockport;
@@ -51,7 +51,7 @@ if ( !defined $pid ) {
     ) or do {
         plan skip_all => "connect failed: ".IO::Socket::SSL->errstr();
     };
-    ok(1,"client connected" );
+    pass("client connected" );
     my $proto = $to_server->alpn_selected;
     is($proto, "two","negotiated $proto");
 } else {                ###### Server
@@ -59,7 +59,7 @@ if ( !defined $pid ) {
         kill(9,$pid);
         exit;
     };
-    ok(1,"Server accepted" );
+    pass("Server accepted" );
     my $proto = $to_client->alpn_selected;
     is($proto, "two","negotiated $proto");
     wait;

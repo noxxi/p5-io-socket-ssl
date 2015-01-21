@@ -62,7 +62,7 @@ foreach my $test ( 1,2,3 ) {
     };
 
     my $saddr = $server->sockhost.':'.$server->sockport;
-    ok(1, "Server Initialization $spec");
+    pass("Server Initialization $spec");
     push @server,$server;
 
     # then connect to it from a child
@@ -81,7 +81,7 @@ foreach my $test ( 1,2,3 ) {
 	} elsif ( ! $to_server ) {
 	    plan skip_all => "connect failed: $!";
 	};
-	ok( 1, "client connected $spec" );
+    pass( "client connected $spec" );
 	<$to_server>; # wait for close from parent
 	exit;
     }
@@ -93,7 +93,7 @@ foreach my $test ( 1,2,3 ) {
 	kill(9,$pid);
 	plan skip_all => "$spec: accept failed: $!";
     } else {
-	ok(1, "Server accepted $spec" );
+    pass( "Server accepted $spec" );
 	# save the X509 certificate from the server
 	$x509 ||= Net::SSLeay::get_certificate($to_client->_get_ssl_object);
     }
