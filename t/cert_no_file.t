@@ -81,7 +81,7 @@ foreach my $test ( 1,2,3 ) {
 	} elsif ( ! $to_server ) {
 	    plan skip_all => "connect failed: $!";
 	};
-       pass( "client connected $spec" );
+        pass( "client connected $spec" );
 	<$to_server>; # wait for close from parent
 	exit;
     }
