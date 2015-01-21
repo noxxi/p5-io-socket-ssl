@@ -19,8 +19,8 @@ my $server = IO::Socket::SSL->new(
     SSL_key_file => "certs/server-wildcard.pem",
 );
 warn "\$!=$!, \$\@=$@, S\$SSL_ERROR=$SSL_ERROR" if ! $server;
-print "not ok\n", exit if !$server;
 ok( $server, "Server Initialization");
+exit if !$server;
 my $saddr = $server->sockhost.':'.$server->sockport;
 
 defined( my $pid = fork() ) || die $!;
@@ -57,14 +57,14 @@ for( my $i=0;$i<@tests;$i+=3 ) {
        ok( $cl, "connection to $name/$scheme succeeded" );
     }
     $cl || next;
-    like( <$cl>, qr/hallo\n/, "received hallo" );
+    is( <$cl>, "hallo\n", "received hallo" );
 }
 
 for( my $i=0;$i<@tests;$i+=3 ) {
     my ($name,$scheme,$result) = @tests[$i,$i+1,$i+2];
     my $cl = IO::Socket::INET->new(
         PeerAddr => $saddr,
-        ) || print "not ";
+        );
     ok( $cl, "tcp connect" );
     $cl = IO::Socket::SSL->start_SSL( $cl,
                                       SSL_verify_mode => 1,
