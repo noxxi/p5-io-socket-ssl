@@ -81,21 +81,21 @@ foreach my $test ( 1,2,3 ) {
 	} elsif ( ! $to_server ) {
 	    plan skip_all => "connect failed: $!";
 	};
-    pass( "client connected $spec" );
+       pass( "client connected $spec" );
 	<$to_server>; # wait for close from parent
 	exit;
     }
 
     my $to_client = $server->accept;
     if ( $test == 3 ) {
-	ok( !$to_client, "$spec: accept succeeded" );
+       ok( !$to_client, "$spec: accept succeeded" );
     } elsif ( ! $to_client ) {
-	kill(9,$pid);
-	plan skip_all => "$spec: accept failed: $!";
+       kill(9,$pid);
+       plan skip_all => "$spec: accept failed: $!";
     } else {
-    pass( "Server accepted $spec" );
-	# save the X509 certificate from the server
-	$x509 ||= Net::SSLeay::get_certificate($to_client->_get_ssl_object);
+       pass( "Server accepted $spec" );
+       # save the X509 certificate from the server
+       $x509 ||= Net::SSLeay::get_certificate($to_client->_get_ssl_object);
     }
 
     close($to_client) if $to_client;
