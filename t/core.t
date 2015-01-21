@@ -72,8 +72,7 @@ unless (fork) {
     close $server;
     my $client = IO::Socket::INET->new($saddr);
     print $client "Test\n";
-    like( <$client>, qr/This server is SSL only/, "Client non-SSL connection" );
-    ok( $client, "Client non-SSL connection");
+    is( <$client>, "This server is SSL only", "Client non-SSL connection");
     close $client;
 
     $client = IO::Socket::SSL->new(
@@ -118,7 +117,7 @@ unless (fork) {
     if ($CAN_PEEK) {
         my $buffer;
         $client->read($buffer,2);
-        like( $buffer, qr/ok/, "Client Peek Check");
+        is( $buffer, "ok", "Client Peek Check");
     }
 
     $client->print("Test\n");
@@ -131,7 +130,7 @@ unless (fork) {
 
     my $buffer="\0\0aaaaaaaaaaaaaaaaaaaa";
     $client->sysread($buffer, 7, 2);
-    like( $buffer, qr/\0\0waaaanf/, "Client Sysread Check");
+    is( $buffer, "\0\0waaaanf", "Client Sysread Check");
 
 
 ## The future...
@@ -141,21 +140,21 @@ unless (fork) {
 #    }
 
     my @array = $client->getline();
-    like( $array[ 0 ], qr/Test\n/, "Client Getline Check");
+    is( $array[0], "Test\n", "Client Getline Check");
 
-    like( $client->getc, qr/\$/, "Client Getc Check");
+    is( $client->getc, "\$", "Client Getc Check");
 
     @array = $client->getlines;
     is( scalar @array, 6, "Client Getlines Check 1");
 
-    like( $array[ 0 ], qr/1\.04\n/, "Client Getlines Check 2");
+    is( $array[0], "1.04\n", "Client Getlines Check 2");
 
-    like( $array[ 1 ], qr/4\n/, "Client Getlines Check 3");
+    is( $array[1], "4\n", "Client Getlines Check 3");
 
-    like( $array[ 2 ], qr/y\n/, "Client Getlines Check 4");
+    is( $array[2], "y\n", "Client Getlines Check 4");
 
-    like( join("", @array[3..5]),
-          qr/Test\nBeaver\nBeaver\n/,
+    is( join("", @array[3..5]),
+          "Test\nBeaver\nBeaver\n",
           "Client Getlines Check 5");
 
     ok( !<$client>, "Client Finished Reading Check");
@@ -170,7 +169,7 @@ unless (fork) {
     ok( $client_2, "Client Init from Fileno Check");
     $buffer = <$client_2>;
 
-    like( $buffer, qr/Boojums\n/, "Client (fileno) Readline Check");
+    is( $buffer, "Boojums\n", "Client (fileno) Readline Check");
     $client_2->close(SSL_ctx_free => 1);
 
     if ($CAN_NONBLOCK) {
@@ -225,7 +224,7 @@ my $buffer;
 
 if ($CAN_PEEK) {
     $client->peek($buffer, 7, 2);
-    like( $buffer, qr/\0\0waaaanf/,"Server Peek Check");
+    is( $buffer, "\0\0waaaanf","Server Peek Check");
 
     is( $client->pending(), 7, "Server Pending Check");
 
@@ -233,23 +232,23 @@ if ($CAN_PEEK) {
 }
 
 sysread($client, $buffer, 7, 2);
-like( $buffer, qr/\0\0waaaanf/, "Server Sysread Check");
+is( $buffer, "\0\0waaaanf", "Server Sysread Check");
 
 my @array = scalar <$client>;
-like( $array[ 0 ], qr/Test\n/, "Server Getline Check");
+is( $array[0], "Test\n", "Server Getline Check");
 
-like( getc($client), qr/\$/, "Server Getc Check");
+is( getc($client), "\$", "Server Getc Check");
 
 @array = <$client>;
 is( scalar @array, 6, "Server Getlines Check 1");
 
-like( $array[ 0 ], qr/1\.04\n/, "Server Getlines Check 2");
+is( $array[0], "1.04\n", "Server Getlines Check 2");
 
-like( $array[ 1 ], qr/4\n/, "Server Getlines Check 3");
+is( $array[1], "4\n", "Server Getlines Check 3");
 
-like( $array[ 2 ], qr/y\n/, "Server Getlines Check 4");
+is( $array[2], "y\n", "Server Getlines Check 4");
 
-like( join("", @array[3..5]), qr/Test\nBeaver\nBeaver\n/, "Server Getlines Check 5");
+is( join("", @array[3..5]), "Test\nBeaver\nBeaver\n", "Server Getlines Check 5");
 
 syswrite($client, '00waaaanf00', 7, 2);
 print($client "Test\n");

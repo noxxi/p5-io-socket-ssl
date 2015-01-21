@@ -38,7 +38,7 @@ unless (fork) {
     close $server;
     my $client = IO::Socket::INET->new($saddr);
     ok( MyClass->start_SSL($client, SSL_verify_mode => 0), "ssl upgrade");
-    like( ref( $client ), qr/MyClass/, "class MyClass");
+    is( ref( $client ), "MyClass", "class MyClass");
     ok( $client->issuer_name, "issuer_name");
     ok( $client->subject_name, "subject_name");
     ok( $client->opened, "opened");
@@ -61,4 +61,4 @@ close $server;
 
 bless $contact, "MyClass";
 ok( !IO::Socket::SSL::socket_to_SSL($contact, SSL_server => 1), "socket_to_SSL");
-like( ref($contact), qr/MyClass/, "upgrade is MyClass");
+is( ref($contact), "MyClass", "upgrade is MyClass");

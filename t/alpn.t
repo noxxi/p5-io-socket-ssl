@@ -51,7 +51,7 @@ if ( !defined $pid ) {
     };
     ok(1,"client connected" );
     my $proto = $to_server->alpn_selected;
-    like($proto, qr/two/,"negotiated $proto");
+    is($proto, "two","negotiated $proto");
 } else {                ###### Server
     my $to_client = $server->accept or do {
         kill(9,$pid);
@@ -59,6 +59,6 @@ if ( !defined $pid ) {
     };
     ok(1,"Server accepted" );
     my $proto = $to_client->alpn_selected;
-    like($proto, qr/two/,"negotiated $proto");
+    is($proto, "two","negotiated $proto");
     wait;
 }

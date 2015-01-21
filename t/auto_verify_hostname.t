@@ -75,7 +75,7 @@ for( my $i=0;$i<@tests;$i+=3 ) {
         ok( $cl, "ssl upgrade of connection to $name/$scheme succeeded" );
     }
     $cl || next;
-    like( <$cl>, qr/hallo\n/, "received hallo" );
+    is( <$cl>, "hallo\n", "received hallo" );
 }
 
 kill(9,$pid);
