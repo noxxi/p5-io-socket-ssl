@@ -3,6 +3,7 @@ use warnings;
 use Test::More;
 use IO::Socket::SSL;
 use File::Temp 'tempfile';
+do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 my $srv = IO::Socket::INET->new(
     LocalAddr => '127.0.0.1',

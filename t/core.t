@@ -9,6 +9,8 @@ use Socket;
 use IO::Socket::SSL;
 use Errno 'EWOULDBLOCK';
 
+do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
+
 use Test::More;
 Test::More->builder->use_numbers(0);
 Test::More->builder->no_ending(1);

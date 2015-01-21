@@ -7,6 +7,8 @@ use warnings;
 use IO::Socket::SSL;
 use Socket;
 
+do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
+
 use Test::More tests => 9;
 Test::More->builder->use_numbers(0);
 Test::More->builder->no_ending(1);

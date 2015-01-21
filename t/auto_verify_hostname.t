@@ -7,6 +7,8 @@ use Socket;
 use IO::Socket::SSL;
 use Test::More;
 
+do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
+
 my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',
     LocalPort => 0,

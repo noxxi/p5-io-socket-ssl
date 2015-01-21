@@ -8,6 +8,8 @@ use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 
+do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
+
 use Test::More;
 
 # check if we have ALPN available
