@@ -27,7 +27,7 @@ my $server = IO::Socket::INET->new(
         "the tests in this suite will fail also unless you change the values in".
         "ssl_settings.req in the t/ directory.";
 };
-ok(1, "server create");
+pass("server create");
 
 {
     package MyClass;
