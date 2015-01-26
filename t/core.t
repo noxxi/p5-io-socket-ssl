@@ -22,8 +22,6 @@ my $numtests = 40;
 $numtests+=5 if $CAN_NONBLOCK;
 $numtests+=3 if $CAN_PEEK;
 
-plan tests => $numtests;
-
 my $expected_peer = do {
     my $us = IO::Socket::INET->new( LocalAddr => '127.0.0.1', Proto => 'udp' );
     my $uc = IO::Socket::INET->new( 
@@ -31,11 +29,12 @@ my $expected_peer = do {
 	PeerPort => $us->sockport,
 	Proto => 'udp'
     ) or do {
-	print "1..0 # Skipped: cannot determine default peer IP\n";
-	exit
+	plan skip_all => "Skipped: cannot determine default peer IP";
     };
     $uc->sockhost,
 };
+
+plan tests => $numtests;
 
 my $error_trapped = 0;
 my $server = IO::Socket::SSL->new(
@@ -60,10 +59,8 @@ my $server = IO::Socket::SSL->new(
     SSL_passwd_cb => sub { return "opossum" }
 );
 
-if (!$server) {
-    plan skip_all => "Server creation failed";
-}
 ok( $server, "Server Initialization");
+$server or exit;
 
 ok( fileno( $server), "Server Fileno Check");
 
@@ -93,8 +90,10 @@ unless (fork) {
 
     sub verify_sub {
 	my ($ok, $ctx_store, $cert, $error) = @_;
-	unless ($ok && $ctx_store && $cert && !$error)
-	{ plan skip_all => "not ok #client failure\n"; }
+	$ok && $ctx_store && $cert && !$error or do {
+	    fail("client failure in verify_sub");
+	    exit;
+	};
 	like( $cert, qr/IO::Socket::SSL Demo CA/, "Client Verify-sub Check");
 	return 1;
     }
@@ -208,15 +207,14 @@ my $client = $server->accept;
 ok( $error_trapped, "Server non-SSL Client Check");
 
 if ($client && $client->opened) {
-    plan skip_all => "client stayed alive";
+    fail("client stayed alive");
+    exit;
 }
 ok( !$client, "Server Kill-client Check");
 
 ($client, my $peer) = $server->accept;
-if (!$client) {
-    plan skip_all => "not ok # no client";
-}
 ok( $client, "Server Client Accept Check");
+$client or exit;
 
 ok( $peer, "Accept returning peer address check.");
 
@@ -258,8 +256,10 @@ printf $client "\$%.2f\n%d\n%c\n%s", (1.0444442342, 4.0, ord("y"), "Test\nBeaver
 
 close $client;
 
-($client, $peer) = $server->accept;
-plan skip_all => "client creation failed" unless $client;
+($client, $peer) = $server->accept or do {
+    fail("client creation failed");
+    exit;
+};
 is( inet_ntoa((unpack_sockaddr_in($peer))[1]), $expected_peer, "Peer address check");
 
 if ($CAN_NONBLOCK) {

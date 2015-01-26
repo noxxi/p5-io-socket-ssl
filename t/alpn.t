@@ -7,16 +7,17 @@ use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
+use Test::More;
 
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
-
-use Test::More;
 
 # check if we have ALPN available
 # if it is available
 if ( ! IO::Socket::SSL->can_alpn ) {
     plan skip_all => "1..0 # Skipped: ALPN not available in Net::SSLeay\n";
 }
+
+plan tests => 5;
 
 # first create simple ssl-server
 my $ID = 'server';
@@ -28,7 +29,8 @@ my $server = IO::Socket::SSL->new(
     SSL_key_file => 'certs/server-key.pem',
     SSL_alpn_protocols => [qw(one two)],
 ) || do {
-    plan skip_all => "$!";
+    fail("server creation failed: $!");
+    exit;
 };
 pass("Server Initialization at $addr");
 
@@ -49,7 +51,8 @@ if ( !defined $pid ) {
 	SSL_verify_mode => 0,
 	SSL_alpn_protocols => [qw(two three)],
     ) or do {
-	plan skip_all => "connect failed: ".IO::Socket::SSL->errstr();
+	fail("connect failed: ".IO::Socket::SSL->errstr());
+	exit;
     };
     pass("client connected" );
     my $proto = $to_server->alpn_selected;
