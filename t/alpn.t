@@ -7,17 +7,17 @@ use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-use Test::More;
 
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 # check if we have ALPN available
 # if it is available
 if ( ! IO::Socket::SSL->can_alpn ) {
-    plan skip_all => "1..0 # Skipped: ALPN not available in Net::SSLeay\n";
+    print "1..0 # Skipped: ALPN not available in Net::SSLeay\n";
+    exit;
 }
 
-plan tests => 5;
+print "1..5\n";
 
 # first create simple ssl-server
 my $ID = 'server';
@@ -32,7 +32,7 @@ my $server = IO::Socket::SSL->new(
     fail("server creation failed: $!");
     exit;
 };
-pass("Server Initialization at $addr");
+ok(1,"Server Initialization at $addr");
 
 # add server port to addr
 $addr = "$addr:".$server->sockport;
@@ -54,16 +54,21 @@ if ( !defined $pid ) {
 	fail("connect failed: ".IO::Socket::SSL->errstr());
 	exit;
     };
-    pass("client connected" );
+    ok(1,"client connected" );
     my $proto = $to_server->alpn_selected;
-    is($proto, "two","negotiated $proto");
+    ok($proto eq "two","negotiated $proto");
 } else {                ###### Server
     my $to_client = $server->accept or do {
 	kill(9,$pid);
 	exit;
     };
-    pass("Server accepted" );
+    ok(1,"Server accepted" );
     my $proto = $to_client->alpn_selected;
-    is($proto, "two","negotiated $proto");
+    ok($proto eq "two","negotiated $proto");
     wait;
+}
+
+sub ok {
+    my $ok = shift;
+    print $ok ? '' : 'not ', "ok # [$ID] @_\n";
 }
