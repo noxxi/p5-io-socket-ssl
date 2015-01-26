@@ -7,16 +7,16 @@ use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
+
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 # check if we have ALPN available
 # if it is available
 if ( ! IO::Socket::SSL->can_alpn ) {
     print "1..0 # Skipped: ALPN not available in Net::SSLeay\n";
-    exit
+    exit;
 }
 
-$|=1;
 print "1..5\n";
 
 # first create simple ssl-server
@@ -29,8 +29,8 @@ my $server = IO::Socket::SSL->new(
     SSL_key_file => 'certs/server-key.pem',
     SSL_alpn_protocols => [qw(one two)],
 ) || do {
-    ok(0,$!);
-    exit
+    fail("server creation failed: $!");
+    exit;
 };
 ok(1,"Server Initialization at $addr");
 
@@ -51,24 +51,20 @@ if ( !defined $pid ) {
 	SSL_verify_mode => 0,
 	SSL_alpn_protocols => [qw(two three)],
     ) or do {
-	ok(0, "connect failed: ".IO::Socket::SSL->errstr() );
-	exit
+	fail("connect failed: ".IO::Socket::SSL->errstr());
+	exit;
     };
     ok(1,"client connected" );
     my $proto = $to_server->alpn_selected;
-    ok($proto eq 'two',"negotiated $proto");
-
-
+    ok($proto eq "two","negotiated $proto");
 } else {                ###### Server
-
     my $to_client = $server->accept or do {
-	ok(0,"accept failed: ".$server->errstr() );
 	kill(9,$pid);
 	exit;
     };
     ok(1,"Server accepted" );
     my $proto = $to_client->alpn_selected;
-    ok($proto eq 'two',"negotiated $proto");
+    ok($proto eq "two","negotiated $proto");
     wait;
 }
 

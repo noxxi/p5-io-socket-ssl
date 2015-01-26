@@ -5,10 +5,9 @@ use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
+use Test::More;
 
-$|=1;
-print "1..30\n";
+do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',
@@ -20,8 +19,8 @@ my $server = IO::Socket::SSL->new(
     SSL_key_file => "certs/server-wildcard.pem",
 );
 warn "\$!=$!, \$\@=$@, S\$SSL_ERROR=$SSL_ERROR" if ! $server;
-print "not ok\n", exit if !$server;
-ok("Server Initialization");
+ok( $server, "Server Initialization");
+exit if !$server;
 my $saddr = $server->sockhost.':'.$server->sockport;
 
 defined( my $pid = fork() ) || die $!;
@@ -53,41 +52,33 @@ for( my $i=0;$i<@tests;$i+=3 ) {
 	SSL_verifycn_name => $name,
     );
     if ( $result eq 'FAIL' ) {
-	print "not " if $cl;
-	ok( "connection to $name/$scheme failed" );
+       ok( !$cl, "connection to $name/$scheme failed" );
     } else {
-	print "not " if !$cl;
-	ok( "connection to $name/$scheme succeeded" );
+       ok( $cl, "connection to $name/$scheme succeeded" );
     }
     $cl || next;
-    print "not " if <$cl> ne "hallo\n";
-    ok( "received hallo" );
+    is( <$cl>, "hallo\n", "received hallo" );
 }
 
 for( my $i=0;$i<@tests;$i+=3 ) {
     my ($name,$scheme,$result) = @tests[$i,$i+1,$i+2];
-    my $cl = IO::Socket::INET->new(
-	PeerAddr => $saddr,
-    ) || print "not ";
-    ok( "tcp connect" );
+    my $cl = IO::Socket::INET->new($saddr);
+    ok( $cl, "tcp connect" );
     $cl = IO::Socket::SSL->start_SSL( $cl,
 	SSL_verify_mode => 1,
 	SSL_verifycn_scheme => $scheme,
 	SSL_verifycn_name => $name,
     );
     if ( $result eq 'FAIL' ) {
-	print "not " if $cl;
-	ok( "ssl upgrade of connection to $name/$scheme failed" );
+	ok( !$cl, "ssl upgrade of connection to $name/$scheme failed" );
     } else {
-	print "not " if !$cl;
-	ok( "ssl upgrade of connection to $name/$scheme succeeded" );
+	ok( $cl, "ssl upgrade of connection to $name/$scheme succeeded" );
     }
     $cl || next;
-    print "not " if <$cl> ne "hallo\n";
-    ok( "received hallo" );
+    is( <$cl>, "hallo\n", "received hallo" );
 }
 
 kill(9,$pid);
 wait;
 
-sub ok { print "ok #$_[0]\n"; }
+done_testing();
