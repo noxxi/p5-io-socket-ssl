@@ -23,9 +23,9 @@ my $server = IO::Socket::INET->new(
     Listen => 1,
 ) or do {
     plan skip_all => "Bail out!".
-        "Setup of test IO::Socket::INET client and server failed.  All the rest of".
-        "the tests in this suite will fail also unless you change the values in".
-        "ssl_settings.req in the t/ directory.";
+	"Setup of test IO::Socket::INET client and server failed.  All the rest of".
+	"the tests in this suite will fail also unless you change the values in".
+	"ssl_settings.req in the t/ directory.";
 };
 pass("server create");
 

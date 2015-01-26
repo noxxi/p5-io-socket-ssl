@@ -76,12 +76,12 @@ foreach my $test ( 1,2,3 ) {
 	    SSL_verify_mode => 0x00,
 	);
 	if ( $test == 3 ) {
-        ok( !$to_server, "$spec: connect succeeded" );
-        exit;
+	    ok( !$to_server, "$spec: connect succeeded" );
+	    exit;
 	} elsif ( ! $to_server ) {
 	    plan skip_all => "connect failed: $!";
-	};
-        pass( "client connected $spec" );
+	}
+	pass( "client connected $spec" );
 	<$to_server>; # wait for close from parent
 	exit;
     }

@@ -49,15 +49,15 @@ if ( !defined $pid ) {
 	SSL_verify_mode => 0,
 	SSL_alpn_protocols => [qw(two three)],
     ) or do {
-        plan skip_all => "connect failed: ".IO::Socket::SSL->errstr();
+	plan skip_all => "connect failed: ".IO::Socket::SSL->errstr();
     };
     pass("client connected" );
     my $proto = $to_server->alpn_selected;
     is($proto, "two","negotiated $proto");
 } else {                ###### Server
     my $to_client = $server->accept or do {
-        kill(9,$pid);
-        exit;
+	kill(9,$pid);
+	exit;
     };
     pass("Server accepted" );
     my $proto = $to_client->alpn_selected;
