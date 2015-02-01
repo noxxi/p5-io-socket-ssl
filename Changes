@@ -1,9 +1,13 @@
+2.011 2014/02/01
+- fix t/ocsp.t - don't count on revoked.grc.com using OCSP stapling #101855
 - added option 'purpose' to Utils::CERT_create to get better control of the
   certificates purpose. Default is 'server,client' for non-CA (contrary to
   only 'server' before)
 - removed RC4 from default cipher suites on the server site
   https://github.com/noxxi/p5-io-socket-ssl/issues/22
-2.009 2014/01/14
+- refactoring of some tests using Test::More thanks to Sweet-kid and the
+  2015 Pull Request Challenge
+2.010 2014/01/14
 - new options SSL_client_ca_file and SSL_client_ca to let the server send
   the list of acceptable CAs for the client certificate.
 - t/protocol_version.t - fix in case SSLv3 is not supported in Net::SSLeay. 
