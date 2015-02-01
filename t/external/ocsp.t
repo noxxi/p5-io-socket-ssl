@@ -100,23 +100,12 @@ for my $test (@tests) {
 	# check with default settings
 	$cl = eval { &$tcp_connect } or skip "TCP connect#3 failed: $@",1;
 	my $ok = IO::Socket::SSL->start_SSL($cl);
-	if ($test->{expect_revoked}) {
-	    if (!$ok && $SSL_ERROR =~m/revoked/) {
-		pass("revoked within stapling as expected");
-		next TEST;
-	    } elsif (!$ok && $SSL_ERROR =~m/OCSP_basic_verify:certificate verify error/) {
-		# badly signed OCSP record
-		pass("maybe revoked, but got OCSP verification error: $SSL_ERROR");
-		next TEST;
-	    } else {
-		fail( $ok ? "expected revoked but connection ok" : 
-		    "expected revoked, but $SSL_ERROR");
-		next TEST;
-	    }
-	} elsif (!$ok) {
-	    fail("SSL upgrade with OCSP stapling failed: $SSL_ERROR");
+	my $err = !$ok && $SSL_ERROR;
+	if (!$ok && !$test->{expect_revoked}) {
+	    fail("SSL upgrade with OCSP stapling failed: $err");
 	    next TEST;
 	}
+
 	# we got usable stapling if _SSL_ocsp_verify is defined
 	if ($test->{ocsp_staple}) {
 	    if ( ! ${*$cl}{_SSL_ocsp_verify}) {
@@ -127,29 +116,47 @@ for my $test (@tests) {
 	    }
 	}
 
-	goto done if ! $have_httptiny;
-
-	# use OCSP resolver to resolve remaining certs, should be at most one
-	my $ocsp_resolver = $cl->ocsp_resolver;
-	my %rq = $ocsp_resolver->requests;
-	if (keys(%rq)>1) {
-	    fail("got more open OCSP requests (".keys(%rq).
-		") than expected(1) in default mode");
-	    next TEST;
-	}
-	my $err = $ocsp_resolver->resolve_blocking(timeout => $timeout);
-	if ($test->{expect_revoked}) {
-	    if ($err =~m/revoked/) {
-		pass("revoked with explicit OCSP request as expected");
-		next TEST;
-	    } elsif ( $err =~m/status not yet valid/ ) {
-		pass("temporary server side error with OCSP check: $err");
-		next TEST;
-	    } else {
-		fail("expected revoked, but error=$err");
+	if (!$err && !$${*$cl}{_SSL_ocsp_verify} && $have_httptiny) {
+	    # use OCSP resolver to resolve remaining certs, should be at most one
+	    my $ocsp_resolver = $cl->ocsp_resolver;
+	    my %rq = $ocsp_resolver->requests;
+	    if (keys(%rq)>1) {
+		fail("got more open OCSP requests (".keys(%rq).
+		    ") than expected(1) in default mode");
 		next TEST;
 	    }
+	    $err = $ocsp_resolver->resolve_blocking(timeout => $timeout);
 	}
+
+	if ($test->{expect_revoked}) {
+	    if ($err =~m/revoked/) {
+		my $where = ${*$cl}{_SSL_ocsp_verify} ? 'stapled':'asked OCSP server';
+		pass("revoked as expected ($where)");
+	    } elsif ($err =~m/OCSP_basic_verify:certificate verify error/) {
+		# badly signed OCSP record
+		pass("maybe revoked, but got OCSP verification error: $SSL_ERROR");
+	    } elsif ($err =~m/response not yet valid or expired/) {
+		pass("maybe revoked, but got not yet valid/expired response from OCSP server");
+	    } elsif ($err) {
+		# some other error
+		pass("maybe revoked, but got error: $err");
+	    } elsif (!$have_httptiny && !$test->{ocsp_staple}) {
+		# could not check because HTTP::Tiny is missing
+		pass("maybe revoked, but could not check because HTTP::Tiny is missing");
+	    } else {
+		fail("expected revoked but connection ok");
+	    }
+	    next TEST;
+
+	} elsif ($err) {
+	    if ($err =~m/revoked/) {
+		fail("expected ok but revoked");
+	    } else {
+		pass("probably ok, but got $err");
+	    }
+	    next TEST;
+	}
+
 	diag("validation with default CA with OCSP defaults ok");
 
 	# now check with full chain
@@ -162,7 +169,7 @@ for my $test (@tests) {
 	    skip "unexpected fail of SSL connect: $SSL_ERROR",1 
 	}
 	my $chain_size = $cl->peer_certificates;
-	$ocsp_resolver = $cl->ocsp_resolver;
+	my $ocsp_resolver = $cl->ocsp_resolver;
 	# there should be no hard error after resolving - unless an intermediate
 	# certificate got revoked which I don't hope
 	$err = $ocsp_resolver->resolve_blocking(timeout => $timeout);

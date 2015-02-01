@@ -660,8 +660,9 @@ sub connect_SSL {
     }
 
     my $start = defined($timeout) && time();
-    for my $dummy (1) {
+    {
 	#DEBUG( 'calling ssleay::connect' );
+	$SSL_ERROR = undef;
 	my $rv = Net::SSLeay::connect($ssl);
 	$DEBUG>=3 && DEBUG("Net::SSLeay::connect -> $rv" );
 	if ( $rv < 0 ) {
@@ -875,6 +876,7 @@ sub accept_SSL {
 
     my $start = defined($timeout) && time();
     {
+	$SSL_ERROR = undef;
 	my $rv = Net::SSLeay::accept($ssl);
 	$DEBUG>=3 && DEBUG( "Net::SSLeay::accept -> $rv" );
 	if ( $rv < 0 ) {
