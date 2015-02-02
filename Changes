@@ -1,3 +1,5 @@
+2.012 2014/02/02
+- fix t/ocsp.t in case no HTTP::Tiny is installed
 2.011 2014/02/01
 - fix t/ocsp.t - don't count on revoked.grc.com using OCSP stapling #101855
 - added option 'purpose' to Utils::CERT_create to get better control of the

@@ -64,7 +64,7 @@ for my $test (@tests) {
 
 	# try to establish tunnel via proxy with CONNECT
 	{
-	    local $SIG{ALRM} = sub { 
+	    local $SIG{ALRM} = sub {
 		die "proxy HTTP tunnel creation timed out" };
 	    alarm($timeout);
 	    print $cl "CONNECT $test->{host}:$test->{port} HTTP/1.0\r\n\r\n";
@@ -84,7 +84,7 @@ for my $test (@tests) {
 	# first check fingerprint in case of SSL interception
 	my $cl = eval { &$tcp_connect } or skip "TCP connect#1 failed: $@",1;
 	diag("tcp connect to $test->{host}:$test->{port} ok");
-	skip "SSL upgrade w/o validation failed: $SSL_ERROR",1 
+	skip "SSL upgrade w/o validation failed: $SSL_ERROR",1
 	    if ! IO::Socket::SSL->start_SSL($cl, SSL_verify_mode => 0);
 	skip "fingerprints do not match",1
 	    if $cl->get_fingerprint('sha1') ne $test->{fingerprint};
@@ -93,7 +93,7 @@ for my $test (@tests) {
 	# then check if we can use the default CA path for successful
 	# validation without OCSP yet
 	$cl = eval { &$tcp_connect } or skip "TCP connect#2 failed: $@",1;
-	skip "SSL upgrade w/o OCSP failed: $SSL_ERROR",1 
+	skip "SSL upgrade w/o OCSP failed: $SSL_ERROR",1
 	    if ! IO::Socket::SSL->start_SSL($cl, SSL_ocsp_mode => SSL_OCSP_NO_STAPLE );
 	diag("validation with default CA w/o OCSP ok");
 
@@ -162,34 +162,34 @@ for my $test (@tests) {
 	# now check with full chain
 	$cl = eval { &$tcp_connect } or skip "TCP connect#4 failed: $@",1;
 	my $cache = IO::Socket::SSL::OCSP_Cache->new;
-	if (! IO::Socket::SSL->start_SSL($cl, 
+	if (! IO::Socket::SSL->start_SSL($cl,
 	    SSL_ocsp_mode => SSL_OCSP_FULL_CHAIN,
 	    SSL_ocsp_cache => $cache
 	)) {
-	    skip "unexpected fail of SSL connect: $SSL_ERROR",1 
+	    skip "unexpected fail of SSL connect: $SSL_ERROR",1
 	}
 	my $chain_size = $cl->peer_certificates;
-	my $ocsp_resolver = $cl->ocsp_resolver;
-	# there should be no hard error after resolving - unless an intermediate
-	# certificate got revoked which I don't hope
-	$err = $ocsp_resolver->resolve_blocking(timeout => $timeout);
-	if ($err) {
-	    fail("fatal error in OCSP resolver: $err");
-	    next TEST;
-	}
-	# we should now either have soft errors or the OCSP cache should have 
-	# chain_size entries
-	if ( ! $ocsp_resolver->soft_error ) {
-	    my $cache_size = keys(%$cache)-1;
-	    if ($cache_size!=$chain_size) {
-		fail("cache_size($cache_size) != chain_size($chain_size)");
+	if ( my $ocsp_resolver = $have_httptiny && $cl->ocsp_resolver ) {
+	    # there should be no hard error after resolving - unless an
+	    # intermediate certificate got revoked which I don't hope
+	    $err = $ocsp_resolver->resolve_blocking(timeout => $timeout);
+	    if ($err) {
+		fail("fatal error in OCSP resolver: $err");
 		next TEST;
 	    }
+	    # we should now either have soft errors or the OCSP cache should
+	    # have chain_size entries
+	    if ( ! $ocsp_resolver->soft_error ) {
+		my $cache_size = keys(%$cache)-1;
+		if ($cache_size!=$chain_size) {
+		    fail("cache_size($cache_size) != chain_size($chain_size)");
+		    next TEST;
+		}
+	    }
+	    diag("validation with default CA with OCSP full chain ok");
 	}
-	diag("validation with default CA with OCSP full chain ok");
 
 	done:
 	pass("OCSP tests $test->{host}:$test->{port} ok");
     }
 }
-
