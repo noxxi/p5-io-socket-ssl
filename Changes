@@ -1,6 +1,6 @@
-2.012 2014/02/02
+2.012 2015/02/02
 - fix t/ocsp.t in case no HTTP::Tiny is installed
-2.011 2014/02/01
+2.011 2015/02/01
 - fix t/ocsp.t - don't count on revoked.grc.com using OCSP stapling #101855
 - added option 'purpose' to Utils::CERT_create to get better control of the
   certificates purpose. Default is 'server,client' for non-CA (contrary to
@@ -9,12 +9,12 @@
   https://github.com/noxxi/p5-io-socket-ssl/issues/22
 - refactoring of some tests using Test::More thanks to Sweet-kid and the
   2015 Pull Request Challenge
-2.010 2014/01/14
+2.010 2015/01/14
 - new options SSL_client_ca_file and SSL_client_ca to let the server send
   the list of acceptable CAs for the client certificate.
 - t/protocol_version.t - fix in case SSLv3 is not supported in Net::SSLeay. 
   RT#101485, thanks to TEAM.
-2.009 2014/01/12
+2.009 2015/01/12
 - remove util/analyze.pl. This tool is now together with other SSL tools in
   https://github.com/noxxi/p5-ssl-tools
 - added ALPN support (needs OpenSSL1.02, Net::SSLeay 1.56+) thanks to TEAM,
