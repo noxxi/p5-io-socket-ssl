@@ -1,3 +1,5 @@
+- enhanced documentation thanks to Chase Whitener 
+  https://github.com/noxxi/p5-io-socket-ssl/pull/26
 2.012 2015/02/02
 - fix t/ocsp.t in case no HTTP::Tiny is installed
 2.011 2015/02/01
