@@ -674,7 +674,7 @@ It is often required to first exchange some plain data and then upgrade the
 socket to SSL after some kind of STARTTLS command. Protocols like FTPS even
 need a way to downgrade the socket again back to plain.
 
-The common way to do this would be to create a normal socket and use start_SSL
+The common way to do this would be to create a normal socket and use C<start_SSL>
 to upgrade and stop_SSL to downgrade:
 
     my $sock = IO::Socket::INET->new(...) or die $!;
@@ -685,14 +685,14 @@ to upgrade and stop_SSL to downgrade:
     $sock->stop_SSL or die $SSL_ERROR;
     ... now $sock is again a IO::Socket::INET object ...
 
-But, lots of modules just derive directly from IO::Socket::INET.
-While this base class can be replaced with IO::Socket::SSL these modules cannot
+But, lots of modules just derive directly from L<IO::Socket::INET>.
+While this base class can be replaced with L<IO::Socket::SSL>, these modules cannot
 easily support different base classes for SSL and plain data and switch between
 these classes on a starttls command.
 
-To help in this case, IO::Socket::SSL can be reduced to a plain socket on
+To help in this case, L<IO::Socket::SSL> can be reduced to a plain socket on
 startup, and connect_SSL/accept_SSL/start_SSL can be used to enable SSL and
-stop_SSL to talk plain again:
+C<stop_SSL> to talk plain again:
 
     my $sock = IO::Socket::SSL->new(
 	PeerAddr => ...
@@ -710,14 +710,14 @@ stop_SSL to talk plain again:
 
 =head1 Integration Into Own Modules
 
-IO::Socket::SSL behaves similar to other L<IO::Socket> modules and thus could
+L<IO::Socket::SSL> behaves similarly to other L<IO::Socket> modules and thus could
 be integrated in the same way, but you have to take special care when using
 non-blocking I/O (like for handling timeouts) or using select or poll.
 Please study the documentation on how to deal with these differences.
 
 Also, it is recommended to not set or touch most of the C<SSL_*> options, so
-that they keep there secure defaults. It is also recommended to let the user
-override this SSL specific settings without the need of global settings or hacks
+that they keep their secure defaults. It is also recommended to let the user
+override these SSL specific settings without the need of global settings or hacks
 like C<set_args_filter_hack>.
 
 The notable exception is C<SSL_verifycn_scheme>.
@@ -729,79 +729,79 @@ protocol.
 
 =head1 Description Of Methods
 
-IO::Socket::SSL inherits from another IO::Socket module.
+L<IO::Socket::SSL> inherits from another L<IO::Socket> module.
 The choice of the super class depends on the installed modules:
 
 =over 4
 
 =item *
 
-If IO::Socket::IP with at least version 0.20 is installed it will use this
+If L<IO::Socket::IP> with at least version 0.20 is installed it will use this
 module as super class, transparently providing IPv6 and IPv4 support.
 
 =item *
 
-If IO::Socket::INET6 is installed it will use this module as super class,
+If L<IO::Socket::INET6> is installed it will use this module as super class,
 transparently providing IPv6 and IPv4 support.
 
 =item *
 
-Otherwise it will fall back to IO::Socket::INET, which is a perl core module.
-With IO::Socket::INET you only get IPv4 support.
+Otherwise it will fall back to L<IO::Socket::INET>, which is a perl core module.
+With L<IO::Socket::INET> you only get IPv4 support.
 
 =back
 
-Please be aware, that with the IPv6 capable super classes, it will lookup first
+Please be aware that with the IPv6 capable super classes, it will look first
 for the IPv6 address of a given hostname. If the resolver provides an IPv6
 address, but the host cannot be reached by IPv6, there will be no automatic
 fallback to IPv4.
 To avoid these problems you can either force IPv4 by specifying and AF_INET
-as C<Domain> of the socket or globally enforce IPv4 by loading IO::Socket::SSL
+as C<Domain> of the socket or globally enforce IPv4 by loading L<IO::Socket::SSL>
 with the option 'inet4'.
 
-IO::Socket::SSL will provide all of the methods of its super class, but
+L<IO::Socket::SSL> will provide all of the methods of its super class, but
 sometimes it will override them to match the behavior expected from SSL or to
 provide additional arguments.
 
-The new or changed methods are described below, but please read also the
+The new or changed methods are described below, but please also read the
 section about SSL specific error handling.
 
 =over 4
 
 =item Error Handling
 
-If an SSL specific error occurs the global variable C<$SSL_ERROR> will be set.
-If the error occurred on an existing SSL socket the method C<errstr> will
+If an SSL specific error occurs, the global variable C<$SSL_ERROR> will be set.
+If the error occurred on an existing SSL socket, the method C<errstr> will
 give access to the latest socket specific error.
-Both C<$SSL_ERROR> and C<errstr> method give a dualvar similar to C<$!>, e.g.
+Both C<$SSL_ERROR> and the C<errstr> method give a dualvar similar to C<$!>, e.g.
 providing an error number in numeric context or an error description in string
 context.
 
 
 =item B<new(...)>
 
-Creates a new IO::Socket::SSL object.  You may use all the friendly options
-that came bundled with the super class (e.g. IO::Socket::IP,
-IO::Socket::INET, ...) plus (optionally) the ones described below.
-If you don't specify any SSL related options it will do it's best in using
-secure defaults, e.g. chosing good ciphers, enabling proper verification etc.
+Creates a new L<IO::Socket::SSL> object.  You may use all the friendly options
+that came bundled with the super class (e.g. L<IO::Socket::IP>,
+L<IO::Socket::INET>, ...) plus (optionally) the ones described below.
+If you don't specify any SSL related options it will do its best in using
+secure defaults, e.g. choosing good ciphers, enabling proper verification, etc.
 
 =over 2
 
 =item SSL_server
 
-Set this option to a true value, if the socket should be used as a server.
-If this is not explicitly set it is assumed, if the Listen parameter is given
+Set this option to a true value if the socket should be used as a server.
+If this is not explicitly set it is assumed if the C<Listen> parameter is given
 when creating the socket.
 
 =item SSL_hostname
 
 This can be given to specify the hostname used for SNI, which is needed if you
 have multiple SSL hostnames on the same IP address. If not given it will try to
-determine hostname from PeerAddr, which will fail if only IP was given or if
-this argument is used within start_SSL.
+determine the hostname from C<PeerAddr>, which will fail if only an IP was given or if
+this argument is used within C<start_SSL>.
 
-If you want to disable SNI set this argument to ''.
+If you want to disable SNI, set this argument to ''.
 
 Currently only supported for the client side and will be ignored for the server
 side.
@@ -810,9 +810,9 @@ See section "SNI Support" for details of SNI the support.
 
 =item SSL_startHandshake
 
-If this option is set to false (defaults to true) it will no start the SSL
+If this option is set to false (defaults to true) it will not start the SSL
 handshake yet. This has to be done later with C<accept_SSL> or C<connect_SSL>.
-Before the handshake is started read/write etc can be used to exchange plain
+Before the handshake is started read/write/etcc can be used to exchange plain
 data.
 
 =item SSL_ca | SSL_ca_file | SSL_ca_path
@@ -828,7 +828,7 @@ If neither SSL_ca, nor SSL_ca_file or SSL_ca_path are set it will use
 C<default_ca()> to determine the user-set or system defaults.
 If you really don't want to set a CA set SSL_ca_file or SSL_ca_path to
 C<\undef> or SSL_ca to an empty list. (unfortunatly C<''> is used by some
-modules using IO::Socket::SSL when CA is not exlicitly given).
+modules using L<IO::Socket::SSL> when CA is not exlicitly given).
 
 =item SSL_client_ca | SSL_client_ca_file
 
