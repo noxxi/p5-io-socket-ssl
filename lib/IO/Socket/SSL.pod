@@ -27,14 +27,14 @@ IO::Socket::SSL - SSL sockets with IO::Socket interface
 IO::Socket::SSL makes using SSL/TLS much easier by wrapping the necessary
 functionality into the familiar L<IO::Socket> interface and providing secure
 defaults whenever possible.
-This way existing applications can be made SSL-aware without much effort, at
+This way, existing applications can be made SSL-aware without much effort, at
 least if you do blocking I/O and don't use select or poll.
 
-But, under the hood SSL is a complex beast.
+But, under the hood, SSL is a complex beast.
 So there are lots of methods to make it do what you need if the default
 behavior is not adequate.
 Because it is easy to inadvertently introduce critical security bugs or just
-getting hard to debug problems, I would recommend to study the following
+hard to debug problems, I would recommend studying the following
 documentation carefully.
 
 The documentation consists of the following parts:
@@ -76,9 +76,9 @@ Additional documentation can be found in
 
 SSL (Secure Socket Layer) or its successor TLS (Transport Layer Security) are
 protocols to facilitate end-to-end security. These protocols are used when
-accessing web sites (https), delivering or retrieving email and in lots of other
+accessing web sites (https), delivering or retrieving email, and in lots of other
 use cases.
-In the following we will only talk use the name SSL, but means SSL and TLS.
+In the following documentation we will refer to both SSL and TLS as simply 'SSL'.
 
 SSL enables end-to-end security by providing two essential functions:
 
@@ -93,7 +93,7 @@ nobody in between can manipulate the data.
 =item Identification
 
 This part makes sure that you talk to the right peer.
-If the identification is done wrong it is easy to mount man-in-the-middle
+If the identification is done incorrectly it is easy to mount man-in-the-middle
 attacks, e.g. if Alice wants to talk to Bob it would be possible for Mallory to
 put itself in the middle, so that Alice talks to Mallory and Mallory to Bob.
 All the data would still be encrypted, but not end-to-end between Alice and Bob,
@@ -105,7 +105,7 @@ Thus Mallory would be able to read and modify all traffic between Alice and Bob.
 Identification is the part which is the hardest to understand and the easiest
 to get wrong.
 
-With SSL the Identification is usually done with B<certificates> inside a B<PKI>
+With SSL, the Identification is usually done with B<certificates> inside a B<PKI>
 (Public Key Infrastructure).
 These Certificates are comparable to an identity card, which contains
 information about the owner of the card. The card then is somehow B<signed> by
@@ -122,9 +122,9 @@ If the peer does not present a certificate we cannot verify it.
 
 =item *
 
-Check if we trust the certificate, e.g. make sure its not a forgery.
+Check if we trust the certificate, e.g. make sure it's not a forgery.
 
-We believe that a certificate is not a fake, if we either know the certificate
+We believe that a certificate is not a fake if we either know the certificate
 already or if we B<trust> the issuer (the CA) and can verify the issuers
 signature on the certificate.
 In reality there is often a hierarchy of certificate agencies and we only
@@ -133,9 +133,9 @@ In this case the peer not only sends his own certificate, but also all
 B<intermediate certificates>.
 Verification will be done by building a B<trust path> from the trusted root up
 to the peers certificate and checking in each step if the we can verify the
-issuers signature.
+issuer's signature.
 
-This step often causes problems, because the client does not know the necessary
+This step often causes problems because the client does not know the necessary
 trusted root certificates. These are usually stored in a system dependent
 CA store, but often the browsers have their own CA store.
 
@@ -175,17 +175,17 @@ for revoked certificates. The client somehow has to download the list
 With OCSP (Online Certificate Status Protocol) the client can check a single
 certificate directly by asking the issuer.
 
-Revocation is the hardest part of the verification and none of todays browsers
-gets it fully correct. But they are still better than most other implementations
+Revocation is the hardest part of the verification and none of today's browsers
+get it fully correct. But, they are still better than most other implementations
 which don't implement revocation checks or leave the hard parts to the
 developer.
 
 =back
 
-When accessing a web site with SSL or delivering mail a secure way the
+When accessing a web site with SSL or delivering mail in a secure way the
 identity is usually only checked one way, e.g. the client wants to make sure it
 talks to the right server, but the server usually does not care which client it
-is.
+talks to.
 But, sometimes the server wants to identify the client too and will request a
 certificate from the client which the server must verify in a similar way.
 
@@ -199,13 +199,13 @@ A basic SSL client is simple:
 
 This will take the OpenSSL default CA store as the store for the trusted CA.
 This usually works on UNIX systems.
-If their are no certificates in the store it will try use L<Mozilla::CA> which
+If there are no certificates in the store it will try use L<Mozilla::CA> which
 provides the default CAs of Firefox.
 
-In the default settings IO::Socket::SSL will use a safer cipher set and SSL
-version, do a proper hostname check against the certificate and uses SNI (server
+In the default settings, L<IO::Socket::SSL> will use a safer cipher set and SSL
+version, do a proper hostname check against the certificate, and use SNI (server
 name indication) to send the hostname inside the SSL handshake. This is
-necessary to work with servers, which have different certificates behind the
+necessary to work with servers which have different certificates behind the
 same IP address.
 It will also check the revocation of the certificate with OCSP, but currently
 only if the server provides OCSP stapling (for deeper checks see
@@ -260,7 +260,7 @@ A more complete example for a simple HTTP client:
     print <$client>;
 
 And to do revocation checks with OCSP (only available with OpenSSL 1.0.0 or
-higher and Net::SSLeay at least 1.59):
+higher and L<Net::SSLeay> 1.59 or higher):
 
     # default will try OCSP stapling and check only leaf certificate
     my $client = IO::Socket::SSL->new($dst);
@@ -322,10 +322,12 @@ also contains settings for certificate and key:
 This will automatically use a secure set of ciphers and SSL version and also
 supports Forward Secrecy with (Elliptic-Curve) Diffie-Hellmann Key Exchange.
 
-If you do a forking a threading server it is recommended to do the SSL handshake
-inside the new process/thread, so that the master is free for new connections.
-Because a client with improper or slow SSL handshake could make the server
-block in the handshake which would be bad to do on the listening socket:
+If you are doing a forking or threading server, we recommend that you do the SSL
+handshake inside the new process/thread so that the master is free for new
+connections.
+We recommend this because a client with improper or slow SSL handshake could
+make the server block in the handshake which would be bad to do on the
+listening socket:
 
     # inet server
     my $server = IO::Socket::INET->new(
@@ -345,14 +347,14 @@ block in the handshake which would be bad to do on the listening socket:
 	SSL_key_file => 'key.pem',
     ) or die "failed to ssl handshake: $SSL_ERROR";
 
-Like with normal sockets neither forking nor threading servers scale well.
+Like with normal sockets, neither forking nor threading servers scale well.
 It is recommended to use non-blocking sockets instead, see
 L</"Using Non-Blocking Sockets">
 
 
 =head1 Common Usage Errors
 
-This is a list of typical errors seen with the use of IO::Socket::SSL:
+This is a list of typical errors seen with the use of L<IO::Socket::SSL>:
 
 =over 4
 
@@ -360,15 +362,15 @@ This is a list of typical errors seen with the use of IO::Socket::SSL:
 
 Disabling verification with C<SSL_verify_mode>.
 
-As described in L</"Essential Information About SSL/TLS"> a proper
+As described in L</"Essential Information About SSL/TLS">, a proper
 identification of the peer is essential and failing to verify makes
 Man-In-The-Middle attacks possible.
 
 Nevertheless, lots of scripts and even public modules or applications disable
-verification, because it is probably the easiest way to make the thing working
+verification, because it is probably the easiest way to make the thing work
 and usually nobody notices any security problems anyway.
 
-If the verification does not succeed with the default settings one can do the
+If the verification does not succeed with the default settings, one can do the
 following:
 
 =over 8
@@ -394,9 +396,9 @@ C<SSL_verifycn_name> to specify they hostname you expect in the certificate.
 
 A common error pattern is also to disable verification if they found no CA
 store (different modules look at different "default" places).
-Because IO::Socket::SSL is now able to provide a usable CA store on most
+Because L<IO::Socket::SSL> is now able to provide a usable CA store on most
 platforms (UNIX, Mac OSX and Windows) it is better to use the defaults provided
-by IO::Socket::SSL.
+by L<IO::Socket::SSL>.
 If necessary these can be checked with the C<default_ca> method.
 
 =item *
@@ -407,7 +409,7 @@ If you sysread one byte on a normal socket it will result in a syscall to read
 one byte. Thus, if more than one byte is available on the socket it will be kept
 in the network stack of your OS and the next select or poll call will return the
 socket as readable.
-But, with SSL you don't deliver single bytes. Multiple data bytes are packet
+But, with SSL you don't deliver single bytes. Multiple data bytes are packaged
 and encrypted together in an SSL frame. Decryption can only be done on the whole
 frame, so a sysread for one byte actually reads the complete SSL frame from the
 socket, decrypts it and returns the first decrypted byte. Further sysreads will
@@ -420,7 +422,7 @@ C<pending> and if there are no data pending you might check the underlying
 socket with select or poll.
 Another way might be if you try to sysread at least 16kByte all the time.
 16kByte is the maximum size of an SSL frame and because sysread returns data
-from only a single SSL frame you guarantee this way, that there are no pending
+from only a single SSL frame you can guarantee that there are no pending
 data.
 
 See also L</"Using Non-Blocking Sockets">.
@@ -429,25 +431,25 @@ See also L</"Using Non-Blocking Sockets">.
 
 Set 'SSL_version' or 'SSL_cipher_list' to a "better" value.
 
-IO::Socket::SSL tries to set these values to reasonable secure values, which
+L<IO::Socket::SSL> tries to set these values to reasonable, secure values which
 are compatible with the rest of the world.
-But, there are some scripts or modules out there, which tried to be smart and
+But, there are some scripts or modules out there which tried to be smart and
 get more secure or compatible settings.
 Unfortunatly, they did this years ago and never updated these values, so they
 are still forced to do only 'TLSv1' (instead of also using TLSv12 or TLSv11).
-Or they set 'HIGH' as the cipher list and thought they are secure, but did not
+Or they set 'HIGH' as the cipher list and thought they were secure, but did not
 notice that 'HIGH' includes anonymous ciphers, e.g. without identification of
 the peer.
 
 So it is recommended to leave the settings at the secure defaults which
-IO::Socket::SSL sets and which get updated from time to time to
+L<IO::Socket::SSL> sets and which get updated from time to time to
 better fit the real world.
 
 =item *
 
 Make SSL settings inacessible by the user, together with bad builtin settings.
 
-Some modules use IO::Socket::SSL, but don't make the SSL settings available
+Some modules use L<IO::Socket::SSL>, but don't make the SSL settings available
 to the user. This is often combined with bad builtin settings or defaults (like
 switching verification off).
 
@@ -468,15 +470,15 @@ constants and not be put inside quotes, because they represent numerical values.
 =head1 Common Problems with SSL
 
 SSL is a complex protocol with multiple implementations and each of these has
-their own quirks. While most of these implementations work together it often
-gets problems with older versions, minimal versions in load balancers or plain
+their own quirks. While most of these implementations work together, it often
+gets problematic with older versions, minimal versions in load balancers, or plain
 wrong setups.
 
 Unfortunatly these problems are hard to debug.
 Helpful for debugging are a knowledge of SSL internals, wireshark and the use of
-the debug settings of IO::Socket::SSL and L<Net::SSLeay>, which can both be
+the debug settings of L<IO::Socket::SSL> and L<Net::SSLeay>, which can both be
 set with C<$IO::Socket::SSL::DEBUG>.
-The following debugs levels are defined, but used not in a consistent way:
+The following debugs levels are defined, but used not in any consistent way:
 
 =over 4
 
@@ -486,21 +488,21 @@ The following debugs levels are defined, but used not in a consistent way:
 
 =item *
 
-1 - Print out errors from IO::Socket::SSL and ciphers from Net::SSLeay.
+1 - Print out errors from L<IO::Socket::SSL> and ciphers from L<Net::SSLeay>.
 
 =item *
 
-2 - Print also information about call flow from IO::Socket::SSL and progress
-information from Net::SSLeay.
+2 - Print also information about call flow from L<IO::Socket::SSL> and progress
+information from L<Net::SSLeay>.
 
 =item *
 
-3 - Print also some data dumps from IO::Socket::SSL and from Net::SSLeay.
+3 - Print also some data dumps from L<IO::Socket::SSL> and from L<Net::SSLeay>.
 
 =back
 
 Also, C<analyze-ssl.pl> from the ssl-tools repository at
-https://github.com/noxxi/p5-ssl-tools  might be a helpful tool when debugging
+L<https://github.com/noxxi/p5-ssl-tools>  might be a helpful tool when debugging
 SSL problems, as do the C<openssl> command line tool and a check with a
 different SSL implementation (e.g. a web browser).
 
@@ -517,19 +519,19 @@ certificates into their server setup, e.g. everything needed to build the trust
 chain from the trusted root.
 If they check the setup with the browser everything looks ok, because browsers
 work around these problems by caching any intermediate certificates and apply
-them to new connections if there are certificates missing.
+them to new connections if certificates are missing.
 
-But, fresh browser profiles which never have seen these intermediates cannot
-fill in the missing certificates and fail to verify, and the same is with
-IO::Socket::SSL.
+But, fresh browser profiles which have never seen these intermediates cannot
+fill in the missing certificates and fail to verify; the same is true with
+L<IO::Socket::SSL>.
 
 =item *
 
-Old version of server or load balancer, which do not understand specific TLS
+Old versions of servers or load balancers which do not understand specific TLS
 versions or croak on specific data.
 
 From time to time one encounters an SSL peer, which just closes the connection
-inside the SSL handshake. This can usually be workarounded by downgrading the
+inside the SSL handshake. This can usually be worked around by downgrading the
 SSL version, e.g. by setting C<SSL_version>. Modern Browsers usually deal with
 such servers by automatically downgrading the SSL version and repeat the
 connection attempt until they succeed.
@@ -547,13 +549,13 @@ implementations.
 
 Bad or old OpenSSL versions.
 
-IO::Socket::SSL uses OpenSSL with the help of the L<Net::SSLeay> library. It
+L<IO::Socket::SSL> uses OpenSSL with the help of the L<Net::SSLeay> library. It
 is recommend to have a recent version of this library, because it has more
 features and usually fewer known bugs.
 
 =item *
 
-Validation of client certificates fails.
+Validation of client certificates fail.
 
 Make sure that the purpose of the certificate allows use as ssl client (check
 with C<< openssl x509 -purpose >>, that the necessary root certificate is in the
@@ -571,8 +573,8 @@ or connect is to set C<$!> to EWOULDBLOCK if the operation can not be completed
 immediately. Note that EWOULDBLOCK is the same as EAGAIN on UNIX systems, but
 is different on Windows.
 
-With SSL handshakes might occure at any time, even within an established
-connections. In this cases it is necessary to finish the handshake before
+With SSL, handshakes might occur at any time, even within an established
+connection. In these cases it is necessary to finish the handshake before
 you can read or write data. This might result in situations where you want to
 read but must first finish the write of a handshake or where you want to write
 but must first finish a read.
@@ -588,13 +590,13 @@ will try to emulate the behavior seen there, e.g. to return the received data
 instead of blocking, even if the line is not complete. If an unrecoverable error
 occurs it will return nothing, even if it already received some data.
 
-Also, I would advise against using C<accept> with a non-blocking SSL object,
+Also, I would advise against using C<accept> with a non-blocking SSL object
 because it might block and this is not what most would expect. The reason for
-this is that accept on a non-blocking TCP socket (e.g. IO::Socket::IP,
-IO::Socket::INET..) results in a new TCP socket, which does not inherit the
-non-blocking behavior of the master socket. And thus the initial SSL handshake
+this is that C<accept> on a non-blocking TCP socket (e.g. L<IO::Socket::IP>,
+L<IO::Socket::INET>..) results in a new TCP socket which does not inherit the
+non-blocking behavior of the master socket. And thus, the initial SSL handshake
 on the new socket inside C<IO::Socket::SSL::accept> will be done in a blocking
-way. To work around this you are safer in doing a TCP accept and later upgrade the
+way. To work around this you are safer by doing a TCP accept and later upgrade the
 TCP socket in a non-blocking way with C<start_SSL> and C<accept_SSL>.
 
     my $cl = IO::Socket::SSL->new($dst);
@@ -647,9 +649,9 @@ Newer extensions to SSL can distinguish between multiple hostnames on the same
 IP address using Server Name Indication (SNI).
 
 Support for SNI on the client side was added somewhere in the OpenSSL 0.9.8
-series, but only with 1.0 a bug was fixed when the server could not decide about
+series, but with 1.0 a bug was fixed when the server could not decide about
 its hostname. Therefore client side SNI is only supported with OpenSSL 1.0 or
-higher in IO::Socket::SSL.
+higher in L<IO::Socket::SSL>.
 With a supported version, SNI is used automatically on the client side, if it
 can determine the hostname from C<PeerAddr> or C<PeerHost> (which are synonyms
 in the underlying IO::Socket:: classes and thus should never be set both or at
@@ -659,7 +661,7 @@ The hostname can also be given explicitly given with C<SSL_hostname>, but in
 this case it will throw in error, if SNI is not supported.
 To check for support you might call C<< IO::Socket::SSL->can_client_sni() >>.
 
-On the server side earlier versions of OpenSSL are supported, but only together
+On the server side, earlier versions of OpenSSL are supported, but only together
 with L<Net::SSLeay> version >= 1.50.
 To check for support you might call C<< IO::Socket::SSL->can_server_sni() >>.
 If server side SNI is supported, you might specify different certificates per
@@ -672,7 +674,7 @@ It is often required to first exchange some plain data and then upgrade the
 socket to SSL after some kind of STARTTLS command. Protocols like FTPS even
 need a way to downgrade the socket again back to plain.
 
-The common way to do this would be to create a normal socket and use start_SSL
+The common way to do this would be to create a normal socket and use C<start_SSL>
 to upgrade and stop_SSL to downgrade:
 
     my $sock = IO::Socket::INET->new(...) or die $!;
@@ -683,14 +685,14 @@ to upgrade and stop_SSL to downgrade:
     $sock->stop_SSL or die $SSL_ERROR;
     ... now $sock is again a IO::Socket::INET object ...
 
-But, lots of modules just derive directly from IO::Socket::INET.
-While this base class can be replaced with IO::Socket::SSL these modules cannot
+But, lots of modules just derive directly from L<IO::Socket::INET>.
+While this base class can be replaced with L<IO::Socket::SSL>, these modules cannot
 easily support different base classes for SSL and plain data and switch between
 these classes on a starttls command.
 
-To help in this case, IO::Socket::SSL can be reduced to a plain socket on
+To help in this case, L<IO::Socket::SSL> can be reduced to a plain socket on
 startup, and connect_SSL/accept_SSL/start_SSL can be used to enable SSL and
-stop_SSL to talk plain again:
+C<stop_SSL> to talk plain again:
 
     my $sock = IO::Socket::SSL->new(
 	PeerAddr => ...
@@ -708,14 +710,14 @@ stop_SSL to talk plain again:
 
 =head1 Integration Into Own Modules
 
-IO::Socket::SSL behaves similar to other L<IO::Socket> modules and thus could
+L<IO::Socket::SSL> behaves similarly to other L<IO::Socket> modules and thus could
 be integrated in the same way, but you have to take special care when using
 non-blocking I/O (like for handling timeouts) or using select or poll.
 Please study the documentation on how to deal with these differences.
 
 Also, it is recommended to not set or touch most of the C<SSL_*> options, so
-that they keep there secure defaults. It is also recommended to let the user
-override this SSL specific settings without the need of global settings or hacks
+that they keep their secure defaults. It is also recommended to let the user
+override these SSL specific settings without the need of global settings or hacks
 like C<set_args_filter_hack>.
 
 The notable exception is C<SSL_verifycn_scheme>.
@@ -727,79 +729,79 @@ protocol.
 
 =head1 Description Of Methods
 
-IO::Socket::SSL inherits from another IO::Socket module.
+L<IO::Socket::SSL> inherits from another L<IO::Socket> module.
 The choice of the super class depends on the installed modules:
 
 =over 4
 
 =item *
 
-If IO::Socket::IP with at least version 0.20 is installed it will use this
+If L<IO::Socket::IP> with at least version 0.20 is installed it will use this
 module as super class, transparently providing IPv6 and IPv4 support.
 
 =item *
 
-If IO::Socket::INET6 is installed it will use this module as super class,
+If L<IO::Socket::INET6> is installed it will use this module as super class,
 transparently providing IPv6 and IPv4 support.
 
 =item *
 
-Otherwise it will fall back to IO::Socket::INET, which is a perl core module.
-With IO::Socket::INET you only get IPv4 support.
+Otherwise it will fall back to L<IO::Socket::INET>, which is a perl core module.
+With L<IO::Socket::INET> you only get IPv4 support.
 
 =back
 
-Please be aware, that with the IPv6 capable super classes, it will lookup first
+Please be aware that with the IPv6 capable super classes, it will look first
 for the IPv6 address of a given hostname. If the resolver provides an IPv6
 address, but the host cannot be reached by IPv6, there will be no automatic
 fallback to IPv4.
 To avoid these problems you can either force IPv4 by specifying and AF_INET
-as C<Domain> of the socket or globally enforce IPv4 by loading IO::Socket::SSL
+as C<Domain> of the socket or globally enforce IPv4 by loading L<IO::Socket::SSL>
 with the option 'inet4'.
 
-IO::Socket::SSL will provide all of the methods of its super class, but
+L<IO::Socket::SSL> will provide all of the methods of its super class, but
 sometimes it will override them to match the behavior expected from SSL or to
 provide additional arguments.
 
-The new or changed methods are described below, but please read also the
+The new or changed methods are described below, but please also read the
 section about SSL specific error handling.
 
 =over 4
 
 =item Error Handling
 
-If an SSL specific error occurs the global variable C<$SSL_ERROR> will be set.
-If the error occurred on an existing SSL socket the method C<errstr> will
+If an SSL specific error occurs, the global variable C<$SSL_ERROR> will be set.
+If the error occurred on an existing SSL socket, the method C<errstr> will
 give access to the latest socket specific error.
-Both C<$SSL_ERROR> and C<errstr> method give a dualvar similar to C<$!>, e.g.
+Both C<$SSL_ERROR> and the C<errstr> method give a dualvar similar to C<$!>, e.g.
 providing an error number in numeric context or an error description in string
 context.
 
 
 =item B<new(...)>
 
-Creates a new IO::Socket::SSL object.  You may use all the friendly options
-that came bundled with the super class (e.g. IO::Socket::IP,
-IO::Socket::INET, ...) plus (optionally) the ones described below.
-If you don't specify any SSL related options it will do it's best in using
-secure defaults, e.g. chosing good ciphers, enabling proper verification etc.
+Creates a new L<IO::Socket::SSL> object.  You may use all the friendly options
+that came bundled with the super class (e.g. L<IO::Socket::IP>,
+L<IO::Socket::INET>, ...) plus (optionally) the ones described below.
+If you don't specify any SSL related options it will do its best in using
+secure defaults, e.g. choosing good ciphers, enabling proper verification, etc.
 
 =over 2
 
 =item SSL_server
 
-Set this option to a true value, if the socket should be used as a server.
-If this is not explicitly set it is assumed, if the Listen parameter is given
+Set this option to a true value if the socket should be used as a server.
+If this is not explicitly set it is assumed if the C<Listen> parameter is given
 when creating the socket.
 
 =item SSL_hostname
 
 This can be given to specify the hostname used for SNI, which is needed if you
 have multiple SSL hostnames on the same IP address. If not given it will try to
-determine hostname from PeerAddr, which will fail if only IP was given or if
-this argument is used within start_SSL.
+determine the hostname from C<PeerAddr>, which will fail if only an IP was given or if
+this argument is used within C<start_SSL>.
 
-If you want to disable SNI set this argument to ''.
+If you want to disable SNI, set this argument to ''.
 
 Currently only supported for the client side and will be ignored for the server
 side.
@@ -808,9 +810,9 @@ See section "SNI Support" for details of SNI the support.
 
 =item SSL_startHandshake
 
-If this option is set to false (defaults to true) it will no start the SSL
+If this option is set to false (defaults to true) it will not start the SSL
 handshake yet. This has to be done later with C<accept_SSL> or C<connect_SSL>.
-Before the handshake is started read/write etc can be used to exchange plain
+Before the handshake is started read/write/etcc can be used to exchange plain
 data.
 
 =item SSL_ca | SSL_ca_file | SSL_ca_path
@@ -826,7 +828,7 @@ If neither SSL_ca, nor SSL_ca_file or SSL_ca_path are set it will use
 C<default_ca()> to determine the user-set or system defaults.
 If you really don't want to set a CA set SSL_ca_file or SSL_ca_path to
 C<\undef> or SSL_ca to an empty list. (unfortunatly C<''> is used by some
-modules using IO::Socket::SSL when CA is not exlicitly given).
+modules using L<IO::Socket::SSL> when CA is not exlicitly given).
 
 =item SSL_client_ca | SSL_client_ca_file
 
