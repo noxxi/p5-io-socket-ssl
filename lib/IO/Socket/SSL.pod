@@ -27,14 +27,14 @@ IO::Socket::SSL - SSL sockets with IO::Socket interface
 IO::Socket::SSL makes using SSL/TLS much easier by wrapping the necessary
 functionality into the familiar L<IO::Socket> interface and providing secure
 defaults whenever possible.
-This way existing applications can be made SSL-aware without much effort, at
+This way, existing applications can be made SSL-aware without much effort, at
 least if you do blocking I/O and don't use select or poll.
 
-But, under the hood SSL is a complex beast.
+But, under the hood, SSL is a complex beast.
 So there are lots of methods to make it do what you need if the default
 behavior is not adequate.
 Because it is easy to inadvertently introduce critical security bugs or just
-getting hard to debug problems, I would recommend to study the following
+hard to debug problems, I would recommend studying the following
 documentation carefully.
 
 The documentation consists of the following parts:
@@ -76,9 +76,9 @@ Additional documentation can be found in
 
 SSL (Secure Socket Layer) or its successor TLS (Transport Layer Security) are
 protocols to facilitate end-to-end security. These protocols are used when
-accessing web sites (https), delivering or retrieving email and in lots of other
+accessing web sites (https), delivering or retrieving email, and in lots of other
 use cases.
-In the following we will only talk use the name SSL, but means SSL and TLS.
+In the following documentation we will refer to both SSL and TLS as simply 'SSL'.
 
 SSL enables end-to-end security by providing two essential functions:
 
@@ -93,7 +93,7 @@ nobody in between can manipulate the data.
 =item Identification
 
 This part makes sure that you talk to the right peer.
-If the identification is done wrong it is easy to mount man-in-the-middle
+If the identification is done incorrectly it is easy to mount man-in-the-middle
 attacks, e.g. if Alice wants to talk to Bob it would be possible for Mallory to
 put itself in the middle, so that Alice talks to Mallory and Mallory to Bob.
 All the data would still be encrypted, but not end-to-end between Alice and Bob,
@@ -105,7 +105,7 @@ Thus Mallory would be able to read and modify all traffic between Alice and Bob.
 Identification is the part which is the hardest to understand and the easiest
 to get wrong.
 
-With SSL the Identification is usually done with B<certificates> inside a B<PKI>
+With SSL, the Identification is usually done with B<certificates> inside a B<PKI>
 (Public Key Infrastructure).
 These Certificates are comparable to an identity card, which contains
 information about the owner of the card. The card then is somehow B<signed> by
@@ -122,9 +122,9 @@ If the peer does not present a certificate we cannot verify it.
 
 =item *
 
-Check if we trust the certificate, e.g. make sure its not a forgery.
+Check if we trust the certificate, e.g. make sure it's not a forgery.
 
-We believe that a certificate is not a fake, if we either know the certificate
+We believe that a certificate is not a fake if we either know the certificate
 already or if we B<trust> the issuer (the CA) and can verify the issuers
 signature on the certificate.
 In reality there is often a hierarchy of certificate agencies and we only
@@ -133,9 +133,9 @@ In this case the peer not only sends his own certificate, but also all
 B<intermediate certificates>.
 Verification will be done by building a B<trust path> from the trusted root up
 to the peers certificate and checking in each step if the we can verify the
-issuers signature.
+issuer's signature.
 
-This step often causes problems, because the client does not know the necessary
+This step often causes problems because the client does not know the necessary
 trusted root certificates. These are usually stored in a system dependent
 CA store, but often the browsers have their own CA store.
 
@@ -175,17 +175,17 @@ for revoked certificates. The client somehow has to download the list
 With OCSP (Online Certificate Status Protocol) the client can check a single
 certificate directly by asking the issuer.
 
-Revocation is the hardest part of the verification and none of todays browsers
-gets it fully correct. But they are still better than most other implementations
+Revocation is the hardest part of the verification and none of today's browsers
+get it fully correct. But, they are still better than most other implementations
 which don't implement revocation checks or leave the hard parts to the
 developer.
 
 =back
 
-When accessing a web site with SSL or delivering mail a secure way the
+When accessing a web site with SSL or delivering mail in a secure way the
 identity is usually only checked one way, e.g. the client wants to make sure it
 talks to the right server, but the server usually does not care which client it
-is.
+talks to.
 But, sometimes the server wants to identify the client too and will request a
 certificate from the client which the server must verify in a similar way.
 
@@ -199,13 +199,13 @@ A basic SSL client is simple:
 
 This will take the OpenSSL default CA store as the store for the trusted CA.
 This usually works on UNIX systems.
-If their are no certificates in the store it will try use L<Mozilla::CA> which
+If there are no certificates in the store it will try use L<Mozilla::CA> which
 provides the default CAs of Firefox.
 
-In the default settings IO::Socket::SSL will use a safer cipher set and SSL
-version, do a proper hostname check against the certificate and uses SNI (server
+In the default settings, L<IO::Socket::SSL> will use a safer cipher set and SSL
+version, do a proper hostname check against the certificate, and use SNI (server
 name indication) to send the hostname inside the SSL handshake. This is
-necessary to work with servers, which have different certificates behind the
+necessary to work with servers which have different certificates behind the
 same IP address.
 It will also check the revocation of the certificate with OCSP, but currently
 only if the server provides OCSP stapling (for deeper checks see
@@ -260,7 +260,7 @@ A more complete example for a simple HTTP client:
     print <$client>;
 
 And to do revocation checks with OCSP (only available with OpenSSL 1.0.0 or
-higher and Net::SSLeay at least 1.59):
+higher and L<Net::SSLeay> 1.59 or higher):
 
     # default will try OCSP stapling and check only leaf certificate
     my $client = IO::Socket::SSL->new($dst);
@@ -322,10 +322,12 @@ also contains settings for certificate and key:
 This will automatically use a secure set of ciphers and SSL version and also
 supports Forward Secrecy with (Elliptic-Curve) Diffie-Hellmann Key Exchange.
 
-If you do a forking a threading server it is recommended to do the SSL handshake
-inside the new process/thread, so that the master is free for new connections.
-Because a client with improper or slow SSL handshake could make the server
-block in the handshake which would be bad to do on the listening socket:
+If you are doing a forking or threading server, we recommend that you do the SSL
+handshake inside the new process/thread so that the master is free for new
+connections.
+We recommend this because a client with improper or slow SSL handshake could
+make the server block in the handshake which would be bad to do on the
+listening socket:
 
     # inet server
     my $server = IO::Socket::INET->new(
@@ -345,14 +347,14 @@ block in the handshake which would be bad to do on the listening socket:
 	SSL_key_file => 'key.pem',
     ) or die "failed to ssl handshake: $SSL_ERROR";
 
-Like with normal sockets neither forking nor threading servers scale well.
+Like with normal sockets, neither forking nor threading servers scale well.
 It is recommended to use non-blocking sockets instead, see
 L</"Using Non-Blocking Sockets">
 
 
 =head1 Common Usage Errors
 
-This is a list of typical errors seen with the use of IO::Socket::SSL:
+This is a list of typical errors seen with the use of L<IO::Socket::SSL>:
 
 =over 4
 
@@ -360,15 +362,15 @@ This is a list of typical errors seen with the use of IO::Socket::SSL:
 
 Disabling verification with C<SSL_verify_mode>.
 
-As described in L</"Essential Information About SSL/TLS"> a proper
+As described in L</"Essential Information About SSL/TLS">, a proper
 identification of the peer is essential and failing to verify makes
 Man-In-The-Middle attacks possible.
 
 Nevertheless, lots of scripts and even public modules or applications disable
-verification, because it is probably the easiest way to make the thing working
+verification, because it is probably the easiest way to make the thing work
 and usually nobody notices any security problems anyway.
 
-If the verification does not succeed with the default settings one can do the
+If the verification does not succeed with the default settings, one can do the
 following:
 
 =over 8
@@ -394,9 +396,9 @@ C<SSL_verifycn_name> to specify they hostname you expect in the certificate.
 
 A common error pattern is also to disable verification if they found no CA
 store (different modules look at different "default" places).
-Because IO::Socket::SSL is now able to provide a usable CA store on most
+Because L<IO::Socket::SSL> is now able to provide a usable CA store on most
 platforms (UNIX, Mac OSX and Windows) it is better to use the defaults provided
-by IO::Socket::SSL.
+by L<IO::Socket::SSL>.
 If necessary these can be checked with the C<default_ca> method.
 
 =item *
@@ -407,7 +409,7 @@ If you sysread one byte on a normal socket it will result in a syscall to read
 one byte. Thus, if more than one byte is available on the socket it will be kept
 in the network stack of your OS and the next select or poll call will return the
 socket as readable.
-But, with SSL you don't deliver single bytes. Multiple data bytes are packet
+But, with SSL you don't deliver single bytes. Multiple data bytes are packaged
 and encrypted together in an SSL frame. Decryption can only be done on the whole
 frame, so a sysread for one byte actually reads the complete SSL frame from the
 socket, decrypts it and returns the first decrypted byte. Further sysreads will
@@ -420,7 +422,7 @@ C<pending> and if there are no data pending you might check the underlying
 socket with select or poll.
 Another way might be if you try to sysread at least 16kByte all the time.
 16kByte is the maximum size of an SSL frame and because sysread returns data
-from only a single SSL frame you guarantee this way, that there are no pending
+from only a single SSL frame you can guarantee that there are no pending
 data.
 
 See also L</"Using Non-Blocking Sockets">.
@@ -429,25 +431,25 @@ See also L</"Using Non-Blocking Sockets">.
 
 Set 'SSL_version' or 'SSL_cipher_list' to a "better" value.
 
-IO::Socket::SSL tries to set these values to reasonable secure values, which
+L<IO::Socket::SSL> tries to set these values to reasonable, secure values which
 are compatible with the rest of the world.
-But, there are some scripts or modules out there, which tried to be smart and
+But, there are some scripts or modules out there which tried to be smart and
 get more secure or compatible settings.
 Unfortunatly, they did this years ago and never updated these values, so they
 are still forced to do only 'TLSv1' (instead of also using TLSv12 or TLSv11).
-Or they set 'HIGH' as the cipher list and thought they are secure, but did not
+Or they set 'HIGH' as the cipher list and thought they were secure, but did not
 notice that 'HIGH' includes anonymous ciphers, e.g. without identification of
 the peer.
 
 So it is recommended to leave the settings at the secure defaults which
-IO::Socket::SSL sets and which get updated from time to time to
+L<IO::Socket::SSL> sets and which get updated from time to time to
 better fit the real world.
 
 =item *
 
 Make SSL settings inacessible by the user, together with bad builtin settings.
 
-Some modules use IO::Socket::SSL, but don't make the SSL settings available
+Some modules use L<IO::Socket::SSL>, but don't make the SSL settings available
 to the user. This is often combined with bad builtin settings or defaults (like
 switching verification off).
 
@@ -468,15 +470,15 @@ constants and not be put inside quotes, because they represent numerical values.
 =head1 Common Problems with SSL
 
 SSL is a complex protocol with multiple implementations and each of these has
-their own quirks. While most of these implementations work together it often
-gets problems with older versions, minimal versions in load balancers or plain
+their own quirks. While most of these implementations work together, it often
+gets problematic with older versions, minimal versions in load balancers, or plain
 wrong setups.
 
 Unfortunatly these problems are hard to debug.
 Helpful for debugging are a knowledge of SSL internals, wireshark and the use of
-the debug settings of IO::Socket::SSL and L<Net::SSLeay>, which can both be
+the debug settings of L<IO::Socket::SSL> and L<Net::SSLeay>, which can both be
 set with C<$IO::Socket::SSL::DEBUG>.
-The following debugs levels are defined, but used not in a consistent way:
+The following debugs levels are defined, but used not in any consistent way:
 
 =over 4
 
@@ -486,21 +488,21 @@ The following debugs levels are defined, but used not in a consistent way:
 
 =item *
 
-1 - Print out errors from IO::Socket::SSL and ciphers from Net::SSLeay.
+1 - Print out errors from L<IO::Socket::SSL> and ciphers from L<Net::SSLeay>.
 
 =item *
 
-2 - Print also information about call flow from IO::Socket::SSL and progress
-information from Net::SSLeay.
+2 - Print also information about call flow from L<IO::Socket::SSL> and progress
+information from L<Net::SSLeay>.
 
 =item *
 
-3 - Print also some data dumps from IO::Socket::SSL and from Net::SSLeay.
+3 - Print also some data dumps from L<IO::Socket::SSL> and from L<Net::SSLeay>.
 
 =back
 
 Also, C<analyze-ssl.pl> from the ssl-tools repository at
-https://github.com/noxxi/p5-ssl-tools  might be a helpful tool when debugging
+L<https://github.com/noxxi/p5-ssl-tools>  might be a helpful tool when debugging
 SSL problems, as do the C<openssl> command line tool and a check with a
 different SSL implementation (e.g. a web browser).
 
