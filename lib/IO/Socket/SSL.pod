@@ -519,19 +519,19 @@ certificates into their server setup, e.g. everything needed to build the trust
 chain from the trusted root.
 If they check the setup with the browser everything looks ok, because browsers
 work around these problems by caching any intermediate certificates and apply
-them to new connections if there are certificates missing.
+them to new connections if certificates are missing.
 
-But, fresh browser profiles which never have seen these intermediates cannot
-fill in the missing certificates and fail to verify, and the same is with
-IO::Socket::SSL.
+But, fresh browser profiles which have never seen these intermediates cannot
+fill in the missing certificates and fail to verify; the same is true with
+L<IO::Socket::SSL>.
 
 =item *
 
-Old version of server or load balancer, which do not understand specific TLS
+Old versions of servers or load balancers which do not understand specific TLS
 versions or croak on specific data.
 
 From time to time one encounters an SSL peer, which just closes the connection
-inside the SSL handshake. This can usually be workarounded by downgrading the
+inside the SSL handshake. This can usually be worked around by downgrading the
 SSL version, e.g. by setting C<SSL_version>. Modern Browsers usually deal with
 such servers by automatically downgrading the SSL version and repeat the
 connection attempt until they succeed.
@@ -549,13 +549,13 @@ implementations.
 
 Bad or old OpenSSL versions.
 
-IO::Socket::SSL uses OpenSSL with the help of the L<Net::SSLeay> library. It
+L<IO::Socket::SSL> uses OpenSSL with the help of the L<Net::SSLeay> library. It
 is recommend to have a recent version of this library, because it has more
 features and usually fewer known bugs.
 
 =item *
 
-Validation of client certificates fails.
+Validation of client certificates fail.
 
 Make sure that the purpose of the certificate allows use as ssl client (check
 with C<< openssl x509 -purpose >>, that the necessary root certificate is in the
@@ -573,8 +573,8 @@ or connect is to set C<$!> to EWOULDBLOCK if the operation can not be completed
 immediately. Note that EWOULDBLOCK is the same as EAGAIN on UNIX systems, but
 is different on Windows.
 
-With SSL handshakes might occure at any time, even within an established
-connections. In this cases it is necessary to finish the handshake before
+With SSL, handshakes might occur at any time, even within an established
+connection. In these cases it is necessary to finish the handshake before
 you can read or write data. This might result in situations where you want to
 read but must first finish the write of a handshake or where you want to write
 but must first finish a read.
@@ -590,13 +590,13 @@ will try to emulate the behavior seen there, e.g. to return the received data
 instead of blocking, even if the line is not complete. If an unrecoverable error
 occurs it will return nothing, even if it already received some data.
 
-Also, I would advise against using C<accept> with a non-blocking SSL object,
+Also, I would advise against using C<accept> with a non-blocking SSL object
 because it might block and this is not what most would expect. The reason for
-this is that accept on a non-blocking TCP socket (e.g. IO::Socket::IP,
-IO::Socket::INET..) results in a new TCP socket, which does not inherit the
-non-blocking behavior of the master socket. And thus the initial SSL handshake
+this is that C<accept> on a non-blocking TCP socket (e.g. L<IO::Socket::IP>,
+L<IO::Socket::INET>..) results in a new TCP socket which does not inherit the
+non-blocking behavior of the master socket. And thus, the initial SSL handshake
 on the new socket inside C<IO::Socket::SSL::accept> will be done in a blocking
-way. To work around this you are safer in doing a TCP accept and later upgrade the
+way. To work around this you are safer by doing a TCP accept and later upgrade the
 TCP socket in a non-blocking way with C<start_SSL> and C<accept_SSL>.
 
     my $cl = IO::Socket::SSL->new($dst);
@@ -649,9 +649,9 @@ Newer extensions to SSL can distinguish between multiple hostnames on the same
 IP address using Server Name Indication (SNI).
 
 Support for SNI on the client side was added somewhere in the OpenSSL 0.9.8
-series, but only with 1.0 a bug was fixed when the server could not decide about
+series, but with 1.0 a bug was fixed when the server could not decide about
 its hostname. Therefore client side SNI is only supported with OpenSSL 1.0 or
-higher in IO::Socket::SSL.
+higher in L<IO::Socket::SSL>.
 With a supported version, SNI is used automatically on the client side, if it
 can determine the hostname from C<PeerAddr> or C<PeerHost> (which are synonyms
 in the underlying IO::Socket:: classes and thus should never be set both or at
@@ -661,7 +661,7 @@ The hostname can also be given explicitly given with C<SSL_hostname>, but in
 this case it will throw in error, if SNI is not supported.
 To check for support you might call C<< IO::Socket::SSL->can_client_sni() >>.
 
-On the server side earlier versions of OpenSSL are supported, but only together
+On the server side, earlier versions of OpenSSL are supported, but only together
 with L<Net::SSLeay> version >= 1.50.
 To check for support you might call C<< IO::Socket::SSL->can_server_sni() >>.
 If server side SNI is supported, you might specify different certificates per
