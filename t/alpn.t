@@ -59,6 +59,7 @@ if ( !defined $pid ) {
     ok($proto eq "two","negotiated $proto");
 } else {                ###### Server
     my $to_client = $server->accept or do {
+	ok(0,"accept failed: ".$server->errstr());
 	kill(9,$pid);
 	exit;
     };
