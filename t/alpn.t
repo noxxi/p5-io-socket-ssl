@@ -29,7 +29,7 @@ my $server = IO::Socket::SSL->new(
     SSL_key_file => 'certs/server-key.pem',
     SSL_alpn_protocols => [qw(one two)],
 ) || do {
-    fail("server creation failed: $!");
+    ok(0,"server creation failed: $!");
     exit;
 };
 ok(1,"Server Initialization at $addr");
@@ -51,7 +51,7 @@ if ( !defined $pid ) {
 	SSL_verify_mode => 0,
 	SSL_alpn_protocols => [qw(two three)],
     ) or do {
-	fail("connect failed: ".IO::Socket::SSL->errstr());
+	ok(0,"connect failed: ".IO::Socket::SSL->errstr());
 	exit;
     };
     ok(1,"client connected" );
