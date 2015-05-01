@@ -52,7 +52,6 @@ sub client {
 	if ( $l =~m{bar\n} ) {
 	    return ok('client receive non-ssl data');
 	}
-	#warn "XXXXXXXX $l";
     }
     fail("receive non-ssl data");
 }

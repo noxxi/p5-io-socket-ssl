@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.012';
+our $VERSION = '2.013';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -276,11 +276,11 @@ BEGIN {
 
     # try IO::Socket::IP or IO::Socket::INET6 for IPv6 support
     if ( $ip6 ) {
-	# if we have IO::Socket::IP >= 0.20 we will use this in preference
+	# if we have IO::Socket::IP >= 0.31 we will use this in preference
 	# because it can handle both IPv4 and IPv6
 	if ( eval { 
 	    require IO::Socket::IP; 
-	    IO::Socket::IP->VERSION(0.20) && IO::Socket::IP->VERSION != 0.30; 
+	    IO::Socket::IP->VERSION(0.31)
 	}) {
 	    @ISA = qw(IO::Socket::IP);
 	    constant->import( CAN_IPV6 => "IO::Socket::IP" );
@@ -437,6 +437,13 @@ my %SSL_OBJECT;
 my %CREATED_IN_THIS_THREAD;
 sub CLONE { %CREATED_IN_THIS_THREAD = (); }
 
+
+# we have callbacks associated with contexts, but have no way to access the
+# current SSL object from these callbacks. To work around this
+# CURRENT_SSL_OBJECT will be set before calling Net::SSLeay::{connect,accept}
+# and reset afterwards, so we have access to it inside _internal_error.
+my $CURRENT_SSL_OBJECT;
+
 # You might be expecting to find a new() subroutine here, but that is
 # not how IO::Socket::INET works.  All configuration gets performed in
 # the calls to configure() and either connect() or accept().
@@ -461,8 +468,8 @@ sub configure {
 
     $self->configure_SSL($arg_hash) || return;
 
-    $self->SUPER::configure($arg_hash)
-	|| return $self->_internal_error("@ISA configuration failed");
+    return $self->_internal_error("@ISA configuration failed",0)
+	if ! $self->SUPER::configure($arg_hash);
 
     $self->blocking(0) if defined $blocking && !$blocking;
     return $self;
@@ -523,7 +530,7 @@ sub _skip_rw_error {
 	return $err;
     }
     $! ||= EWOULDBLOCK;
-    ${*$self}{'_SSL_last_err'} = $SSL_ERROR if ref($self);
+    ${*$self}{_SSL_last_err} = [$SSL_ERROR,4] if ref($self);
     Net::SSLeay::ERR_clear_error();
     return 0;
 }
@@ -568,7 +575,7 @@ sub connect_SSL {
 	my $arg_hash = ${*$self}{'_SSL_arguments'};
 
 	my $fileno = ${*$self}{'_SSL_fileno'} = fileno($self);
-	return $self->_internal_error("Socket has no fileno")
+	return $self->_internal_error("Socket has no fileno",9)
 	    if ! defined $fileno;
 
 	$ctx = ${*$self}{'_SSL_ctx'};  # Reference to real context
@@ -603,7 +610,7 @@ sub connect_SSL {
 	    }
 	} elsif ( $arg_hash->{SSL_hostname} ) {
 	    return $self->_internal_error(
-		"Client side SNI not supported for this openssl");
+		"Client side SNI not supported for this openssl",9);
 	} else {
 	    $DEBUG>=2 && DEBUG("not using SNI because openssl is too old");
 	}
@@ -663,7 +670,9 @@ sub connect_SSL {
     {
 	#DEBUG( 'calling ssleay::connect' );
 	$SSL_ERROR = undef;
+	$CURRENT_SSL_OBJECT = $self;
 	my $rv = Net::SSLeay::connect($ssl);
+	$CURRENT_SSL_OBJECT = undef;
 	$DEBUG>=3 && DEBUG("Net::SSLeay::connect -> $rv" );
 	if ( $rv < 0 ) {
 	    if ( my $err = $self->_skip_rw_error( $ssl,$rv )) {
@@ -745,11 +754,11 @@ sub connect_SSL {
 	    # definitly revoked
 	    $DEBUG>=3 && DEBUG("got OCSP revocation with stapling: %s",
 		$ocsp_result->[1]);
-	    $self->_internal_error($ocsp_result->[1]);
+	    $self->_internal_error($ocsp_result->[1],5);
 	    return $self->fatal_ssl_error();
 	}
     } elsif ( $ctx->{ocsp_mode} & SSL_OCSP_MUST_STAPLE ) {
-	$self->_internal_error("did not receive the required stapled OCSP response");
+	$self->_internal_error("did not receive the required stapled OCSP response",5);
 	return $self->fatal_ssl_error();
     }
 
@@ -844,7 +853,7 @@ sub accept_SSL {
 	}
 
 	my $fileno = ${*$socket}{'_SSL_fileno'} = fileno($socket);
-	return $socket->_internal_error("Socket has no fileno")
+	return $socket->_internal_error("Socket has no fileno",9)
 	    if ! defined $fileno;
 
 	$ssl = ${*$socket}{_SSL_object} =
@@ -877,7 +886,9 @@ sub accept_SSL {
     my $start = defined($timeout) && time();
     {
 	$SSL_ERROR = undef;
+	$CURRENT_SSL_OBJECT = $self;
 	my $rv = Net::SSLeay::accept($ssl);
+	$CURRENT_SSL_OBJECT = undef;
 	$DEBUG>=3 && DEBUG( "Net::SSLeay::accept -> $rv" );
 	if ( $rv < 0 ) {
 	    if ( my $err = $socket->_skip_rw_error( $ssl,$rv )) {
@@ -1012,7 +1023,7 @@ sub _generic_write {
     my $buf_len = length($$buffer);
     $length ||= $buf_len;
     $offset ||= 0;
-    return $self->_internal_error("Invalid offset for SSL write")
+    return $self->_internal_error("Invalid offset for SSL write",9)
 	if $offset>$buf_len;
     return 0 if ($offset == $buf_len);
 
@@ -1315,7 +1326,7 @@ sub fileno {
 sub _get_ssl_object {
     my $self = shift;
     return ${*$self}{'_SSL_object'} ||
-	IO::Socket::SSL->_internal_error("Undefined SSL object");
+	IO::Socket::SSL->_internal_error("Undefined SSL object",9);
 }
 
 # _get_ctx_object is for internal use ONLY!
@@ -1327,7 +1338,7 @@ sub _get_ctx_object {
 
 # default error for undefined arguments
 sub _invalid_object {
-    return IO::Socket::SSL->_internal_error("Undefined IO::Socket::SSL object");
+    return IO::Socket::SSL->_internal_error("Undefined IO::Socket::SSL object",9);
 }
 
 
@@ -1338,18 +1349,18 @@ sub pending {
 
 sub start_SSL {
     my ($class,$socket) = (shift,shift);
-    return $class->_internal_error("Not a socket") if ! ref($socket);
+    return $class->_internal_error("Not a socket",9) if ! ref($socket);
     my $arg_hash = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
     my %to = exists $arg_hash->{Timeout} ? ( Timeout => delete $arg_hash->{Timeout} ) :();
     my $original_class = ref($socket);
     if ( ! $original_class ) {
 	$socket = ($original_class = $ISA[0])->new_from_fd($socket,'<+')
 	    or return $class->_internal_error(
-	    "creating $original_class from file handle failed");
+	    "creating $original_class from file handle failed",9);
     }
     my $original_fileno = (UNIVERSAL::can($socket, "fileno"))
 	? $socket->fileno : CORE::fileno($socket);
-    return $class->_internal_error("Socket has no fileno")
+    return $class->_internal_error("Socket has no fileno",9)
 	if ! defined $original_fileno;
 
     bless $socket, $class;
@@ -1747,7 +1758,8 @@ if ($can_ocsp) {
 
 sub errstr {
     my $self = shift;
-    return (ref($self) ? ${*$self}{'_SSL_last_err'} : $SSL_ERROR) || '';
+    my $oe = ref($self) && ${*$self}{_SSL_last_err};
+    return $oe ? $oe->[0] : $SSL_ERROR || '';
 }
 
 sub fatal_ssl_error {
@@ -1773,29 +1785,48 @@ sub get_ssleay_error {
     return Net::SSLeay::print_errs('SSL error: ') || '';
 }
 
-# internal errors, e.g unsupported features etc
+# internal errors, e.g unsupported features, hostname check failed etc
+# _SSL_last_err contains severity so that on error chains we can decide if one
+# error should replace the previous one or if this is just a less specific
+# follow-up error, e.g. configuration failed because certificate failed because
+# hostname check went wrong:
+# 0 - fallback errors
+# 4 - errors bubbled up from OpenSSL (sub error, r/w error)
+# 5 - hostname or OCSP verification failed
+# 9 - fatal problems, e.g. missing feature, no fileno...
+# _SSL_last_err and SSL_ERROR are only replaced if the error has a higher
+# severity than the previous one
+
 sub _internal_error {
-    my ($self, $error, $destroy_socket) = @_;
-    $SSL_ERROR = dualvar( -1, $error );
-    $DEBUG && DEBUG($error);
-    ${*$self}{'_SSL_last_err'} = $SSL_ERROR if (ref($self));
+    my ($self, $error, $severity) = @_;
+    $error = dualvar( -1, $error );
+    $self = $CURRENT_SSL_OBJECT if !ref($self) && $CURRENT_SSL_OBJECT;
+    if (ref($self)) {
+	my $oe = ${*$self}{_SSL_last_err};
+	if (!$oe || $oe->[1] <= $severity) {
+	    ${*$self}{_SSL_last_err} = [$error,$severity];
+	    $SSL_ERROR = $error;
+	    $DEBUG && DEBUG("local error: $error");
+	} else {
+	    $DEBUG && DEBUG("ignoring less severe local error '$error', keep '$oe->[0]'");
+	}
+    } else {
+	$SSL_ERROR = $error;
+	$DEBUG && DEBUG("global error: $error");
+    }
     return;
 }
 
 # OpenSSL errors
 sub error {
-    my ($self, $error, $destroy_socket) = @_;
+    my ($self, $error) = @_;
     my @err;
     while ( my $err = Net::SSLeay::ERR_get_error()) {
 	push @err, Net::SSLeay::ERR_error_string($err);
 	$DEBUG>=2 && DEBUG( $error."\n".$self->get_ssleay_error());
     }
     $error .= ' '.join(' ',@err) if @err;
-    if ($error) {
-	$SSL_ERROR = dualvar( -1, $error );
-	$DEBUG && DEBUG($error);
-	${*$self}{'_SSL_last_err'} = $SSL_ERROR if (ref($self));
-    }
+    return $self->_internal_error($error,4) if $error;
     return;
 }
 
@@ -1897,14 +1928,14 @@ sub set_args_filter_hack {
 
 sub next_proto_negotiated {
     my $self = shift;
-    return $self->_internal_error("NPN not supported in Net::SSLeay") if ! $can_npn;
+    return $self->_internal_error("NPN not supported in Net::SSLeay",9) if ! $can_npn;
     my $ssl = $self->_get_ssl_object || return;
     return Net::SSLeay::P_next_proto_negotiated($ssl);
 }
 
 sub alpn_selected {
     my $self = shift;
-    return $self->_internal_error("ALPN not supported in Net::SSLeay") if ! $can_alpn;
+    return $self->_internal_error("ALPN not supported in Net::SSLeay",9) if ! $can_alpn;
     my $ssl = $self->_get_ssl_object || return;
     return Net::SSLeay::P_alpn_selected($ssl);
 }
@@ -2080,7 +2111,7 @@ sub new {
 	    if ( ! $host ) {
 		if ( $vcn_scheme ) {
 		    IO::Socket::SSL->_internal_error(
-			"Cannot determine peer hostname for verification" );
+			"Cannot determine peer hostname for verification",8);
 		    return 0;
 		}
 		warn "Cannot determine hostname of peer for verification. ".
@@ -2116,7 +2147,7 @@ WARN
 	    }
 	    if ( ! $rv ) {
 		IO::Socket::SSL->_internal_error(
-		    "hostname verification failed" );
+		    "hostname verification failed",5);
 	    }
 	    return $rv;
 	};
@@ -2150,7 +2181,7 @@ WARN
 	$ver eq 'TLSv1_1' ? 'CTX_tlsv1_1_new' :
 	$ver eq 'TLSv1_2' ? 'CTX_tlsv1_2_new' :
 	'CTX_new'
-    ) or return IO::Socket::SSL->_internal_error("SSL Version $ver not supported");
+    ) or return IO::Socket::SSL->_internal_error("SSL Version $ver not supported",9);
 
     # For SNI in server mode we need a separate context for each certificate.
     my %ctx;
@@ -2205,7 +2236,7 @@ WARN
 	    SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER|SSL_MODE_ENABLE_PARTIAL_WRITE);
 
 	if ( my $proto_list = $arg_hash->{SSL_npn_protocols} ) {
-	    return IO::Socket::SSL->_internal_error("NPN not supported in Net::SSLeay")
+	    return IO::Socket::SSL->_internal_error("NPN not supported in Net::SSLeay",9)
 		if ! $can_npn;
 	    if($arg_hash->{SSL_server}) {
 		# on server side SSL_npn_protocols means a list of advertised protocols
@@ -2218,7 +2249,7 @@ WARN
 	}
 
 	if ( my $proto_list = $arg_hash->{SSL_alpn_protocols} ) {
-	    return IO::Socket::SSL->_internal_error("ALPN not supported in Net::SSLeay")
+	    return IO::Socket::SSL->_internal_error("ALPN not supported in Net::SSLeay",9)
 		if ! $can_alpn;
 	    if($arg_hash->{SSL_server}) {
 		Net::SSLeay::CTX_set_alpn_select_cb($ctx, $proto_list);
@@ -2394,7 +2425,7 @@ WARN
 
 	if ( my $curve = $arg_hash->{SSL_ecdh_curve} ) {
 	    return IO::Socket::SSL->_internal_error(
-		"ECDH curve needs Net::SSLeay>=1.56 and OpenSSL>=1.0")
+		"ECDH curve needs Net::SSLeay>=1.56 and OpenSSL>=1.0",9)
 		if ! $can_ecdh;
 	    if ( $curve !~ /^\d+$/ ) {
 		# name of curve, find NID
@@ -2419,7 +2450,7 @@ WARN
     if ( my $fp = $arg_hash->{SSL_fingerprint} ) {
 	for( ref($fp) ? @$fp : $fp) {
 	    my ($algo,$digest) = m{^([\w-]+)\$([a-f\d:]+)$}i;
-	    return IO::Socket::SSL->_internal_error("invalid fingerprint '$_'")
+	    return IO::Socket::SSL->_internal_error("invalid fingerprint '$_'",9)
 		if ! $algo;
 	    $algo = lc($algo);
 	    ( $digest = lc($digest) ) =~s{:}{}g;
@@ -2572,7 +2603,7 @@ WARN
     my $ctx = $ctx{''} || (values %ctx)[0];
     if (keys(%ctx) > 1 || ! exists $ctx{''}) {
 	$can_server_sni or return IO::Socket::SSL->_internal_error(
-	    "Server side SNI not supported for this openssl/Net::SSLeay");
+	    "Server side SNI not supported for this openssl/Net::SSLeay",9);
 
 	Net::SSLeay::CTX_set_tlsext_servername_callback($ctx, sub {
 	    my $ssl = shift;

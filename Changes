@@ -1,3 +1,8 @@
+2.013 2015/05/01
+- assign severities to internal error handling and make sure that follow-up
+  errors like "configuration failed" or "certificate verify error" don't
+  replace more specific "hostname verification failed" when reporting in
+  sub errstr/$SSL_ERROR. see also RT#103423
 - enhanced documentation thanks to Chase Whitener 
   https://github.com/noxxi/p5-io-socket-ssl/pull/26
 2.012 2015/02/02

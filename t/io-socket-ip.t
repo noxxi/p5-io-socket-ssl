@@ -18,7 +18,7 @@ unless( IO::Socket::SSL->CAN_IPV6 eq "IO::Socket::IP" ) {
     # not available or IO::Socket::SSL forgot to load it
     if ( ! eval { 
 	require IO::Socket::IP; 
-	IO::Socket::IP->VERSION(0.20) && IO::Socket::IP->VERSION != 0.30; 
+	IO::Socket::IP->VERSION(0.31)
     }) {
 	print "1..0 # Skipped: usuable IO::Socket::IP is not available\n";
     } else {

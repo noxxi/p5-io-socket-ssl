@@ -15,7 +15,7 @@ my $can_idn  = eval { require Encode } && (
 );
 
 $|=1;
-my $max = 40;
+my $max = 42;
 $max+=3 if $can_idn;
 print "1..$max\n";
 
@@ -97,12 +97,50 @@ if ( $pid == 0 ) {
 	    ok( "$want $host $typ" );
 	}
     }
-
     exit;
 }
 
 my $csock = $server->accept;
 wait;
+
+# try with implicit checking
+# Should succeed
+defined( $pid = fork() ) || die $!;
+if ( $pid == 0 ) {
+    IO::Socket::SSL->new(
+	PeerAddr => $saddr,
+	SSL_ca_file => "certs/test-ca.pem",
+	SSL_verify_mode => 1,
+	SSL_verifycn_scheme => 'www',
+	SSL_verifycn_name => 'www.server.local'
+    ) || print "not ";
+    ok("implicit hostname check www.server.local");
+    exit;
+}
+$csock = $server->accept;
+wait;
+
+# Should fail
+defined( $pid = fork() ) || die $!;
+if ( $pid == 0 ) {
+    if (IO::Socket::SSL->new(
+	PeerAddr => $saddr,
+	SSL_ca_file => "certs/test-ca.pem",
+	SSL_verify_mode => 1,
+	SSL_verifycn_scheme => 'www',
+	SSL_verifycn_name => 'does.not.match.server.local'
+    )) {
+	print "not ";
+    } elsif ($SSL_ERROR !~ /hostname verification failed/) {
+	print "# wrong error(should be hostname verification failed): $SSL_ERROR\n";
+	print "not ";
+    }
+    ok("implicit hostname check does.not.match.server.local");
+    exit;
+}
+$csock = $server->accept;
+wait;
+
 
 
 sub ok { print "ok #$_[0]\n"; }
