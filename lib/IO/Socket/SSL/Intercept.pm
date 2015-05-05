@@ -6,7 +6,7 @@ use Carp 'croak';
 use IO::Socket::SSL::Utils;
 use Net::SSLeay;
 
-our $VERSION = '1.93';
+our $VERSION = '2.014';
 
 sub new {
     my ($class,%args) = @_;
@@ -73,8 +73,21 @@ sub clone_cert {
     }
 
     # create new certificate based on original
+    # copy most but not all extensions
+    my $hash = CERT_asHash($old_cert);
+    if (my $ext = $hash->{ext}) {
+	@$ext = grep {
+	    $_->{sn} !~m{^(?:
+		authorityInfoAccess    |
+		subjectKeyIdentifier   |
+		authorityKeyIdentifier |
+		certificatePolicies    |
+		crlDistributionPoints
+	    )$}x
+	} @$ext;
+    }
     my ($clone,$key) = CERT_create(
-	%{ CERT_asHash($old_cert) },
+	%$hash,
 	serial => $self->{serial}++,
 	issuer_cert => $self->{cacert},
 	issuer_key => $self->{cakey},

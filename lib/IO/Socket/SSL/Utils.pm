@@ -9,7 +9,7 @@ use Net::SSLeay;
 require Exporter;
 *import = \&Exporter::import;
 
-our $VERSION = '0.031';
+our $VERSION = '2.014';
 our @EXPORT = qw(
     PEM_file2cert PEM_string2cert PEM_cert2file PEM_cert2string
     PEM_file2key PEM_string2key PEM_key2file PEM_key2string
@@ -343,17 +343,27 @@ sub CERT_create {
 	=> join(",",sort keys %cert_type) if %cert_type;
     push @ext,&Net::SSLeay::NID_ext_key_usage
 	=> join(",",sort keys %ext_key_usage) if %ext_key_usage;
+    Net::SSLeay::P_X509_add_extensions($cert, $issuer_cert, @ext);
 
     for my $ext (@{ $args{ext} || [] }) {
 	my $nid = $ext->{nid}
 	    || $ext->{sn} && Net::SSLeay::OBJ_sn2nid($ext->{sn})
 	    || croak "cannot determine NID of extension";
 	my $val = $ext->{data};
-	$val = "critical,$val" if $ext->{critical};
-	push @ext,($nid,$val);
+	if ($nid == 177) {
+	    # authorityInfoAccess:
+	    # OpenSSL i2v does not output the same way as expected by i2v :(
+	    for (split(/\n/,$val)) {
+		s{ - }{;}; # "OCSP - URI:..." -> "OCSP;URI:..."
+		$_ = "critical,$_" if $ext->{critical};
+		Net::SSLeay::P_X509_add_extensions($cert,$issuer_cert,$nid,$_);
+	    }
+	} else {
+	    $val = "critical,$val" if $ext->{critical};
+	    Net::SSLeay::P_X509_add_extensions($cert, $issuer_cert, $nid, $val);
+	}
     }
 
-    Net::SSLeay::P_X509_add_extensions($cert, $issuer_cert, @ext);
     Net::SSLeay::X509_set_issuer_name($cert,
 	Net::SSLeay::X509_get_subject_name($issuer_cert));
     Net::SSLeay::X509_sign($cert,$issuer_key,_digest($digest_name));

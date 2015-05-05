@@ -1,3 +1,8 @@
+2.014 2015/05/05
+- Utils::CERT_create - work around problems with authorityInfoAccess, where
+  OpenSSL i2v does not create the same string as v2i expects
+- Intercept - don't clone some specific extensions which make only sense with
+  the original certificate
 2.013 2015/05/01
 - assign severities to internal error handling and make sure that follow-up
   errors like "configuration failed" or "certificate verify error" don't
