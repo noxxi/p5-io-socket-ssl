@@ -1600,6 +1600,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	my $ipn;
 	if ( CAN_IPV6 and $identity =~m{:} ) {
 	    # no IPv4 or hostname have ':'  in it, try IPv6.
+	    $identity =~m{[^\da-fA-F:\.]} and return; # invalid characters in name
 	    $ipn = inet_pton(AF_INET6,$identity) or return; # invalid name
 	} elsif ( my @ip = $identity =~m{^(\d+)(?:\.(\d+)\.(\d+)\.(\d+)|[\d\.]*)$} ) {
 	    # check for invalid IP/hostname
