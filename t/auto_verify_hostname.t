@@ -47,6 +47,7 @@ for( my $i=0;$i<@tests;$i+=3 ) {
     my ($name,$scheme,$result) = @tests[$i,$i+1,$i+2];
     my $cl = IO::Socket::SSL->new(
 	PeerAddr => $saddr,
+	Domain => AF_INET,
 	SSL_verify_mode => 1,
 	SSL_verifycn_scheme => $scheme,
 	SSL_verifycn_name => $name,

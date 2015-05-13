@@ -36,6 +36,7 @@ if ( $pid == 0 ) {
     close($server);
     my $client = IO::Socket::SSL->new(
 	PeerAddr => $saddr,
+	Domain => AF_INET,
 	SSL_verify_mode => 0
     ) || print "not ";
     ok( "client ssl connect" );

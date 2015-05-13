@@ -76,6 +76,7 @@ unless (fork) {
 
     $client = IO::Socket::SSL->new(
 	PeerAddr => $saddr,
+	Domain => AF_INET,
 	SSL_verify_mode => 0x01,
 	SSL_ca_file => "certs/test-ca.pem",
 	SSL_use_cert => 1,
@@ -176,6 +177,7 @@ unless (fork) {
     if ($CAN_NONBLOCK) {
 	my $client_3 = IO::Socket::SSL->new(
 	    PeerAddr => $saddr,
+	    Domain => AF_INET,
 	    SSL_verify_mode => 0x01,
 	    SSL_version => 'TLSv1',
 	    SSL_cipher_list => 'HIGH',
@@ -185,16 +187,17 @@ unless (fork) {
 	    SSL_key_file => "certs/server-key.enc",
 	    SSL_passwd_cb => sub { return "bluebell" },
 	    Blocking => 0,
-	    );
+	);
 
 	ok( $client_3, "Client Nonblocking Check 1");
 	close $client_3;
 
 	my $client_4 = IO::Socket::SSL->new(
 	    PeerAddr => $saddr,
+	    Domain => AF_INET,
 	    SSL_reuse_ctx => $client_3,
 	    Blocking => 0
-	    );
+	);
 	ok( $client_4, "Client Nonblocking Check 2");
 	$client_3->close(SSL_ctx_free => 1);
     }

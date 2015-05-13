@@ -59,6 +59,7 @@ if ( $pid == 0 ) {
     for my $host (@tests) {
 	my $client = IO::Socket::SSL->new(
 	    PeerAddr => $saddr,
+	    Domain => AF_INET,
 	    SSL_verify_mode => 1,
 	    SSL_hostname => $host,
 	    SSL_ca_file => 'certs/my-ca.pem',

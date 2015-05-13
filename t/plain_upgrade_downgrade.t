@@ -1,5 +1,6 @@
 use strict;
 use warnings;
+use Socket;
 use IO::Socket::SSL;
 use IO::Socket::SSL::Utils;
 use Test::More;
@@ -104,6 +105,7 @@ for my $test (
 	    if ($act =~m{newSSL(?::(.*))?$} ) {
 		$cl = IO::Socket::SSL->new(
 		    PeerAddr => $saddr,
+		    Domain => AF_INET,
 		    defined($1) ? (SSL_startHandshake => $1):(),
 		) or die "failed to connect: $!|$SSL_ERROR";
 		if ( ! defined($1) || $1 ) {

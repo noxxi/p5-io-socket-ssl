@@ -154,6 +154,7 @@ my $testid = "Test00";
 foreach my $test (@tests) {
     my $to_server = IO::Socket::SSL->new(
 	PeerAddr => $addr,
+	Domain => AF_INET,
 	SSL_verify_mode => 0 ) || do {
 	notok( "connect failed: ".IO::Socket::SSL->errstr() );
 	exit

@@ -47,6 +47,7 @@ if ( $pid == 0 ) {
 
     my $to_server = IO::Socket::SSL->new(
 	PeerAddr => $saddr,
+	Domain => AF_INET,
 	SSL_ca_file => "certs/test-ca.pem",
     ) || do {
 	print "not ok: connect failed: $!\n";

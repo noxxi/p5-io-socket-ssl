@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use Test::More;
+use Socket;
 use IO::Socket::SSL;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
@@ -38,6 +39,7 @@ if ($pid == 0) {
 
 	my $cl = IO::Socket::SSL->new(
 	    PeerAddr => $saddr,
+	    Domain => AF_INET,
 	    SSL_startHandshake => 0,
 	    SSL_verify_mode => 0,
 	    SSL_version => $ver,

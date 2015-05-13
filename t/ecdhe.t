@@ -46,6 +46,7 @@ if ( !defined $pid ) {
     close($server);
     my $to_server = IO::Socket::SSL->new(
 	PeerAddr => $addr,
+	Domain => AF_INET,
 	SSL_verify_mode => 0 ) || do {
 	notok( "connect failed: $SSL_ERROR" );
 	exit

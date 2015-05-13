@@ -47,7 +47,8 @@ if ( !defined $pid ) {
     $ID = 'client';
     close($server);
     my $to_server = IO::Socket::SSL->new(
-	PeerHost => $addr,
+	PeerAddr => $addr,
+	Domain => AF_INET,
 	SSL_verify_mode => 0,
 	SSL_npn_protocols => [qw(two three)],
     ) or do {

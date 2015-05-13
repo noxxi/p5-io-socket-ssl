@@ -39,6 +39,7 @@ if ( $pid == 0 ) {
     close($server);
     my $client = IO::Socket::SSL->new(
 	PeerAddr => $saddr,
+	Domain => AF_INET,
 	SSL_verify_mode => 0
     ) || print "not ";
     ok( "client ssl connect" );
@@ -109,6 +110,7 @@ defined( $pid = fork() ) || die $!;
 if ( $pid == 0 ) {
     IO::Socket::SSL->new(
 	PeerAddr => $saddr,
+	Domain => AF_INET,
 	SSL_ca_file => "certs/test-ca.pem",
 	SSL_verify_mode => 1,
 	SSL_verifycn_scheme => 'www',
@@ -125,6 +127,7 @@ defined( $pid = fork() ) || die $!;
 if ( $pid == 0 ) {
     if (IO::Socket::SSL->new(
 	PeerAddr => $saddr,
+	Domain => AF_INET,
 	SSL_ca_file => "certs/test-ca.pem",
 	SSL_verify_mode => 1,
 	SSL_verifycn_scheme => 'www',

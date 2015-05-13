@@ -43,6 +43,7 @@ close($proxy);
 # connect to server, check certificate
 my $cl = IO::Socket::SSL->new(
     PeerAddr => $saddr,
+    Domain => AF_INET,
     SSL_verify_mode => 1,
     SSL_ca_file => 'certs/my-ca.pem',
 );
@@ -54,6 +55,7 @@ ok( $cl->peer_certificate('issuer') =~ m{IO::Socket::SSL Demo CA},
 # connect to proxy, check certificate
 $cl = IO::Socket::SSL->new(
     PeerAddr => $paddr,
+    Domain => AF_INET,
     SSL_verify_mode => 1,
     SSL_ca_file => 'certs/proxyca.pem',
 );
@@ -79,6 +81,7 @@ sub proxy {
 	my $toc = $proxy->accept or next;
 	my $tos = IO::Socket::SSL->new(
 	    PeerAddr => $saddr,
+	    Domain => AF_INET,
 	    SSL_verify_mode => 1,
 	    SSL_ca_file => 'certs/my-ca.pem',
 	) or die "failed connect to server: $!, $SSL_ERROR";

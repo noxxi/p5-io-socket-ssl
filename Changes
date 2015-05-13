@@ -1,3 +1,7 @@
+2.014 2015/05/13
+- work around problem with IO::Socket::INET6 on windows, by explicitly using
+  Domain AF_INET in the tests. 
+  Fixes RT#104226 reported by CHORNY
 2.014 2015/05/05
 - Utils::CERT_create - work around problems with authorityInfoAccess, where
   OpenSSL i2v does not create the same string as v2i expects

@@ -73,6 +73,7 @@ foreach my $test ( 1,2,3 ) {
 
 	my $to_server = IO::Socket::SSL->new(
 	    PeerAddr => $saddr,
+	    Domain => AF_INET,
 	    SSL_verify_mode => 0x00,
 	);
 	if ( $test == 3 ) {

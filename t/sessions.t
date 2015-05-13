@@ -97,8 +97,8 @@ unless (fork) {
 
     my $sock3 = IO::Socket::INET->new($saddr[2]);
     my @clients = (
-	IO::Socket::SSL->new($saddr[0]),
-	IO::Socket::SSL->new($saddr[1]),
+	IO::Socket::SSL->new(PeerAddr => $saddr[0], Domain => AF_INET),
+	IO::Socket::SSL->new(PeerAddr => $saddr[1], Domain => AF_INET),
 	IO::Socket::SSL->start_SSL( $sock3 ),
     );
 
@@ -140,7 +140,7 @@ unless (fork) {
     }
 
     @clients = map {
-	IO::Socket::SSL->new($_)
+	IO::Socket::SSL->new(PeerAddr => $_, Domain => AF_INET)
     } @saddr;
 
     if (keys(%$cache) != 6) {
