@@ -256,6 +256,7 @@ use vars qw(@ISA $SSL_ERROR @EXPORT);
 my @caller_force_inet4; # in case inet4 gets forced we store here who forced it
 
 my $IOCLASS;
+my $family_key; # 'Domain'||'Family'
 BEGIN {
     # declare @ISA depending of the installed socket class
 
@@ -275,6 +276,7 @@ BEGIN {
     };
 
     # try IO::Socket::IP or IO::Socket::INET6 for IPv6 support
+    $family_key = 'Domain'; # traditional
     if ( $ip6 ) {
 	# if we have IO::Socket::IP >= 0.31 we will use this in preference
 	# because it can handle both IPv4 and IPv6
@@ -284,6 +286,7 @@ BEGIN {
 	}) {
 	    @ISA = qw(IO::Socket::IP);
 	    constant->import( CAN_IPV6 => "IO::Socket::IP" );
+	    $family_key = 'Family';
 	    $IOCLASS = "IO::Socket::IP";
 
 	# if we have IO::Socket::INET6 we will use this not IO::Socket::INET
@@ -468,6 +471,7 @@ sub configure {
 
     $self->configure_SSL($arg_hash) || return;
 
+    $arg_hash->{$family_key} ||= $arg_hash->{Domain} || $arg_hash->{Family};
     return $self->_internal_error("@ISA configuration failed",0)
 	if ! $self->SUPER::configure($arg_hash);
 
