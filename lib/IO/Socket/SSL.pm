@@ -318,7 +318,12 @@ BEGIN {
 
 sub DEBUG {
     $DEBUG or return;
-    my (undef,$file,$line) = caller;
+    my (undef,$file,$line,$sub) = caller(1);
+    if ($sub =~m{^IO::Socket::SSL::(?:error|(_internal_error))$}) {
+	(undef,$file,$line) = caller(2) if $1;
+    } else {
+	(undef,$file,$line) = caller;
+    }
     my $msg = shift;
     $file = '...'.substr( $file,-17 ) if length($file)>20;
     $msg = sprintf $msg,@_ if @_;
@@ -422,7 +427,7 @@ sub import {
 		    @ISA = ( CAN_IPV6 );
 		    warn "IPv6 support re-enabled in __PACKAGE__, got disabled in file $caller_force_inet4[1] line $caller_force_inet4[2]";
 		} else {
-		    die "INET6 is not supported, install IO::Socket::INET6";
+		    die "INET6 is not supported, install IO::Socket::IP";
 		}
 	    }
 	} elsif ( /^:?debug(\d+)/ ) {
@@ -672,12 +677,12 @@ sub connect_SSL {
 
     my $start = defined($timeout) && time();
     {
-	#DEBUG( 'calling ssleay::connect' );
 	$SSL_ERROR = undef;
 	$CURRENT_SSL_OBJECT = $self;
+	$DEBUG>=3 && DEBUG("call Net::SSLeay::connect" );
 	my $rv = Net::SSLeay::connect($ssl);
 	$CURRENT_SSL_OBJECT = undef;
-	$DEBUG>=3 && DEBUG("Net::SSLeay::connect -> $rv" );
+	$DEBUG>=3 && DEBUG("done Net::SSLeay::connect -> $rv" );
 	if ( $rv < 0 ) {
 	    if ( my $err = $self->_skip_rw_error( $ssl,$rv )) {
 		$self->error("SSL connect attempt failed");
@@ -830,7 +835,7 @@ sub accept {
 	    };
 	    $DEBUG>=2 && DEBUG('will not start SSL handshake yet');
 	    return wantarray ? ($socket, getpeername($socket) ) : $socket
-	};
+	}
     }
 
     $self->accept_SSL($socket) || return;
@@ -1164,7 +1169,7 @@ sub readline {
 	    $buf .= $pb
 	} else {
 	    return $buf eq '' ? ():$buf;
-	};
+	}
 	if ( !$eod ) {
 	    my $pos = index( $buf,$delim0 );
 	    if ( $pos<0 ) {
@@ -2377,8 +2382,8 @@ WARN
 		# don't free @chain, because CTX_add_extra_chain_cert
 		# did not duplicate the certificates
 	    }
-	    $havecert or return
-		IO::Socket::SSL->error("Failed to use certificate file");
+	    $havecert or return IO::Socket::SSL->error(
+		"Failed to load certificate from file (no PEM, DER or PKCS12)");
 	}
 
 	if (!$havecert || $havekey) {
@@ -2396,9 +2401,8 @@ WARN
 		    last;
 		}
 	    }
-	}
-	if ($havecert && !$havekey) {
-	    return IO::Socket::SSL->error("Failed to use private key");
+	    $havekey or return IO::Socket::SSL->error(
+		"Failed to load key from file (no PEM or DER)");
 	}
 
 	# replace arg_hash with created context

@@ -1,3 +1,4 @@
+- add better debugging based on patch from H.Merijn Brand
 2.014 2015/05/13
 - work around problem with IO::Socket::INET6 on windows, by explicitly using
   Domain AF_INET in the tests. 
