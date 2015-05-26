@@ -10,7 +10,22 @@ use IO::Socket::SSL;
 use IO::Select;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
-if ( grep { $^O =~m{$_}i } qw( MacOS VOS vmesa riscos amigaos mswin32) ) {
+my $getsize;
+if ( -f "/proc/$$/statm" ) {
+    $getsize = sub {
+	my $pid = shift;
+	open( my $fh,'<', "/proc/$pid/statm");
+	my $line = <$fh>;
+	return (split(' ',$line))[0] * 4;
+    };
+} elsif ( ! grep { $^O =~m{$_}i } qw( MacOS VOS vmesa riscos amigaos mswin32) ) {
+    $getsize = sub {
+	my $pid = shift;
+	open( my $ps,'-|',"ps -o vsize -p $pid 2>/dev/null" ) or return;
+	$ps && <$ps> or return; # header
+	return int(<$ps>); # size
+    };
+} else {
     print "1..0 # Skipped: ps not implemented on this platform\n";
     exit
 }
@@ -22,7 +37,7 @@ if ( $^O =~m{aix}i ) {
 
 
 $|=1;
-if ( ! getsize($$) ) {
+if ( ! $getsize->($$) ) {
     print "1..0 # Skipped: no usable ps\n";
     exit;
 }
@@ -52,7 +67,7 @@ close($server);
 for(1..100) {
     IO::Socket::INET->new( $saddr ) or next;
 }
-my $size100 = getsize($pid);
+my $size100 = $getsize->($pid);
 if ( ! $size100 ) {
     print "1..0 # Skipped: cannot get size of child process\n";
     goto done;
@@ -61,12 +76,12 @@ if ( ! $size100 ) {
 for(100..200) {
     IO::Socket::INET->new( $saddr ) or next;
 }
-my $size200 = getsize($pid);
+my $size200 = $getsize->($pid);
 
 for(200..300) {
     IO::Socket::INET->new( $saddr ) or next;
 }
-my $size300 = getsize($pid);
+my $size300 = $getsize->($pid);
 if ($size100>$size200 or $size200<$size300) {;
     print "1..0 # skipped  - do we measure the right thing?\n";
     goto done;
@@ -82,9 +97,3 @@ wait;
 exit;
 
 
-sub getsize {
-    my $pid = shift;
-    open( my $ps,'-|',"ps -o vsize -p $pid 2>/dev/null" ) or return;
-    $ps && <$ps> or return; # header
-    return int(<$ps>); # size
-}

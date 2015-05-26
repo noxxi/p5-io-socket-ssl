@@ -1,3 +1,5 @@
+- make t/memleak_bad_handshake.t work on cygwin and other systems having 
+  /proc/pid/statm., see RT#104659
 - add better debugging based on patch from H.Merijn Brand
 2.014 2015/05/13
 - work around problem with IO::Socket::INET6 on windows, by explicitly using
