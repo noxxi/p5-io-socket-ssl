@@ -9,6 +9,19 @@ use Test::More;
 
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
+plan tests => 1 + 7 + 4 + 7*2 + 4;
+my @tests = qw(
+    example.com      www FAIL
+    server.local     ldap OK
+    server.local     www FAIL
+    bla.server.local www OK
+    www7.other.local www OK
+    www7.other.local ldap FAIL
+    bla.server.local ldap OK
+);
+
+
+
 my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',
     LocalPort => 0,
@@ -32,16 +45,6 @@ if ( $pid == 0 ) {
 }
 
 close($server);
-my @tests = qw(
-    example.com      www FAIL
-    server.local     ldap OK
-    server.local     www FAIL
-    bla.server.local www OK
-    www7.other.local www OK
-    www7.other.local ldap FAIL
-    bla.server.local ldap OK
-);
-
 IO::Socket::SSL::default_ca('certs/test-ca.pem');
 for( my $i=0;$i<@tests;$i+=3 ) {
     my ($name,$scheme,$result) = @tests[$i,$i+1,$i+2];
@@ -82,4 +85,3 @@ for( my $i=0;$i<@tests;$i+=3 ) {
 kill(9,$pid);
 wait;
 
-done_testing();

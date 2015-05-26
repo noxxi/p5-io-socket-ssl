@@ -7,6 +7,9 @@ use Socket;
 use IO::Socket::SSL;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
+plan skip_all => "Test::More has no done_testing"
+    if !defined &done_testing;
+
 $|=1;
 
 my $XDEBUG = 0;
