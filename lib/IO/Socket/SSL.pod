@@ -821,9 +821,9 @@ Usually you want to verify that the peer certificate has been signed by a
 trusted certificate authority. In this case you should use this option to
 specify the file (C<SSL_ca_file>) or directory (C<SSL_ca_path>) containing the
 certificateZ<>(s) of the trusted certificate authorities.
-Also you can give X509* certificate handles (from L<Net::SSLeay> or
-L<IO::Socket::SSL::Utils>) as a list with C<SSL_ca>. These will be added to the
-CA store before path and file and thus take precedence.
+You can also give a list of X509* certificate handles (like you get from
+L<Net::SSLeay> or L<IO::Socket::SSL::Utils::PEM_xxx2cert>) with C<SSL_ca>. These
+will be added to the CA store before path and file and thus take precedence.
 If neither SSL_ca, nor SSL_ca_file or SSL_ca_path are set it will use
 C<default_ca()> to determine the user-set or system defaults.
 If you really don't want to set a CA set SSL_ca_file or SSL_ca_path to
@@ -859,7 +859,8 @@ If you create a server you usually need to specify a server certificate which
 should be verified by the client. Same is true for client certificates, which
 should be verified by the server.
 The certificate can be given as a file with SSL_cert_file or as an internal
-representation of a X509* object with SSL_cert.
+representation of a X509* object (like you get from L<Net::SSLeay> or 
+L<IO::Socket::SSL::Utils::PEM_xxx2cert>) with SSL_cert.
 If given as a file it will automatically detect the format.
 Supported file formats are PEM, DER and PKCS#12, where PEM and PKCS#12 can
 contain the certicate and the chain to use, while DER can only contain a single
@@ -873,7 +874,8 @@ thus must be freed by the application.
 
 For each certificate a key is need, which can either be given as a file with
 SSL_key_file or as an internal representation of a EVP_PKEY* object with
-SSL_key.
+SSL_key (like you get from L<Net::SSLeay> or
+L<IO::Socket::SSL::Utils::PEM_xxx2key>).
 If a key was already given within the PKCS#12 file specified by SSL_cert_file
 it will ignore any SSL_key or SSL_key_file.
 If no SSL_key or SSL_key_file was given it will try to use the PEM file given
