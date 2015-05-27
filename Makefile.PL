@@ -13,6 +13,21 @@ unless (defined $ENV{EGD_PATH}) {
 
 $| = 1;
 
+my $yesno = sub {
+    my ($msg,$default) = @_;
+    # Taken from ExtUtils::MakeMaker 6.16 (Michael Schwern) so that
+    # the prompt() function can be emulated for older versions of ExtUtils::MakeMaker.
+    while ( -t STDIN && (-t STDOUT || !(-f STDOUT || -c STDOUT))) {
+	print "$msg ";
+	my $choice = <STDIN>;
+	$choice ||= $default;
+	next if $choice !~m{^\s*([yn])}i;
+	return lc($1);
+    }
+
+    return $default;
+};
+
 {
     # issue warning, if Net::SSLeay cannot find random generator
     # redefine __WARN__ only locally to allow detection of failures
@@ -26,16 +41,8 @@ $| = 1;
 	print "to fail.  Please see the README file for more information.\n";
 	print "the message from Net::SSLeay was: $warning\n";
 
-	# Taken from ExtUtils::MakeMaker 6.16 (Michael Schwern) so that 
-	# the prompt() function can be emulated for older versions of ExtUtils::MakeMaker.
-	my $isa_tty = -t STDIN && (-t STDOUT || !(-f STDOUT || -c STDOUT));
-	
-	if ($isa_tty) {
-	    print "Do you REALLY want to continue? [Default: no] ";
-	    die "User cancelled install!\n" if (<STDIN> !~ /^y(?:es)?$/);
-	} else {
-	    die "Install cancelled.\n";
-	}
+	$yesno->("Do you REALLY want to continue? y/[N]","n") eq 'y'
+	    or die "Install cancelled.\n";
     };
 
     if (! defined $ENV{SKIP_RNG_TEST}) {
@@ -109,11 +116,10 @@ my %usable_ca;
 }
 
 my $xt = $ENV{NO_NETWORK_TESTING} && 'n';
-$xt ||= prompt( "Should I do external tests?\n".
+$xt ||= $yesno->( "Should I do external tests?\n".
     "These test will detect if there are network problems and fail soft,\n".
     "so please disable them only if you definitely don't want to have any\n".
-    "network traffic to external sites.   ".
-    "[Y/n]", 'y' );
+    "network traffic to external sites.  [Y/n]", 'y' );
 
 
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
@@ -131,7 +137,7 @@ WriteMakefile(
 	! %usable_ca ? ( 'Mozilla::CA' => 0 ):(),
     },
     'dist' => { COMPRESS => 'gzip', SUFFIX => 'gz', },
-    $xt =~m{^y}i ? ( test => { TESTS => 't/*.t t/external/*.t' }):(),
+    $xt eq 'y' ? ( test => { TESTS => 't/*.t t/external/*.t' }):(),
     $ExtUtils::MakeMaker::VERSION >= 6.46 ? (
 	'META_MERGE' => {
 	    resources => {
