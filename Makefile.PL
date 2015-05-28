@@ -15,11 +15,13 @@ $| = 1;
 
 my $yesno = sub {
     my ($msg,$default) = @_;
+    return $default if defined $default && $ENV{PERL_MM_USE_DEFAULT};
     # Taken from ExtUtils::MakeMaker 6.16 (Michael Schwern) so that
     # the prompt() function can be emulated for older versions of ExtUtils::MakeMaker.
     while ( -t STDIN && (-t STDOUT || !(-f STDOUT || -c STDOUT))) {
 	print "$msg ";
 	my $choice = <STDIN>;
+	$choice =~s{\s+$}{};
 	$choice ||= $default;
 	next if $choice !~m{^\s*([yn])}i;
 	return lc($1);
