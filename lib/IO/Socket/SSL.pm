@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.015_004';
+our $VERSION = '2.015_005';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -228,6 +228,12 @@ if (!defined &Net::SSLeay::CTX_clear_options) {
 	# 77 = SSL_CTRL_CLEAR_OPTIONS
 	Net::SSLeay::CTX_ctrl($ctx,77,$opt,0);
     };
+}
+
+# Try to work around problems with alternative trust path by default, RT#104759
+my $DEFAULT_X509_STORE_flags = 0;
+if (defined &Net::SSLeay::X509_V_FLAG_TRUSTED_FIRST) {
+    $DEFAULT_X509_STORE_flags = Net::SSLeay::X509_V_FLAG_TRUSTED_FIRST();
 }
 
 our $DEBUG;
@@ -2320,11 +2326,9 @@ WARN
 	    }
 	}
 
+	my $X509_STORE_flags = $DEFAULT_X509_STORE_flags;
 	if ($arg_hash->{'SSL_check_crl'}) {
-	    Net::SSLeay::X509_STORE_set_flags(
-		Net::SSLeay::CTX_get_cert_store($ctx),
-		Net::SSLeay::X509_V_FLAG_CRL_CHECK()
-	    );
+	    $X509_STORE_flags |= Net::SSLeay::X509_V_FLAG_CRL_CHECK();
 	    if ($arg_hash->{'SSL_crl_file'}) {
 		my $bio = Net::SSLeay::BIO_new_file($arg_hash->{'SSL_crl_file'}, 'r');
 		my $crl = Net::SSLeay::PEM_read_bio_X509_CRL($bio);
@@ -2335,6 +2339,11 @@ WARN
 		}
 	    }
 	}
+
+	Net::SSLeay::X509_STORE_set_flags(
+	    Net::SSLeay::CTX_get_cert_store($ctx),
+	    $X509_STORE_flags
+	) if $X509_STORE_flags;
 
 	Net::SSLeay::CTX_set_default_passwd_cb($ctx,$arg_hash->{SSL_passwd_cb})
 	    if $arg_hash->{SSL_passwd_cb};
