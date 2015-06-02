@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.015_005';
+our $VERSION = '2.015_006';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -232,9 +232,7 @@ if (!defined &Net::SSLeay::CTX_clear_options) {
 
 # Try to work around problems with alternative trust path by default, RT#104759
 my $DEFAULT_X509_STORE_flags = 0;
-if (defined &Net::SSLeay::X509_V_FLAG_TRUSTED_FIRST) {
-    $DEFAULT_X509_STORE_flags = Net::SSLeay::X509_V_FLAG_TRUSTED_FIRST();
-}
+eval { $DEFAULT_X509_STORE_flags |= Net::SSLeay::X509_V_FLAG_TRUSTED_FIRST() };
 
 our $DEBUG;
 use vars qw(@ISA $SSL_ERROR @EXPORT);
