@@ -1,3 +1,4 @@
+2.016 2015/06/02
 - add flag X509_V_FLAG_TRUSTED_FIRST by default if available in OpenSSL 
   (since 1.02) and available with Net::SSLeay. RT#104759 (thanks GAAS)
 - work around hanging prompt() with older perl in Makefile.PL RT#104731
