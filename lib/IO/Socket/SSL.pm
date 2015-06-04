@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.016';
+our $VERSION = '2.016_001';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -2609,9 +2609,11 @@ WARN
     }
 
     if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
-	for (values %ctx) {
-	    Net::SSLeay::CTX_set_cipher_list($_, $cl ) || return 
-		IO::Socket::SSL->error("Failed to set SSL cipher list");
+	for (keys %ctx) {
+	    Net::SSLeay::CTX_set_cipher_list($ctx{$_}, ref($cl) 
+		? $cl->{$_} || $cl->{''} || $DEFAULT_SSL_ARGS{SSL_cipher_list} || next 
+		: $cl
+	    ) || return IO::Socket::SSL->error("Failed to set SSL cipher list");
 	}
     }
 

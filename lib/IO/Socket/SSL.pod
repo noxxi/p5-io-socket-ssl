@@ -965,6 +965,10 @@ at the tests of SSL Labs.
 To use the less secure OpenSSL builtin default (whatever this is) set
 SSL_cipher_list to ''.
 
+In case different cipher lists are needed for different SNI hosts a hash can be
+given with the host as key and the cipher suite as value, similar to
+B<SSL_cert*>.
+
 =item SSL_honor_cipher_order
 
 If this option is true the cipher order the server specified is used instead
