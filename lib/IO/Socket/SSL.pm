@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.016_001';
+our $VERSION = '2.016_002';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -2141,24 +2141,6 @@ sub new {
 	    # verify name
 	    my $rv = IO::Socket::SSL::verify_hostname_of_cert(
 		$host,$cert,$vcn_scheme,$vcn_publicsuffix );
-	    if ( ! $rv && ! $vcn_scheme ) {
-		# For now we use the default hostname verification if none
-		# was specified and complain loudly but return ok if it does
-		# not match. In the future we will enforce checks and users
-		# should better specify and explicite verification scheme.
-		warn <<WARN;
-
-The verification of cert '$certname'
-failed against the host '$host' with the default verification scheme.
-
-   THIS MIGHT BE A MAN-IN-THE-MIDDLE ATTACK !!!!
-
-To stop this warning you might need to set SSL_verifycn_name to
-the name of the host you expect in the certificate.
-
-WARN
-		return $ok;
-	    }
 	    if ( ! $rv ) {
 		IO::Socket::SSL->_internal_error(
 		    "hostname verification failed",5);
