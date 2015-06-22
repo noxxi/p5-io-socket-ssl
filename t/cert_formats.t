@@ -69,7 +69,7 @@ while (my ($name,$sslargs) = splice(@tests,0,2)) {
 	)) {
 	    fail("[$name] ssl connect failed: $SSL_ERROR");
 	} else {
-	    pass("[$name] ssl connect sucess");
+	    pass("[$name] ssl connect success");
 	}
 	wait;
     }

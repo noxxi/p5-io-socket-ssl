@@ -55,7 +55,7 @@ for my $test (
     ok( ($ok?1:0) == ($expect?1:0),$what);
 }
 
-# Notify server childs to exit by connecting and disconnecting immediatly,
+# Notify server children to exit by connecting and disconnecting immediately,
 # kill only if they will not exit.
 alarm(10);
 my @child;

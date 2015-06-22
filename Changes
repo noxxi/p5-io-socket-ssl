@@ -1,6 +1,6 @@
 - enforce default verification scheme if none was specified, i.e. no longer
   just warn but accept. If really no verification is wanted a scheme of 
-  'none' must be explicitely specified.
+  'none' must be explicitly specified.
 - support different cipher suites per SNI hosts
 2.016 2015/06/02
 - add flag X509_V_FLAG_TRUSTED_FIRST by default if available in OpenSSL 
@@ -864,7 +864,7 @@ v1.14
   Thanks to <at[AT]altlinux[DOT]ru> for bugreport and patch
 - clarified and enhanced debugging supppport based on bugreport
   http://rt.cpan.org/Ticket/Display.html?id=32960
-- put information into README regarding the supported and recommanded
+- put information into README regarding the supported and recommended
   version of Net::SSLeay
 
 v1.13
