@@ -218,8 +218,10 @@ With protocols like SMTP it is necessary to upgrade an existing socket to SSL.
 This can be done like this:
 
     my $client = IO::Socket::INET->new('mx.example.com:25') or die $!;
-    # .. SMTP dialogs ... send STARTTLS and read reply ...
-    # SSL upgrade
+    # .. read greeting from server
+    # .. send EHLO and read response
+    # .. send STARTTLS command and read response
+    # .. if response was successful we can upgrade the socket to SSL now:
     IO::Socket::SSL->start_SSL($client,
 	# explicitly set hostname we should use for SNI
 	SSL_hostname => 'mx.example.com'
