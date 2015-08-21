@@ -19,7 +19,7 @@ use IO::Socket;
 use Net::SSLeay 1.46;
 use IO::Socket::SSL::PublicSuffix;
 use Exporter ();
-use Errno qw( EWOULDBLOCK ETIMEDOUT EINTR );
+use Errno qw( EWOULDBLOCK EAGAIN ETIMEDOUT EINTR );
 use Carp;
 use strict;
 
@@ -1111,7 +1111,7 @@ sub readline {
 	    my $rv = $self->sysread($buf,2**16,length($buf));
 	    if ( ! defined $rv ) {
 		next if $! == EINTR;       # retry
-		last if $! == EWOULDBLOCK; # use everything so far
+		last if $! == EWOULDBLOCK || $! == EAGAIN; # use everything so far
 		return;                    # return error
 	    } elsif ( ! $rv ) {
 		last
@@ -1141,7 +1141,7 @@ sub readline {
 	    my $rv = $self->sysread($buf,$size-length($buf),length($buf));
 	    if ( ! defined $rv ) {
 		next if $! == EINTR;       # retry
-		last if $! == EWOULDBLOCK; # use everything so far
+		last if $! == EWOULDBLOCK || $! == EAGAIN; # use everything so far
 		return;                    # return error
 	    } elsif ( ! $rv ) {
 		last
