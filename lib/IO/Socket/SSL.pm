@@ -2082,7 +2082,6 @@ sub new {
 	 defined( my $file = $arg_hash->{$_} ) or next;
 	for my $f (ref($file) eq 'HASH' ? values(%$file):$file ) {
 	    die "$_ $f does not exist" if ! -f $f;
-	    die "$_ $f is not accessible" if ! -r _;
 	}
     }
 
