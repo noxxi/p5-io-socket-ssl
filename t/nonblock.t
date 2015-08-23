@@ -9,7 +9,7 @@ use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 use IO::Select;
-use Errno qw( EWOULDBLOCK EINPROGRESS EPIPE ECONNRESET );
+use Errno qw( EWOULDBLOCK EAGAIN EINPROGRESS EPIPE ECONNRESET );
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 if ( ! eval "use 5.006; use IO::Select; return 1" ) {
@@ -66,7 +66,7 @@ if ( $pid == 0 ) {
 		IO::Select->new( $to_server )->can_write(30) && next;
 		print "not ";
 		last;
-	    } elsif ( $!{EWOULDBLOCK} ) {
+	    } elsif ( $!{EWOULDBLOCK} || $!{EAGAIN} ) {
 		diag( 'connect not yet completed');
 		# just wait
 		select(undef,undef,undef,0.1);
@@ -94,7 +94,7 @@ if ( $pid == 0 ) {
 	while ( $pmsg ne '' ) {
 	    my $w = syswrite( $to_server,$pmsg );
 	    if ( ! defined $w ) {
-		if ( ! $!{EWOULDBLOCK} ) {
+		if ( ! $!{EWOULDBLOCK} && ! $!{EAGAIN} ) {
 		    diag("syswrite failed with $!");
 		    print "not ";
 		    last;
@@ -197,7 +197,7 @@ if ( $pid == 0 ) {
 		my $n = syswrite( $to_server,$msg,length($msg)-$offset,$offset );
 		if ( !defined($n) ) {
 		    diag( "\$!=$! \$SSL_ERROR=$SSL_ERROR send=$bytes_send" );
-		    if ( $! == EWOULDBLOCK ) {
+		    if ( $! == EWOULDBLOCK || $! == EAGAIN ) {
 			if ( $SSL_ERROR == SSL_WANT_WRITE ) {
 			    diag( 'wait for write' );
 			    $can = 'can_write';
@@ -273,7 +273,7 @@ if ( $pid == 0 ) {
 	my $buf = '';
 	while ( length($buf) <9 ) {
 	    sysread( $from_client, $buf,9-length($buf),length($buf) ) && next;
-	    die "sysread failed: $!" if $! != EWOULDBLOCK;
+	    die "sysread failed: $!" if $! != EWOULDBLOCK && $! != EAGAIN;
 	    IO::Select->new( $from_client )->can_read(30);
 	}
 	$buf eq 'plaintext' || print "not ";
@@ -350,7 +350,7 @@ if ( $pid == 0 ) {
 	    my $n = sysread( $from_client,my $buf,$diff );
 	    if ( !defined($n) ) {
 		diag( "\$!=$! \$SSL_ERROR=$SSL_ERROR" );
-		if ( $! == EWOULDBLOCK ) {
+		if ( $! == EWOULDBLOCK || $! == EAGAIN ) {
 		    if ( $SSL_ERROR == SSL_WANT_READ ) {
 			$attempts++;
 			$can = 'can_read';

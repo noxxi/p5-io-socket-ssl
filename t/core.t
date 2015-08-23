@@ -7,7 +7,7 @@ use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
-use Errno 'EWOULDBLOCK';
+use Errno qw( EWOULDBLOCK EAGAIN );
 
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
@@ -291,7 +291,7 @@ if ($CAN_NONBLOCK) {
     $client = $server->accept;
     while ( ! $client ) {
 	#DEBUG( "$!,$SSL_ERROR" );
-	if ( $! == EWOULDBLOCK ) {
+	if ( $! == EWOULDBLOCK || $! == EAGAIN ) {
 	    if ( $SSL_ERROR == SSL_WANT_WRITE ) {
 		IO::Select->new( $server->opening )->can_write(30);
 	    } else {
