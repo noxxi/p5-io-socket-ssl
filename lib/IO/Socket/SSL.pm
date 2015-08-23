@@ -804,7 +804,7 @@ sub _update_peer {
 	my $sockaddr = getpeername( $self );
 	my $af = sockaddr_family($sockaddr);
 	if( CAN_IPV6 && $af == AF_INET6 ) {
-	    my ($host, $port) = getnameinfo($sockaddr,
+	    my (undef, $host, $port) = getnameinfo($sockaddr,
 		NI_NUMERICHOST | NI_NUMERICSERV);
 	    $arg_hash->{PeerAddr} = $host;
 	    $arg_hash->{PeerPort} = $port;
