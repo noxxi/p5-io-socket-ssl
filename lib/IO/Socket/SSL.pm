@@ -1494,6 +1494,21 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	}
     }
 
+    sub sock_certificate {
+	my ($self,$field) = @_;
+	my $ssl = $self->_get_ssl_object || return;
+	my $cert = Net::SSLeay::get_certificate( $ssl ) || return;
+	if ($field) {
+	    my $sub = $dispatcher{$field} or croak
+		"invalid argument for sock_certificate, valid are: ".join( " ",keys %dispatcher ).
+		"\nMaybe you need to upgrade your Net::SSLeay";
+	    return $sub->($cert);
+	} else {
+	    return $cert
+	}
+    }
+
+
     # known schemes, possible attributes are:
     #  - wildcards_in_alt (0, 'full_label', 'anywhere')
     #  - wildcards_in_cn (0, 'full_label', 'anywhere')
@@ -1719,14 +1734,15 @@ sub get_servername {
 }
 
 sub get_fingerprint_bin {
-    my $cert = shift()->peer_certificate;
-    return Net::SSLeay::X509_digest($cert, $algo2digest->(shift() || 'sha256'));
+    my ($self,$algo,$cert) = @_;
+    $cert ||= $self->peer_certificate;
+    return Net::SSLeay::X509_digest($cert, $algo2digest->($algo || 'sha256'));
 }
 
 sub get_fingerprint {
-    my ($self,$algo) = @_;
+    my ($self,$algo,$cert) = @_;
     $algo ||= 'sha256';
-    my $fp = get_fingerprint_bin($self,$algo) or return;
+    my $fp = get_fingerprint_bin($self,$algo,$cert) or return;
     return $algo.'$'.unpack('H*',$fp);
 }
 

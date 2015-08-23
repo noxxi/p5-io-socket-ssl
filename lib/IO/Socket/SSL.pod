@@ -1409,15 +1409,17 @@ This function gives you the number of bytes available without reading from the
 underlying socket object. This function is essential if you work with event
 loops, please see the section about polling SSL sockets.
 
-=item B<get_fingerprint([algo])>
+=item B<get_fingerprint([algo,certificate])>
 
-This methods returns the fingerprint of the peer certificate in the form
+This methods returns the fingerprint of the given certificate in the form
 C<algo$digest_hex>, where C<algo> is the used algorithm, default 'sha256'.
+If no certificate is given the peer certificate of the connection is used.
 
-=item B<get_fingerprint_bin([algo])>
+=item B<get_fingerprint_bin([algo,certificate])>
 
-This methods returns the binary fingerprint of the peer certificate by using the
-algorithm C<algo>, default 'sha256'.
+This methods returns the binary fingerprint of the given certificate by using
+the algorithm C<algo>, default 'sha256'.
+If no certificate is given the peer certificate of the connection is used.
 
 =item B<get_cipher()>
 
@@ -1473,6 +1475,14 @@ constants are exported from IO::Socket::SSL).
 See Net::SSLeay::X509_get_subjectAltNames.
 
 =back
+
+=item B<sock_certificate($field)>
+
+This is similar to C<peer_certificate> but will return the sites own
+certificate. The same arguments for B<$field> can be used.
+If no B<$field> is given the certificate handle from the underlying OpenSSL will
+be returned. This handle will only be valid as long as the SSL connection exists
+and if used afterwards it might result in strange crashes of the application.
 
 =item B<peer_certificates>
 
