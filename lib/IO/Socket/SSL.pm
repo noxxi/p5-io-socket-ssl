@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.016_002';
+our $VERSION = '2.017';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -2101,7 +2101,7 @@ sub new {
 	}
     }
 
-    my $verify_mode = $arg_hash->{SSL_verify_mode};
+    my $verify_mode = $arg_hash->{SSL_verify_mode} || 0;
     if ( $verify_mode != Net::SSLeay::VERIFY_NONE()) {
 	if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
 	    if ( ! ref($f) || $$f ) {
@@ -2117,6 +2117,9 @@ sub new {
 		    if ! opendir(my $dh,$d);
 	    }
 	}
+    } elsif ( $verify_mode ne '0' ) {
+	# some users use the string 'SSL_VERIFY_PEER' instead of the constant
+	die "SSL_verify_mode must be a number and not a string";
     }
 
     my $self = bless {},$class;
@@ -2501,7 +2504,7 @@ sub new {
 		Net::SSLeay::X509_NAME_oneline(Net::SSLeay::X509_get_subject_name($cert));
 	    $error &&= Net::SSLeay::ERR_error_string($error);
 	}
-	$DEBUG>=3 && DEBUG( "ok=$ok cert=$cert" );
+	$DEBUG>=3 && DEBUG( "ok=$ok [$depth] $certname" );
 	$ok = $verify_cb->($ok,$ctx_store,$certname,$error,$cert,$depth) if $verify_cb;
 	$ok = $verify_fingerprint->($ok,$cert,$depth) if $verify_fingerprint && $cert;
 	return $ok;

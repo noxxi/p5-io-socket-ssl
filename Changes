@@ -1,3 +1,12 @@
+2.017 2015/08/24
+- checks for readability of files/dirs for certificates and CA no longer use
+  -r because this is not safe when ACLs are used. Thanks to BBYRD, RT#106295
+- new method sock_certificate similar to peer_certificate based on idea of
+  Paul Evans, RT#105733
+- get_fingerprint can now take optional certificate as argument and compute
+  the fingerprint of it. Useful in connection with sock_certificate.
+- check for both EWOULDBLOCK and EAGAIN since these codes are different on
+  some platforms. Thanks to Andy Grundman, RT#106573
 - enforce default verification scheme if none was specified, i.e. no longer
   just warn but accept. If really no verification is wanted a scheme of 
   'none' must be explicitely specified.
