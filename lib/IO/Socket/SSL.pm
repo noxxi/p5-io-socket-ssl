@@ -2106,13 +2106,15 @@ sub new {
 	if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
 	    if ( ! ref($f) || $$f ) {
 		die "SSL_ca_file $f does not exist" if ! -f $f;
-		die "SSL_ca_file $f is not accessible" if ! -r _;
+		die "SSL_ca_file $f is not accessible: $!" 
+		    if ! open(my $fh,'<',$f);
 	    }
 	}
 	if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
 	    if ( ! ref($d) || $$d ) {
 		die "SSL_ca_path $d does not exist" if ! -d $d;
-		die "SSL_ca_path $d is not accessible" if ! -r _;
+		die "SSL_ca_path $d is not accessible: $!" 
+		    if ! opendir(my $dh,$d);
 	    }
 	}
     }
