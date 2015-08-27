@@ -87,7 +87,7 @@ IO::Socket::SSL->start_SSL( $csock,
     SSL_ca_file => "certs/test-ca.pem",
     SSL_cert_file => "certs/server-cert.pem",
     SSL_version => 'TLSv1',
-    SSL_cipher_list => 'HIGH',
+    SSL_cipher_list => 'HIGH:!ADH',
     SSL_key_file => "certs/server-key.enc",
     SSL_passwd_cb => sub { return "bluebell" },
 ) || print "not ";

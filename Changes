@@ -1,3 +1,6 @@
+2.018 2015/08/27
+- RT#106687 - startssl.t failed on darwin with old openssl since server 
+  requested client certificate but offered also anon ciphers
 2.017 2015/08/24
 - checks for readability of files/dirs for certificates and CA no longer use
   -r because this is not safe when ACLs are used. Thanks to BBYRD, RT#106295
