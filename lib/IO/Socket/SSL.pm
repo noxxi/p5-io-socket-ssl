@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.018';
+our $VERSION = '2.019';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -270,12 +270,20 @@ BEGIN {
 	require Socket;
 	Socket->VERSION(1.95);
 	my $ok = Socket::inet_pton( AF_INET6(),'::1') && AF_INET6();
-	$ok && Socket->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
+	$ok && Socket->import( qw/inet_pton NI_NUMERICHOST NI_NUMERICSERV/ );
+	# behavior different to Socket6::getnameinfo - wrap
+	*_getnameinfo = sub { 
+	    my ($err,$host,$port) = Socket::getnameinfo(@_) or return; 
+	    return if $err;
+	    return ($host,$port);
+	};
 	$ok;
     } || eval {
 	require Socket6;
 	my $ok = Socket6::inet_pton( AF_INET6(),'::1') && AF_INET6();
-	$ok && Socket6->import( qw/inet_pton getnameinfo NI_NUMERICHOST NI_NUMERICSERV/ );
+	$ok && Socket6->import( qw/inet_pton NI_NUMERICHOST NI_NUMERICSERV/ );
+	# behavior different to Socket::getnameinfo - wrap
+	*_getnameinfo = sub { return Socket6::getnameinfo(@_); };
 	$ok;
     };
 
@@ -804,7 +812,7 @@ sub _update_peer {
 	my $sockaddr = getpeername( $self );
 	my $af = sockaddr_family($sockaddr);
 	if( CAN_IPV6 && $af == AF_INET6 ) {
-	    my (undef, $host, $port) = getnameinfo($sockaddr,
+	    my (undef, $host, $port) = _getnameinfo($sockaddr,
 		NI_NUMERICHOST | NI_NUMERICSERV);
 	    $arg_hash->{PeerAddr} = $host;
 	    $arg_hash->{PeerPort} = $port;

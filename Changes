@@ -1,3 +1,7 @@
+2.019 2015/09/01
+- work around different behavior of getnameinfo from Socket and Socket6 by
+  using a different wrapper depending on which module I use for IPv6.
+  Thanks to bluhm for reporting.
 2.018 2015/08/27
 - RT#106687 - startssl.t failed on darwin with old openssl since server 
   requested client certificate but offered also anon ciphers
