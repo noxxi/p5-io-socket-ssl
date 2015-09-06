@@ -31,7 +31,7 @@ if ( ! $pid ) {
 	#${*$cl}{_SSL_ctx} or die "accepted socket has no SSL context";
 	${*$cl}{_SSL_object} and die "accepted socket is already SSL";
 
-	# try to find out if we start with TLS immediatly (peek gets data from
+	# try to find out if we start with TLS immediately (peek gets data from
 	# client hello) or have some plain data initially (peek gets these
 	# plain data)
 	diag("wait for initial data from client");

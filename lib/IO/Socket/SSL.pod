@@ -437,7 +437,7 @@ L<IO::Socket::SSL> tries to set these values to reasonable, secure values which
 are compatible with the rest of the world.
 But, there are some scripts or modules out there which tried to be smart and
 get more secure or compatible settings.
-Unfortunatly, they did this years ago and never updated these values, so they
+Unfortunately, they did this years ago and never updated these values, so they
 are still forced to do only 'TLSv1' (instead of also using TLSv12 or TLSv11).
 Or they set 'HIGH' as the cipher list and thought they were secure, but did not
 notice that 'HIGH' includes anonymous ciphers, e.g. without identification of
@@ -476,7 +476,7 @@ their own quirks. While most of these implementations work together, it often
 gets problematic with older versions, minimal versions in load balancers, or plain
 wrong setups.
 
-Unfortunatly these problems are hard to debug.
+Unfortunately these problems are hard to debug.
 Helpful for debugging are a knowledge of SSL internals, wireshark and the use of
 the debug settings of L<IO::Socket::SSL> and L<Net::SSLeay>, which can both be
 set with C<$IO::Socket::SSL::DEBUG>.
@@ -829,7 +829,7 @@ will be added to the CA store before path and file and thus take precedence.
 If neither SSL_ca, nor SSL_ca_file or SSL_ca_path are set it will use
 C<default_ca()> to determine the user-set or system defaults.
 If you really don't want to set a CA set SSL_ca_file or SSL_ca_path to
-C<\undef> or SSL_ca to an empty list. (unfortunatly C<''> is used by some
+C<\undef> or SSL_ca to an empty list. (unfortunately C<''> is used by some
 modules using L<IO::Socket::SSL> when CA is not exlicitly given).
 
 =item SSL_client_ca | SSL_client_ca_file
@@ -1717,13 +1717,13 @@ about the certificates) will be considered a hard error too.
 
 The OCSP resolving will stop on the first hard error.
 
-The method will return undef as long as no hard errors occured and still
+The method will return undef as long as no hard errors occurred and still
 requests to be resolved. If all requests got resolved and no hard errors
-occured the method will return C<''>.
+occurred the method will return C<''>.
 
 =item soft_error
 
-This returns the soft error(s) which occured when asking the OCSP responders.
+This returns the soft error(s) which occurred when asking the OCSP responders.
 
 =item requests
 
@@ -1743,7 +1743,7 @@ remaining requests.
 =item add_response($uri,$response)
 
 This method takes the HTTP body of the response which got received when sending
-the OCSP request to C<$uri>. If no response was received or an error occured
+the OCSP request to C<$uri>. If no response was received or an error occurred
 one should either retry or consider C<$response> as empty which will trigger a
 soft error.
 

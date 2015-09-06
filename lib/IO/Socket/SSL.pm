@@ -772,7 +772,7 @@ sub connect_SSL {
 	    $DEBUG>=3 && DEBUG("got OCSP failure with stapling: %s",
 		$ocsp_result->[1]);
 	} else {
-	    # definitly revoked
+	    # definitely revoked
 	    $DEBUG>=3 && DEBUG("got OCSP revocation with stapling: %s",
 		$ocsp_result->[1]);
 	    $self->_internal_error($ocsp_result->[1],5);
@@ -2519,7 +2519,7 @@ sub new {
     };
 
     if ( $^O eq 'darwin' ) {
-	# explicitely set error code to disable use of apples TEA patch
+	# explicitly set error code to disable use of apples TEA patch
 	# https://hynek.me/articles/apple-openssl-verification-surprises/
 	my $vcb = $verify_callback;
 	$verify_callback = sub {
