@@ -1,3 +1,8 @@
+2.020 2015/09/20
+- support multiple directories in SSL_ca_path as proposed in RT#106711
+  by dr1027[AT]evocat[DOT]ne. Directories can be given as array or as string
+  with a path separator, see documentation.
+- typos fixed thanks to jwilk https://github.com/noxxi/p5-io-socket-ssl/pull/34
 2.019 2015/09/01
 - work around different behavior of getnameinfo from Socket and Socket6 by
   using a different wrapper depending on which module I use for IPv6.

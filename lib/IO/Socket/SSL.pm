@@ -1,4 +1,4 @@
-# vim: set sts=4 sw=4 ts=8 ai:
+#vim: set sts=4 sw=4 ts=8 ai:
 #
 # IO::Socket::SSL:
 # provide an interface to SSL connections similar to IO::Socket modules
@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.019';
+our $VERSION = '2.020';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -359,10 +359,48 @@ BEGIN {
     *idn_to_unicode = \&IO::Socket::SSL::PublicSuffix::idn_to_unicode;
 }
 
+my $OPENSSL_LIST_SEPARATOR = $^O =~m{^(?:(dos|os2|mswin32|netware)|vms)$}i
+    ? $1 ? ';' : ',' : ':';
+my $CHECK_SSL_PATH = sub {
+    my %args = (@_ == 1) ? ('',@_) : @_;
+    for my $type (keys %args) {
+	my $path = $args{$type};
+	if (!$type) {
+	    delete $args{$type};
+	    $type = (ref($path) || -d $path) ? 'SSL_ca_path' : 'SSL_ca_file';
+	    $args{$type} = $path;
+	}
+
+	next if ref($path) eq 'SCALAR' && ! $$path;
+	if ($type eq 'SSL_ca_file') {
+	    die "SSL_ca_file $path does not exist" if ! -f $path;
+	    die "SSL_ca_file $path is not accessible: $!"
+		if ! open(my $fh,'<',$path);
+	} elsif ($type eq 'SSL_ca_path') {
+	    $path = [ split($OPENSSL_LIST_SEPARATOR,$path) ] if !ref($path);
+	    my @err;
+	    for my $d (ref($path) ? @$path : $path) {
+		if (! -d $d) {
+		    push @err, "SSL_ca_path $d does not exist";
+		} elsif (! opendir(my $dh,$d)) {
+		    push @err, "SSL_ca_path $d is not accessible: $!"
+		} else {
+		    @err = ();
+		    last
+		}
+	    }
+	    die "@err" if @err;
+	}
+    }
+    return %args;
+};
+
+
 {
     my %default_ca;
     my $ca_detected; # 0: never detect, undef: need to (re)detect
     my $openssldir;
+
     sub default_ca {
 	if (@_) {
 	    # user defined default CA or reset
@@ -370,10 +408,7 @@ BEGIN {
 		%default_ca = @_;
 		$ca_detected  = 0;
 	    } elsif ( my $path = shift ) {
-		%default_ca =
-		    -d $path ? ( SSL_ca_path => $path ) :
-		    -f $path ? ( SSL_ca_file => $path ) :
-		    die "no such file or directory $path";
+		%default_ca = $CHECK_SSL_PATH->($path);
 		$ca_detected  = 0;
 	    } else {
 		$ca_detected = undef;
@@ -2111,19 +2146,8 @@ sub new {
 
     my $verify_mode = $arg_hash->{SSL_verify_mode} || 0;
     if ( $verify_mode != Net::SSLeay::VERIFY_NONE()) {
-	if ( defined( my $f = $arg_hash->{SSL_ca_file} )) {
-	    if ( ! ref($f) || $$f ) {
-		die "SSL_ca_file $f does not exist" if ! -f $f;
-		die "SSL_ca_file $f is not accessible: $!" 
-		    if ! open(my $fh,'<',$f);
-	    }
-	}
-	if ( defined( my $d = $arg_hash->{SSL_ca_path} )) {
-	    if ( ! ref($d) || $$d ) {
-		die "SSL_ca_path $d does not exist" if ! -d $d;
-		die "SSL_ca_path $d is not accessible: $!" 
-		    if ! opendir(my $dh,$d);
-	    }
+	for (qw(SSL_ca_file SSL_ca_path)) {
+	    $CHECK_SSL_PATH->($_ => $arg_hash->{$_} || next);
 	}
     } elsif ( $verify_mode ne '0' ) {
 	# some users use the string 'SSL_VERIFY_PEER' instead of the constant
@@ -2289,9 +2313,9 @@ sub new {
 	    || defined $arg_hash->{SSL_ca_file}
 	    || defined $arg_hash->{SSL_ca_path} ) {
 	    my $file = $arg_hash->{SSL_ca_file};
-	    $file = undef if ref($file) && ! $$file;
+	    $file = undef if ref($file) eq 'SCALAR' && ! $$file;
 	    my $dir = $arg_hash->{SSL_ca_path};
-	    $dir = undef if ref($dir) && ! $$dir;
+	    $dir = undef if ref($dir) eq 'SCALAR' && ! $$dir;
 	    if ( $arg_hash->{SSL_ca} ) {
 		my $store = Net::SSLeay::CTX_get_cert_store($ctx);
 		for (@{$arg_hash->{SSL_ca}}) {
@@ -2300,6 +2324,7 @@ sub new {
 			    "Failed to add certificate to CA store");
 		}
 	    }
+	    $dir = join($OPENSSL_LIST_SEPARATOR,@$dir) if ref($dir);
 	    if ( $file || $dir and ! Net::SSLeay::CTX_load_verify_locations(
 		$ctx, $file || '', $dir || '')) {
 		return IO::Socket::SSL->error(
@@ -2308,8 +2333,10 @@ sub new {
 	    }
 	} elsif ( my %ca = IO::Socket::SSL::default_ca()) {
 	    # no CA path given, continue with system defaults
+	    my $dir = $ca{SSL_ca_path};
+	    $dir = join($OPENSSL_LIST_SEPARATOR,@$dir) if ref($dir);
 	    if (! Net::SSLeay::CTX_load_verify_locations( $ctx,
-		$ca{SSL_ca_file} || '',$ca{SSL_ca_path} || '')
+		$ca{SSL_ca_file} || '',$dir || '')
 		&& $verify_mode != Net::SSLeay::VERIFY_NONE()) {
 		return IO::Socket::SSL->error(
 		    "Invalid default certificate authority locations")

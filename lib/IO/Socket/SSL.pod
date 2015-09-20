@@ -823,6 +823,12 @@ Usually you want to verify that the peer certificate has been signed by a
 trusted certificate authority. In this case you should use this option to
 specify the file (C<SSL_ca_file>) or directory (C<SSL_ca_path>) containing the
 certificateZ<>(s) of the trusted certificate authorities.
+
+C<SSL_ca_path> can also be an array or a string containing multiple path, where
+the path are separated by the platform specific separator. This separator is
+C<;> on DOS, Windows, Netware, C<,> on VMS and C<:> for all the other systems.
+If multiple path are given at least one of these must be accessible.
+
 You can also give a list of X509* certificate handles (like you get from
 L<Net::SSLeay> or L<IO::Socket::SSL::Utils::PEM_xxx2cert>) with C<SSL_ca>. These
 will be added to the CA store before path and file and thus take precedence.
