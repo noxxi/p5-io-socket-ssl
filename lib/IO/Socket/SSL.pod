@@ -636,7 +636,7 @@ TCP socket in a non-blocking way with C<start_SSL> and C<accept_SSL>.
 	    # we might have still data within the current SSL frame
 	    # thus first process these data instead of waiting on the underlying
 	    # socket object
-	    goto READ if $self->pending;  # goto sysread
+	    goto READ if $cl->pending;    # goto sysread
 	    next;                         # goto $sel->can_read
 	}
     }
@@ -867,7 +867,7 @@ If you create a server you usually need to specify a server certificate which
 should be verified by the client. Same is true for client certificates, which
 should be verified by the server.
 The certificate can be given as a file with SSL_cert_file or as an internal
-representation of a X509* object (like you get from L<Net::SSLeay> or 
+representation of a X509* object (like you get from L<Net::SSLeay> or
 L<IO::Socket::SSL::Utils::PEM_xxx2cert>) with SSL_cert.
 If given as a file it will automatically detect the format.
 Supported file formats are PEM, DER and PKCS#12, where PEM and PKCS#12 can
