@@ -60,10 +60,6 @@ BEGIN {
     $can_npn        = defined &Net::SSLeay::P_next_proto_negotiated;
     $can_alpn       = defined &Net::SSLeay::CTX_set_alpn_protos;
     $can_ecdh       = defined &Net::SSLeay::CTX_set_tmp_ecdh &&
-	# There is a regression with elliptic curves on 1.0.1d with 64bit
-	# http://rt.openssl.org/Ticket/Display.html?id=2975
-	( Net::SSLeay::OPENSSL_VERSION_NUMBER() != 0x1000104f
-	|| length(pack("P",0)) == 4 );
     $can_ocsp        = defined &Net::SSLeay::OCSP_cert2ids;
     $can_ocsp_staple = $can_ocsp
 	&& defined &Net::SSLeay::set_tlsext_status_type;
