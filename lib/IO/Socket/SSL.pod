@@ -757,9 +757,11 @@ Please be aware that with the IPv6 capable super classes, it will look first
 for the IPv6 address of a given hostname. If the resolver provides an IPv6
 address, but the host cannot be reached by IPv6, there will be no automatic
 fallback to IPv4.
-To avoid these problems you can either force IPv4 by specifying and AF_INET
-as C<Domain> of the socket or globally enforce IPv4 by loading L<IO::Socket::SSL>
-with the option 'inet4'.
+To avoid these problems you can enforce IPv4 for a specific socket by
+using the C<Domain> or C<Family> option with the value AF_INET as described in
+L<IO::Socket::IP>. Alternatively you can enforce IPv4 globally by loading
+L<IO::Socket::SSL> with the option 'inet4', in which case it will use the IPv4
+only class L<IO::Socket::INET> as the super class.
 
 L<IO::Socket::SSL> will provide all of the methods of its super class, but
 sometimes it will override them to match the behavior expected from SSL or to
