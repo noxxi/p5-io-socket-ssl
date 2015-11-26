@@ -130,13 +130,13 @@ sub run_with_lib {
     # TLD with only one (wildcard) rule:
     if(0) {
 	# we return '' not undef
-	is public_suffix('cy'), undef;
+	is public_suffix('bd'), undef;
     } else {
-	is public_suffix('cy'), '';
+	is public_suffix('bd'), '';
     }
-    is public_suffix('c.cy'), 'c.cy';
-    is public_suffix('b.c.cy'), 'c.cy';
-    is public_suffix('a.b.c.cy'), 'c.cy';
+    is public_suffix('c.bd'), 'c.bd';
+    is public_suffix('b.c.bd'), 'c.bd';
+    is public_suffix('a.b.c.bd'), 'c.bd';
 
     # More complex suffixes:
     is public_suffix('jp'), 'jp';
