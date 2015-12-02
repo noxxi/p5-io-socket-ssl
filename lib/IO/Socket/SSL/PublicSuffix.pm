@@ -9,7 +9,7 @@ use constant URL => 'http://publicsuffix.org/list/effective_tld_names.dat';
 
 =head1 NAME
 
-IO::Socket::SSL::PublicSuffix - provide access to Mozillas list of effective TLD names
+IO::Socket::SSL::PublicSuffix - provide access to Mozilla's list of effective TLD names
 
 =head1 SYNOPSIS
 

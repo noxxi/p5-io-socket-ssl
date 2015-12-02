@@ -302,7 +302,7 @@ if ( $pid == 0 ) {
 	sleep(5) if $test eq 'slow'; # wait until client calls connect_SSL
 
 	# SSL handshake  thru accept_SSL
-	# if test is 'fast' (e.g. client is 'slow') we excpect the first
+	# if test is 'fast' (e.g. client is 'slow') we expect the first
 	# accept_SSL attempt to fail because client did not call connect_SSL yet
 	my $attempts = 0;
 	while ( 1 ) {

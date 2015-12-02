@@ -119,7 +119,7 @@ sub tests {(
     [ 1, 'www.xn--poema-9qae5a.com.br', '*.xn--poema-9qae5a.com.br' ],
     [ 0, 'xn--poema-9qae5a.com.br', '', '*.xn--poema-9qae5a.com.br,xn--poema-*.com.br,xn--*-9qae5a.com.br,*--poema-9qae5a.com.br' ],
 
-# There should be no *.com.br certificates and public sufffix catches this.
+# There should be no *.com.br certificates and public suffix catches this.
 # So this example is bad and we change it to .foo.com.br
 #   [ 1, 'xn--poema-9qae5a.com.br', '*.com.br' ],
     [ 1, 'xn--poema-9qae5a.foo.com.br', '*.foo.com.br' ],

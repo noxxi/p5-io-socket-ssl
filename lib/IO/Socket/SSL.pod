@@ -449,7 +449,7 @@ better fit the real world.
 
 =item *
 
-Make SSL settings inacessible by the user, together with bad builtin settings.
+Make SSL settings inaccessible by the user, together with bad builtin settings.
 
 Some modules use L<IO::Socket::SSL>, but don't make the SSL settings available
 to the user. This is often combined with bad builtin settings or defaults (like
@@ -580,7 +580,7 @@ connection. In these cases it is necessary to finish the handshake before
 you can read or write data. This might result in situations where you want to
 read but must first finish the write of a handshake or where you want to write
 but must first finish a read.
-In these cases C<$!> is set to EGAIN like expected, and additionally
+In these cases C<$!> is set to EAGAIN like expected, and additionally
 C<$SSL_ERROR> is set to either SSL_WANT_READ or SSL_WANT_WRITE.
 Thus if you get EWOULDBLOCK on a SSL socket you must check C<$SSL_ERROR> for
 SSL_WANT_* and adapt your event mask accordingly.
@@ -816,7 +816,7 @@ See section "SNI Support" for details of SNI the support.
 
 If this option is set to false (defaults to true) it will not start the SSL
 handshake yet. This has to be done later with C<accept_SSL> or C<connect_SSL>.
-Before the handshake is started read/write/etcc can be used to exchange plain
+Before the handshake is started read/write/etc. can be used to exchange plain
 data.
 
 =item SSL_ca | SSL_ca_file | SSL_ca_path
@@ -838,7 +838,7 @@ If neither SSL_ca, nor SSL_ca_file or SSL_ca_path are set it will use
 C<default_ca()> to determine the user-set or system defaults.
 If you really don't want to set a CA set SSL_ca_file or SSL_ca_path to
 C<\undef> or SSL_ca to an empty list. (unfortunately C<''> is used by some
-modules using L<IO::Socket::SSL> when CA is not exlicitly given).
+modules using L<IO::Socket::SSL> when CA is not explicitly given).
 
 =item SSL_client_ca | SSL_client_ca_file
 
@@ -873,7 +873,7 @@ representation of a X509* object (like you get from L<Net::SSLeay> or
 L<IO::Socket::SSL::Utils::PEM_xxx2cert>) with SSL_cert.
 If given as a file it will automatically detect the format.
 Supported file formats are PEM, DER and PKCS#12, where PEM and PKCS#12 can
-contain the certicate and the chain to use, while DER can only contain a single
+contain the certificate and the chain to use, while DER can only contain a single
 certificate.
 
 If given as a list of X509* please note, that the all the chain certificates
@@ -1324,7 +1324,7 @@ upgrade it with C<start_SSL> later.
 
 =item B<connect(...)>
 
-This behaves similar to the connnect function but also does an SSL handshake.
+This behaves similar to the connect function but also does an SSL handshake.
 Because you cannot give SSL specific arguments to this function, you should
 better either use C<new> to create a connect SSL socket or C<start_SSL> to
 upgrade an established TCP socket to SSL.
@@ -1684,7 +1684,7 @@ SSL_WANT_READ or SSL_WANT_WRITE. In this case the call should be retried again
 with the same arguments once the socket is ready.
 
 For calling from C<stop_SSL> C<SSL_fast_shutdown> default to false, e.g. it
-waits for the close_notify of the peer. This is necesarry in case you want to
+waits for the close_notify of the peer. This is necessary in case you want to
 downgrade the socket and continue to use it as a plain socket.
 
 After stop_SSL the socket can again be used to exchange plain data.
