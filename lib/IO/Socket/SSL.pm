@@ -137,7 +137,7 @@ my %DEFAULT_SSL_CLIENT_ARGS = (
 	    DES-CBC3-SHA
 	    RC4-SHA
 	),
-	# just to make sure, that we don't accidentely add bad ciphers above
+	# just to make sure, that we don't accidentally add bad ciphers above
 	"!EXP !LOW !eNULL !aNULL !DES !MD5 !PSK !SRP"
     )
 );
@@ -211,7 +211,7 @@ BEGIN{
 	if $@;
 }
 
-# get constants for SSL_OP_NO_* now, instead calling the releated functions
+# get constants for SSL_OP_NO_* now, instead calling the related functions
 # every time we setup a connection
 my %SSL_OP_NO;
 for(qw( SSLv2 SSLv3 TLSv1 TLSv1_1 TLSv11:TLSv1_1 TLSv1_2 TLSv12:TLSv1_2 )) {
@@ -1447,7 +1447,7 @@ sub start_SSL {
 	    return;
 	}
     } else {
-	$DEBUG>=2 && DEBUG( "dont start handshake: $socket" );
+	$DEBUG>=2 && DEBUG( "don't start handshake: $socket" );
 	return $socket; # just return upgraded socket
     }
 
@@ -2570,7 +2570,7 @@ sub new {
 		die "no IO::Socket::SSL object found for SSL $ssl";
 	    $iossl->[1] and do {
 		# we must return with 1 or it will be called again
-		# and beause we have no SSL object we must make the error global
+		# and because we have no SSL object we must make the error global
 		Carp::cluck($IO::Socket::SSL::SSL_ERROR
 		    = "OCSP callback on server side");
 		return 1;
