@@ -437,7 +437,6 @@ leasing.aero
 logistics.aero
 magazine.aero
 maintenance.aero
-marketplace.aero
 media.aero
 microlight.aero
 modelling.aero
@@ -460,7 +459,6 @@ show.aero
 skydiving.aero
 software.aero
 student.aero
-taxi.aero
 trader.aero
 trading.aero
 trainer.aero
