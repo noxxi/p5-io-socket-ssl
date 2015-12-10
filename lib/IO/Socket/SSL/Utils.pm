@@ -155,7 +155,30 @@ sub CERT_asHash {
 		if (length($v) == 4) {
 		    $v = join('.',unpack("CCCC",$v));
 		} elsif ( length($v) == 16 ) {
-		    $v = join(':',map { sprintf( "%x",$_) } unpack("NNNN",$v));
+		    my @v = unpack("nnnnnnnn",$v);
+		    my ($best0,$last0);
+		    for(my $i=0;$i<@v;$i++) {
+			if ($v[$i] == 0) {
+			    if ($last0) {
+				$last0->[1] = $i;
+				$last0->[2]++;
+				$best0 = $last0 if ++$last0->[2]>$best0->[2];
+			    } else {
+				$last0 = [ $i,$i,0 ];
+				$best0 ||= $last0;
+			    }
+			} else {
+			    $last0 = undef;
+			}
+		    }
+		    if ($best0) {
+			$v = '';
+			$v .= join(':', map { sprintf( "%x",$_) } @v[0..$best0->[0]-1]) if $best0->[0]>0;
+			$v .= '::';
+			$v .= join(':', map { sprintf( "%x",$_) } @v[$best0->[1]+1..$#v]) if $best0->[1]<$#v;
+		    } else {
+			$v = join(':', map { sprintf( "%x",$_) } @v);
+		    }
 		}
 	    }
 	    push @$alt,[$t,$v]

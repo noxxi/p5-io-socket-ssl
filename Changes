@@ -1,3 +1,6 @@
+2.022 2015/12/10
+- fix stringification of IPv6 inside subjectAltNames in Utils::CERT_asHash.
+  Thanks to Mark.Martinec[AT]ijs[DOT]si for reporting in #110253
 2.021 2015/12/02
 - Fixes for documentation and typos thanks to DavsX and jwilk.
 - Update PublicSuffx with latest version from publicsuffix.org
