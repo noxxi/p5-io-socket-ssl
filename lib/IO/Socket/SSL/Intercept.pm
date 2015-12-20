@@ -260,7 +260,7 @@ the client yet.
 Establish the SSL connection to the server and verify the servers certificate as
 usually. Then create a new certificate based on the original servers
 certificate, but signed by your proxy CA.
-This a the step where IO::Socket::SSL::Intercept helps.
+This is the step where IO::Socket::SSL::Intercept helps.
 
 =item *
 
