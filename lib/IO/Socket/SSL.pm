@@ -15,12 +15,12 @@ package IO::Socket::SSL;
 
 our $VERSION = '2.022';
 
-use IO::Socket;
+# we are only using qw(MSG_PEEK AF_INET AF_INET6 sockaddr_family sockaddr_in inet_ntoa) from Socket / IO::Socket
+use IO::Socket ();
 use Net::SSLeay 1.46;
 use IO::Socket::SSL::PublicSuffix;
 use Exporter ();
 use Errno qw( EWOULDBLOCK EAGAIN ETIMEDOUT EINTR );
-use Carp;
 use strict;
 
 BEGIN {
@@ -67,6 +67,11 @@ BEGIN {
     $can_ocsp        = defined &Net::SSLeay::OCSP_cert2ids;
     $can_ocsp_staple = $can_ocsp
 	&& defined &Net::SSLeay::set_tlsext_status_type;
+}
+
+sub croak {
+	require Carp;
+	Carp::croak(@_);
 }
 
 my $algo2digest = do {
@@ -269,7 +274,7 @@ BEGIN {
     my $ip6 = eval {
 	require Socket;
 	Socket->VERSION(1.95);
-	my $ok = Socket::inet_pton( AF_INET6(),'::1') && AF_INET6();
+	my $ok = Socket::inet_pton( Socket::AF_INET6(),'::1') && Socket::AF_INET6();
 	$ok && Socket->import( qw/inet_pton NI_NUMERICHOST NI_NUMERICSERV/ );
 	# behavior different to Socket6::getnameinfo - wrap
 	*_getnameinfo = sub { 
@@ -280,7 +285,7 @@ BEGIN {
 	$ok;
     } || eval {
 	require Socket6;
-	my $ok = Socket6::inet_pton( AF_INET6(),'::1') && AF_INET6();
+	my $ok = Socket6::inet_pton( Socket::AF_INET6(),'::1') && Socket::AF_INET6();
 	$ok && Socket6->import( qw/inet_pton NI_NUMERICHOST NI_NUMERICSERV/ );
 	# behavior different to Socket::getnameinfo - wrap
 	*_getnameinfo = sub { return Socket6::getnameinfo(@_); };
@@ -845,15 +850,15 @@ sub _update_peer {
     my $arg_hash = ${*$self}{'_SSL_arguments'};
     eval {
 	my $sockaddr = getpeername( $self );
-	my $af = sockaddr_family($sockaddr);
-	if( CAN_IPV6 && $af == AF_INET6 ) {
+	my $af = Socket::sockaddr_family($sockaddr);
+	if( CAN_IPV6 && $af == Socket::AF_INET6() ) {
 	    my (undef, $host, $port) = _getnameinfo($sockaddr,
 		NI_NUMERICHOST | NI_NUMERICSERV);
 	    $arg_hash->{PeerAddr} = $host;
 	    $arg_hash->{PeerPort} = $port;
 	} else {
-	    my ($port,$addr) = sockaddr_in( $sockaddr);
-	    $arg_hash->{PeerAddr} = inet_ntoa( $addr );
+	    my ($port,$addr) = Socket::sockaddr_in( $sockaddr);
+	    $arg_hash->{PeerAddr} = Socket::inet_ntoa( $addr );
 	    $arg_hash->{PeerPort} = $port;
 	}
     }
@@ -1064,7 +1069,7 @@ sub peek {
 
     # fall back to plain peek if we are not required to use SSL yet
     # emulate peek with recv(...,MS_PEEK) - peek(buf,len,offset)
-    return if ! defined recv($self,my $buf,$_[1],MSG_PEEK);
+    return if ! defined recv($self,my $buf,$_[1],Socket::MSG_PEEK());
     $_[0] = $_[2] ? substr($_[0],0,$_[2]).$buf : $buf;
     return length($buf);
 }
@@ -1672,7 +1677,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	if ( CAN_IPV6 and $identity =~m{:} ) {
 	    # no IPv4 or hostname have ':'  in it, try IPv6.
 	    $identity =~m{[^\da-fA-F:\.]} and return; # invalid characters in name
-	    $ipn = inet_pton(AF_INET6,$identity) or return; # invalid name
+	    $ipn = inet_pton(Socket::AF_INET6,$identity) or return; # invalid name
 	} elsif ( my @ip = $identity =~m{^(\d+)(?:\.(\d+)\.(\d+)\.(\d+)|[\d\.]*)$} ) {
 	    # check for invalid IP/hostname
 	    return if 4 != @ip or 4 != grep { defined($_) && $_<256 } @ip; 
@@ -2078,7 +2083,6 @@ sub CLOSE {                          #<---- Do not change this function!
 
 
 package IO::Socket::SSL::SSL_Context;
-use Carp;
 use strict;
 
 my %CTX_CREATED_IN_THIS_THREAD;
@@ -2089,6 +2093,11 @@ use constant SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER => 2;
 
 use constant FILETYPE_PEM => Net::SSLeay::FILETYPE_PEM();
 use constant FILETYPE_ASN1 => Net::SSLeay::FILETYPE_ASN1();
+
+sub croak {
+    require Carp;
+    Carp::croak(@_);
+}
 
 # Note that the final object will actually be a reference to the scalar
 # (C-style pointer) returned by Net::SSLeay::CTX_*_new() so that
@@ -2502,7 +2511,8 @@ sub new {
     my @accept_fp;
     if ( my $fp = $arg_hash->{SSL_fingerprint} ) {
 	for( ref($fp) ? @$fp : $fp) {
-	    my ($algo,$digest) = m{^([\w-]+)\$([a-f\d:]+)$}i;
+	    my ($algo,$digest);
+	    eval q/($algo,$digest) = m{^([\w-]+)\$([a-f\d:]+)$}i/;
 	    return IO::Socket::SSL->_internal_error("invalid fingerprint '$_'",9)
 		if ! $algo;
 	    $algo = lc($algo);
@@ -2569,6 +2579,7 @@ sub new {
 	    my $iossl = $SSL_OBJECT{$ssl} or
 		die "no IO::Socket::SSL object found for SSL $ssl";
 	    $iossl->[1] and do {
+	    require Carp;
 		# we must return with 1 or it will be called again
 		# and because we have no SSL object we must make the error global
 		Carp::cluck($IO::Socket::SSL::SSL_ERROR
