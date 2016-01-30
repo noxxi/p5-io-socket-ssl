@@ -1,3 +1,10 @@
+2.023 2016/01/30
+- OpenSSL 1.0.2f changed the behavior of SSL shutdown in case the TLS connection
+  was not fully established (commit: f73c737c7ac908c5d6407c419769123392a3b0a9).
+  This somehow resulted in Net::SSLeay::shutdown returning 0 (i.e. keep trying)
+  which caused an endless loop. It will now ignore this result in case the TLS
+  connection was not yet established and consider the TLS connection closed
+  instead.
 2.022 2015/12/10
 - fix stringification of IPv6 inside subjectAltNames in Utils::CERT_asHash.
   Thanks to Mark.Martinec[AT]ijs[DOT]si for reporting in #110253

@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.022';
+our $VERSION = '2.023';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -1300,6 +1300,11 @@ sub stop_SSL {
 		    $status & SSL_RECEIVED_SHUTDOWN
 			|| $stop_args->{SSL_fast_shutdown}) {
 		    # shutdown complete
+		    last;
+		}
+		if ((${*$self}{'_SSL_opened'}||0) <= 0) {
+		    # not really open, thus don't expect shutdown to return
+		    # something meaningful
 		    last;
 		}
 
