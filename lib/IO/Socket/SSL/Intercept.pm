@@ -329,8 +329,8 @@ The key for the hash is an C<ident> either given to C<clone_cert> or generated
 from the original certificate.
 
 If the argument is a subroutine it will be called as C<< $cache->(ident) >>
-to get an existing certificate and with C<< $cache->(ident,cert) >> to cache the
-newly created certificate.
+to get an existing (cert,key) and with C<< $cache->(ident,cert,key) >> to cache
+the newly created certificate.
 
 =back
 

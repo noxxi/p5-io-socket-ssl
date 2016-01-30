@@ -57,11 +57,11 @@ sub PEM_file2key {
     my $file = shift;
     my $bio = Net::SSLeay::BIO_new_file($file,'r') or
 	croak "cannot read $file: $!";
-    my $cert = Net::SSLeay::PEM_read_bio_PrivateKey($bio);
+    my $key = Net::SSLeay::PEM_read_bio_PrivateKey($bio);
     Net::SSLeay::BIO_free($bio);
-    $cert or croak "cannot parse $file as PEM private key: ".
+    $key or croak "cannot parse $file as PEM private key: ".
 	Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error());
-    return $cert;
+    return $key;
 }
 
 sub PEM_key2file {
@@ -76,11 +76,11 @@ sub PEM_string2key {
     my $string = shift;
     my $bio = Net::SSLeay::BIO_new( Net::SSLeay::BIO_s_mem());
     Net::SSLeay::BIO_write($bio,$string);
-    my $cert = Net::SSLeay::PEM_read_bio_PrivateKey($bio);
+    my $key = Net::SSLeay::PEM_read_bio_PrivateKey($bio);
     Net::SSLeay::BIO_free($bio);
-    $cert or croak "cannot parse string as PEM private key: ".
+    $key or croak "cannot parse string as PEM private key: ".
 	Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error());
-    return $cert;
+    return $key;
 }
 
 sub PEM_key2string {
