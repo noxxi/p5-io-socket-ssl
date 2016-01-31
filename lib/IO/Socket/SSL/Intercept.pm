@@ -77,7 +77,7 @@ sub clone_cert {
     my $hash = CERT_asHash($old_cert);
     if (my $ext = $hash->{ext}) {
 	@$ext = grep {
-	    $_->{sn} !~m{^(?:
+	    defined($_->{sn}) && $_->{sn} !~m{^(?:
 		authorityInfoAccess    |
 		subjectKeyIdentifier   |
 		authorityKeyIdentifier |
