@@ -259,9 +259,11 @@ sub CERT_create {
 	commonName => 'IO::Socket::SSL Test'
     };
     while ( my ($k,$v) = each %$subj ) {
-	# 0x1000 = MBSTRING_UTF8
-	Net::SSLeay::X509_NAME_add_entry_by_txt($subj_e,
-	    $k, 0x1000, $v, -1, 0)
+	# Not everything we get is nice - try with MBSTRING_UTF8 first and if it
+	# fails try V_ASN1_T61STRING and finally V_ASN1_OCTET_STRING
+	Net::SSLeay::X509_NAME_add_entry_by_txt($subj_e,$k,0x1000,$v,-1,0)
+	    or Net::SSLeay::X509_NAME_add_entry_by_txt($subj_e,$k,20,$v,-1,0)
+	    or Net::SSLeay::X509_NAME_add_entry_by_txt($subj_e,$k,4,$v,-1,0)
 	    or croak("failed to add entry for $k - ".
 	    Net::SSLeay::ERR_error_string(Net::SSLeay::ERR_get_error()));
     }
