@@ -1,3 +1,12 @@
+2.024 2016/02/06
+- Work around issue where the connect fails on systems having only a loopback
+  interface and where IO::Socket::IP is used as super class (default when
+  available). Since IO::Socket::IP sets AI_ADDRCONFIG by default connect to
+  localhost would fail on this systems. This happened at least for the tests,
+  see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=813796
+  Workaround is to explicitely set GetAddrInfoFlags to 0 if no GetAddrInfoFlags
+  is set but the Family/Domain is given. In this case AI_ADDRCONFIG would not
+  be useful anyway but would cause at most harm.
 2.023 2016/01/30
 - OpenSSL 1.0.2f changed the behavior of SSL shutdown in case the TLS connection
   was not fully established (commit: f73c737c7ac908c5d6407c419769123392a3b0a9).
