@@ -1,3 +1,7 @@
+2.025 2016/04/04
+- Resolved memleak if SSL_crl_file was used: RT#113257, RT#113530
+  Thanks to avi[DOT]maslati[AT]forescout[DOT]com and
+  mark[DOT]kurman[AT]gmail[DOT]com for reporting the problem
 2.024 2016/02/06
 - Work around issue where the connect fails on systems having only a loopback
   interface and where IO::Socket::IP is used as super class (default when

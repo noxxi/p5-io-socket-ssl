@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.024';
+our $VERSION = '2.025';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -2379,6 +2379,7 @@ sub new {
 	    if ($arg_hash->{'SSL_crl_file'}) {
 		my $bio = Net::SSLeay::BIO_new_file($arg_hash->{'SSL_crl_file'}, 'r');
 		my $crl = Net::SSLeay::PEM_read_bio_X509_CRL($bio);
+		Net::SSLeay::BIO_free($bio);
 		if ( $crl ) {
 		    Net::SSLeay::X509_STORE_add_crl(Net::SSLeay::CTX_get_cert_store($ctx), $crl);
 		} else {
@@ -2876,6 +2877,7 @@ sub new {
 	};
 	if (!($done = $cache->get($certid))) {
 	    push @{ $todo{$uri}{ids} }, $certid;
+	    push @{ $todo{$uri}{subj} }, $subj;
 	} elsif ( $done->{hard_error} ) {
 	    # one error is enough to fail validation
 	    $hard_error = $done->{hard_error};
@@ -2922,11 +2924,13 @@ sub add_response {
 
     # do we have a response
     if (!$resp) {
-	@soft_error = "http request failed"
+	@soft_error = "http request for OCSP failed; subject: ".
+	    join("; ",@{$todo->{subj}});
 
     # is it an valid OCSP_RESPONSE
     } elsif ( ! eval { $resp = Net::SSLeay::d2i_OCSP_RESPONSE($resp) }) {
-	@soft_error = "invalid response (no OCSP_RESPONSE)";
+	@soft_error = "invalid response (no OCSP_RESPONSE); subject: ".
+	    join("; ",@{$todo->{subj}});
 	# hopefully short-time error
 	$self->{cache}->put($_,{
 	    soft_error => "@soft_error",
@@ -2938,7 +2942,8 @@ sub add_response {
 	    != Net::SSLeay::OCSP_RESPONSE_STATUS_SUCCESSFUL()
     ){
 	@soft_error = "OCSP response failed: ".
-	    Net::SSLeay::OCSP_response_status_str($status);
+	    Net::SSLeay::OCSP_response_status_str($status).
+	    "; subject: ".join("; ",@{$todo->{subj}});
 	# hopefully short-time error
 	$self->{cache}->put($_,{
 	    soft_error => "@soft_error",
@@ -2957,7 +2962,8 @@ sub add_response {
 	    while ( my $err = Net::SSLeay::ERR_get_error()) {
 		push @soft_error, Net::SSLeay::ERR_error_string($err);
 	    }
-	    @soft_error = 'failed to verify OCSP response' if ! @soft_error;
+	    @soft_error = 'failed to verify OCSP response; subject: '.
+		join("; ",@{$todo->{subj}}) if ! @soft_error;
 	}
 	# configuration problem or we don't know the signer
 	$self->{cache}->put($_,{
@@ -2978,7 +2984,8 @@ sub add_response {
 		} elsif ( $rv->[2]{statusType} ==
 		    Net::SSLeay::V_OCSP_CERTSTATUS_GOOD()) {
 		    # soft error, like response after nextUpdate
-		    push @soft_error,$rv->[1];
+		    push @soft_error,$rv->[1]."; subject: ".
+			join("; ",@{$todo->{subj}});
 		    $self->{cache}->put($rv->[0],{
 			%{$rv->[2]},
 			soft_error => "@soft_error",
@@ -2987,7 +2994,8 @@ sub add_response {
 		} else {
 		    # hard error
 		    $self->{cache}->put($rv->[0],$rv->[2]);
-		    push @hard_error, $rv->[1];
+		    push @hard_error, $rv->[1]."; subject: ".
+			join("; ",@{$todo->{subj}});
 		}
 	    } else {
 		push @miss,$rv->[0];
@@ -3003,7 +3011,8 @@ sub add_response {
 	    $DEBUG>=2 && DEBUG("$uri just answered ".@found." of ".(@found+@miss)." requests");
 	}
     } else {
-	@soft_error = "no data in response";
+	@soft_error = "no data in response; subject: ".
+	    join("; ",@{$todo->{subj}});
 	# probably configuration problem
 	$self->{cache}->put($_,{
 	    soft_error => "@soft_error",
