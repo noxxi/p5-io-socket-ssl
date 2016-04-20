@@ -1,3 +1,5 @@
+2.027 2016/04/20
+- only added Changes for 2.026
 2.026 2016/04/20
 - update default server and client ciphers based on recommendation of
   Mozilla and what the current browsers use. Notably this finally disables
