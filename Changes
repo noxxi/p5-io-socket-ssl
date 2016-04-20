@@ -1,3 +1,7 @@
+2.026 2016/04/20
+- update default server and client ciphers based on recommendation of
+  Mozilla and what the current browsers use. Notably this finally disables
+  RC4 for the client (was disabled for server long ago) and adds CHACHA20.
 2.025 2016/04/04
 - Resolved memleak if SSL_crl_file was used: RT#113257, RT#113530
   Thanks to avi[DOT]maslati[AT]forescout[DOT]com and

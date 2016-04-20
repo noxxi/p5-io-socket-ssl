@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.025';
+our $VERSION = '2.026';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -92,9 +92,11 @@ my %DEFAULT_SSL_ARGS = (
     #SSL_verifycn_name => undef,   # use from PeerAddr/PeerHost - do not override in set_args_filter_hack 'use_defaults'
     SSL_npn_protocols => undef,    # meaning depends whether on server or client side
     SSL_alpn_protocols => undef,   # list of protocols we'll accept/send, for example ['http/1.1','spdy/3.1']
-    SSL_cipher_list =>
-	'EECDH+AESGCM+ECDSA EECDH+AESGCM EECDH+ECDSA +AES256 EECDH EDH+AESGCM '.
-	'EDH ALL +SHA +3DES !RC4 !LOW !EXP !eNULL !aNULL !DES !MD5 !PSK !SRP',
+
+    # https://wiki.mozilla.org/Security/Server_Side_TLS, 2016/04/20
+    # "Old backward compatibility" for best compatibility
+    # .. "Most ciphers that are not clearly broken and dangerous to use are supported"
+    SSL_cipher_list => 'ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-AES256-GCM-SHA384:DHE-RSA-AES128-GCM-SHA256:DHE-DSS-AES128-GCM-SHA256:kEDH+AESGCM:ECDHE-RSA-AES128-SHA256:ECDHE-ECDSA-AES128-SHA256:ECDHE-RSA-AES128-SHA:ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES256-SHA384:ECDHE-ECDSA-AES256-SHA384:ECDHE-RSA-AES256-SHA:ECDHE-ECDSA-AES256-SHA:DHE-RSA-AES128-SHA256:DHE-RSA-AES128-SHA:DHE-DSS-AES128-SHA256:DHE-RSA-AES256-SHA256:DHE-DSS-AES256-SHA:DHE-RSA-AES256-SHA:ECDHE-RSA-DES-CBC3-SHA:ECDHE-ECDSA-DES-CBC3-SHA:EDH-RSA-DES-CBC3-SHA:AES128-GCM-SHA256:AES256-GCM-SHA384:AES128-SHA256:AES256-SHA256:AES128-SHA:AES256-SHA:AES:DES-CBC3-SHA:HIGH:SEED:!aNULL:!eNULL:!EXPORT:!DES:!RC4:!MD5:!PSK:!RSAPSK:!aDH:!aECDH:!EDH-DSS-DES-CBC3-SHA:!KRB5-DES-CBC3-SHA:!SRP',
 );
 
 my %DEFAULT_SSL_CLIENT_ARGS = (
@@ -107,38 +109,59 @@ my %DEFAULT_SSL_CLIENT_ARGS = (
     # older versions of F5 BIG-IP hang when getting SSL client hello >255 bytes
     # http://support.f5.com/kb/en-us/solutions/public/13000/000/sol13037.html
     # http://guest:guest@rt.openssl.org/Ticket/Display.html?id=2771
-    # Debian works around this by disabling TLSv1_2 on the client side
-    # Chrome and IE11 use TLSv1_2 but use only a few ciphers, so that packet
-    # stays small enough
-    # The following list is taken from IE11, except that we don't do RC4-MD5,
-    # RC4-SHA is already bad enough. Also, we have a different sort order
-    # compared to IE11, because we put ciphers supporting forward secrecy on top
+    # Ubuntu worked around this by disabling TLSv1_2 on the client side for
+    # a while. Later a padding extension was added to OpenSSL to work around
+    # broken F5 but then IronPort croaked because it did not understand this
+    # extension so it was disabled again :(
+    # Firefox, Chrome and IE11 use TLSv1_2 but use only a few ciphers, so
+    # that packet stays small enough. We try the same here.
 
     SSL_cipher_list => join(" ",
-	qw(
-	    ECDHE-ECDSA-AES128-GCM-SHA256
-	    ECDHE-ECDSA-AES128-SHA256
-	    ECDHE-ECDSA-AES256-GCM-SHA384
-	    ECDHE-ECDSA-AES256-SHA384
-	    ECDHE-ECDSA-AES128-SHA
-	    ECDHE-ECDSA-AES256-SHA
-	    ECDHE-RSA-AES128-SHA256
-	    ECDHE-RSA-AES128-SHA
-	    ECDHE-RSA-AES256-SHA
-	    DHE-DSS-AES128-SHA256
-	    DHE-DSS-AES128-SHA
-	    DHE-DSS-AES256-SHA256
-	    DHE-DSS-AES256-SHA
-	    AES128-SHA256
-	    AES128-SHA
-	    AES256-SHA256
-	    AES256-SHA
-	    EDH-DSS-DES-CBC3-SHA
-	    DES-CBC3-SHA
-	    RC4-SHA
-	),
-	# just to make sure, that we don't accidentally add bad ciphers above
-	"!EXP !LOW !eNULL !aNULL !DES !MD5 !PSK !SRP"
+
+	# SSLabs report for Chrome 48/OSX. 
+	# This also includes the fewer ciphers Firefox uses.
+	'ECDHE-ECDSA-AES128-GCM-SHA256',
+	'ECDHE-RSA-AES128-GCM-SHA256',
+	'DHE-RSA-AES128-GCM-SHA256',
+	'ECDHE-ECDSA-CHACHA20-POLY1305',
+	'ECDHE-RSA-CHACHA20-POLY1305',
+	'ECDHE-ECDSA-AES256-SHA',
+	'ECDHE-RSA-AES256-SHA',
+	'DHE-RSA-AES256-SHA',
+	'ECDHE-ECDSA-AES128-SHA',
+	'ECDHE-RSA-AES128-SHA',
+	'DHE-RSA-AES128-SHA',
+	'AES128-GCM-SHA256',
+	'AES256-SHA',
+	'AES128-SHA',
+	'DES-CBC3-SHA',
+
+	# IE11/Edge has some more ciphers, notably SHA384 and DSS
+	# we don't offer the *-AES128-SHA256 and *-AES256-SHA384 non-GCM
+	# ciphers IE/Edge offers because they look like a large mismatch
+	# between a very strong HMAC and a comparably weak (but sufficient)
+	# encryption. Similar all browsers which do SHA384 can do ECDHE
+	# so skip the DHE*SHA384 ciphers.
+	'ECDHE-RSA-AES256-GCM-SHA384',
+	'ECDHE-ECDSA-AES256-GCM-SHA384',
+	# 'ECDHE-RSA-AES256-SHA384',
+	# 'ECDHE-ECDSA-AES256-SHA384',
+	# 'ECDHE-RSA-AES128-SHA256',
+	# 'ECDHE-ECDSA-AES128-SHA256',
+	# 'DHE-RSA-AES256-GCM-SHA384',
+	# 'AES256-GCM-SHA384',
+	'AES256-SHA256',
+	# 'AES128-SHA256',
+	'DHE-DSS-AES256-SHA256',
+	# 'DHE-DSS-AES128-SHA256',
+	'DHE-DSS-AES256-SHA',
+	'DHE-DSS-AES128-SHA',
+	'EDH-DSS-DES-CBC3-SHA',
+
+	# Just to make sure, that we don't accidentally add bad ciphers above.
+	# This includes dropping RC4 which is no longer supported by modern
+	# browsers and also excluded in the SSL libraries of Python and Ruby.
+	"!EXP !MEDIUM !LOW !eNULL !aNULL !RC4 !DES !MD5 !PSK !SRP"
     )
 );
 
