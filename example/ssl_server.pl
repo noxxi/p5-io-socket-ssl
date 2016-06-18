@@ -27,7 +27,8 @@ Options:
   -C|--cert  cert-file    file containing certificate
   -K|--key   key-file     file containing private key, default cert-file
   -P|--pass  passphrase   passphrase for private key, default none
-  --ca dir|file           use given dir/file as trusted CA store to verify client certificate
+  --ca dir|file           request a client certificate and use given dir/file as 
+                          trusted CA store to verify it
 USAGE
     exit(2);
 }
