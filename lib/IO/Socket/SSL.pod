@@ -1824,8 +1824,8 @@ mod_perl scripts).
 You may use this to make IO::Socket::SSL automatically re-use a given session
 cache (unless specifically overridden in a call to new()).
 It accepts one argument, which should be an IO::Socket::SSL::Session_Cache
-object or similar (e.g something which implements get_session and add_session
-like IO::Socket::SSL::Session_Cache does).
+object or similar (e.g something which implements get_session, add_session and
+maybe del_session like IO::Socket::SSL::Session_Cache does).
 See the SSL_session_cache option of new() for more details.
 Note that this sets the default cache globally, so use with caution.
 

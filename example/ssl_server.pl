@@ -52,7 +52,7 @@ my $ctx = IO::Socket::SSL::SSL_Context->new(
     defined($key_pass) ? ( SSL_passwd_cb => sub { $key_pass } ):(),
     $ca ? (
 	SSL_verify_mode => SSL_VERIFY_PEER,
-	-d $ca ? ( SSL_ca_path => $ca ):( SSL_ca_file => $ca )
+	-d $ca ? ( SSL_ca_path => $ca ):( SSL_ca_file => $ca, SSL_client_ca_file => $ca )
     ):(),
 ) or die "cannot create context: $SSL_ERROR";
 

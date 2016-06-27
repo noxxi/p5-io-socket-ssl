@@ -1,3 +1,5 @@
+2.028 2016/07/26
+- add del_session method to session cache
 2.027 2016/04/20
 - only added Changes for 2.026
 2.026 2016/04/20

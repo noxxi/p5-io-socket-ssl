@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.027';
+our $VERSION = '2.028';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -2782,6 +2782,15 @@ sub new {
     return bless { _maxsize => $size }, $class;
 }
 
+
+sub del_session {
+    my ($self, $key) = @_;
+    my $val = $self->{$key} or return;
+    Net::SSLeay::SESSION_free($val->{session});
+    $val->{prev}{next} = $val->{next};
+    $val->{next}{prev} = $val->{prev};
+    $self->{_head} = $val->{next} if $val == $self->{_head};
+}
 
 sub get_session {
     my ($self, $key) = @_;
