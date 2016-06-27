@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.028';
+our $VERSION = '2.029';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -728,7 +728,7 @@ sub connect_SSL {
 	}
 
 	my $session = $ctx->session_cache( $arg_hash->{SSL_session_key} ?
-	    ( $arg_hash->{SSL_session_key},1 ) :
+	    ( $arg_hash->{SSL_session_key} ) :
 	    ( 
 		$arg_hash->{PeerAddr} || $arg_hash->{PeerHost}, 
 		$arg_hash->{PeerPort} || $arg_hash->{PeerService}
@@ -853,7 +853,7 @@ sub connect_SSL {
 	my $arg_hash = ${*$self}{'_SSL_arguments'};
 	$arg_hash->{PeerAddr} || $arg_hash->{PeerHost} || $self->_update_peer;
 	$ctx->session_cache( $arg_hash->{SSL_session_key} ?
-	    ( $arg_hash->{SSL_session_key},1 ) :
+	    ( $arg_hash->{SSL_session_key} ) :
 	    ( 
 		$arg_hash->{PeerAddr} || $arg_hash->{PeerHost},
 		$arg_hash->{PeerPort} || $arg_hash->{PeerService}
@@ -2737,12 +2737,11 @@ sub new {
 sub session_cache {
     my $self = shift;
     my $cache = $self->{session_cache} || return;
-    my ($addr,$port,$session) = @_;
-    $port ||= $addr =~s{:(\w+)$}{} && $1; # host:port
-    my $key = "$addr:$port";
+    my ($host,$port,$session) = @_;
+    $host .= ':'.$port if $port;
     return defined($session)
-	? $cache->add_session($key, $session)
-	: $cache->get_session($key);
+	? $cache->add_session($host, $session)
+	: $cache->get_session($host);
 }
 
 sub has_session_cache {
@@ -2789,7 +2788,15 @@ sub del_session {
     Net::SSLeay::SESSION_free($val->{session});
     $val->{prev}{next} = $val->{next};
     $val->{next}{prev} = $val->{prev};
-    $self->{_head} = $val->{next} if $val == $self->{_head};
+    if ($val != $self->{_head}) {
+	# keep head
+    } elsif ($val == $val->{next}) {
+	# single element in cache, drop it
+	$self->{_head} = undef
+    } else {
+	# point to next element in cache
+	$self->{_head} = $val->{next}
+    }
 }
 
 sub get_session {

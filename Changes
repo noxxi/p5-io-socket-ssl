@@ -1,3 +1,7 @@
+2.029 2016/07/26
+- fix del_session method in case a single item was in the cache
+- use SSL_session_key as the real key for the cache and not some derivate of it,
+  so that it works to remove the entry using the same key
 2.028 2016/07/26
 - add del_session method to session cache
 2.027 2016/04/20
