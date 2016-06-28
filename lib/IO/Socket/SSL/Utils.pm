@@ -107,6 +107,17 @@ sub KEY_create_rsa {
     return $key;
 }
 
+if (defined &Net::SSLeay::EC_KEY_generate_key) {
+    push @EXPORT,'KEY_create_ec';
+    *KEY_create_ec = sub {
+	my $curve = shift || 'prime256v1';
+	my $key = Net::SSLeay::EVP_PKEY_new();
+	my $ec = Net::SSLeay::EC_KEY_generate_key($curve);
+	Net::SSLeay::EVP_PKEY_assign_EC_KEY($key,$ec);
+	return $key;
+    }
+}
+
 # extract information from cert
 my %gen2i = qw( OTHERNAME 0 EMAIL 1 DNS 2 X400 3 DIRNAME 4 EDIPARTY 5 URI 6 IP 7 RID 8 );
 my %i2gen = reverse %gen2i;
@@ -505,6 +516,10 @@ Each loaded or created cert and key must be freed to not leak memory.
 =item * KEY_create_rsa(bits) -> key
 
 Creates an RSA key pair, bits defaults to 2048.
+
+=item * KEY_create_ec(curve) -> key
+
+Creates an EC key, curve defaults to C<prime256v1>.
 
 =item * CERT_asHash(cert,[digest_algo]) -> hash
 
