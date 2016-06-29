@@ -2448,7 +2448,13 @@ sub new {
 		}
 		PKCS12: while ($cert) {
 		    Net::SSLeay::CTX_use_certificate($ctx,$cert) or last;
-		    for my $ca (@chain) {
+		    # Net::SSLeay::P_PKCS12_load_file is implemented using
+		    # OpenSSL PKCS12_parse which according to the source code
+		    # returns the chain with the last CA certificate first (i.e.
+		    # reverse order as in the PKCS12 file). This is not
+		    # documented but given the age of this function we'll assume
+		    # that this will stay this way in the future.
+		    while (my $ca = pop @chain) {
 			Net::SSLeay::CTX_add_extra_chain_cert($ctx,$ca)
 			    or last PKCS12;
 		    }
