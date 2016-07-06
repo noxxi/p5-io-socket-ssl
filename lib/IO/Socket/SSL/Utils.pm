@@ -381,10 +381,15 @@ sub CERT_create {
 	=> join(",",sort keys %ext_key_usage) if %ext_key_usage;
     Net::SSLeay::P_X509_add_extensions($cert, $issuer_cert, @ext);
 
+    my %have_ext;
+    for(my $i=0;$i<@ext;$i+=2) {
+	$have_ext{ $ext[$i] }++
+    }
     for my $ext (@{ $args{ext} || [] }) {
 	my $nid = $ext->{nid}
 	    || $ext->{sn} && Net::SSLeay::OBJ_sn2nid($ext->{sn})
 	    || croak "cannot determine NID of extension";
+	$have_ext{$nid} and next;
 	my $val = $ext->{data};
 	if ($nid == 177) {
 	    # authorityInfoAccess:

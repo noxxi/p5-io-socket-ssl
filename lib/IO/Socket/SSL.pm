@@ -848,7 +848,7 @@ sub connect_SSL {
 	return $self->fatal_ssl_error();
     }
 
-    if ( $ctx->has_session_cache
+    if ( $ctx->{session_cache}
 	and my $session = Net::SSLeay::get1_session($ssl)) {
 	my $arg_hash = ${*$self}{'_SSL_arguments'};
 	$arg_hash->{PeerAddr} || $arg_hash->{PeerHost} || $self->_update_peer;
