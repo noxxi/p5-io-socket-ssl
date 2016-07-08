@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.030';
+our $VERSION = '2.031';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -729,9 +729,11 @@ sub connect_SSL {
 
 	if ($ctx->{session_cache}
 	    and my $session = $ctx->{session_cache}->get_session(
-		$arg_hash->{SSL_session_key} || join(':',
-		    $arg_hash->{PeerAddr} || $arg_hash->{PeerHost},
-		    $arg_hash->{PeerPort} || $arg_hash->{PeerService})
+		$arg_hash->{SSL_session_key} || do {
+		    my $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost};
+		    my $port = $arg_hash->{PeerPort} || $arg_hash->{PeerService};
+		    $port ? "$host:$port" : $host;
+		}
 	    )) {
 	    Net::SSLeay::set_session($ssl, $session);
 	}
@@ -852,9 +854,12 @@ sub connect_SSL {
 	and my $session = Net::SSLeay::get1_session($ssl)) {
 	my $arg_hash = ${*$self}{'_SSL_arguments'};
 	$ctx->{session_cache}->add_session(
-	    $arg_hash->{SSL_session_key} || join(':',
-		$arg_hash->{PeerAddr} || $arg_hash->{PeerHost} || $self->_update_peer,
-		$arg_hash->{PeerPort} || $arg_hash->{PeerService}),
+	    $arg_hash->{SSL_session_key} || do {
+		my $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost}
+		    || self->_update_peer;
+		my $port = $arg_hash->{PeerPort} || $arg_hash->{PeerService};
+		$port ? "$host:$port" : $host;
+	    },
 	    $session
 	);
     }

@@ -1,3 +1,6 @@
+2.031 2016/07/08
+- fix for bug in session handling introduced in 2.031, RT#115975
+  Thanks to paul[AT]city-fan[DOT]org for reporting
 2.030 2016/07/08
 - Utils::CERT_create - don't add given extensions again if they were already
   added. Firefox croaks with sec_error_extension_value_invalid if (specific?)
