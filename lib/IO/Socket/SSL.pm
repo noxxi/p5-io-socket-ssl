@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.029';
+our $VERSION = '2.030';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -727,14 +727,14 @@ sub connect_SSL {
 	    $DEBUG>=2 && DEBUG("request OCSP stapling");
 	}
 
-	my $session = $ctx->session_cache( $arg_hash->{SSL_session_key} ?
-	    ( $arg_hash->{SSL_session_key} ) :
-	    ( 
-		$arg_hash->{PeerAddr} || $arg_hash->{PeerHost}, 
-		$arg_hash->{PeerPort} || $arg_hash->{PeerService}
-	    )
-	);
-	Net::SSLeay::set_session($ssl, $session) if ($session);
+	if ($ctx->{session_cache}
+	    and my $session = $ctx->{session_cache}->get_session(
+		$arg_hash->{SSL_session_key} || join(':',
+		    $arg_hash->{PeerAddr} || $arg_hash->{PeerHost},
+		    $arg_hash->{PeerPort} || $arg_hash->{PeerService})
+	    )) {
+	    Net::SSLeay::set_session($ssl, $session);
+	}
     }
 
     $ssl ||= ${*$self}{'_SSL_object'};
@@ -851,13 +851,10 @@ sub connect_SSL {
     if ( $ctx->{session_cache}
 	and my $session = Net::SSLeay::get1_session($ssl)) {
 	my $arg_hash = ${*$self}{'_SSL_arguments'};
-	$arg_hash->{PeerAddr} || $arg_hash->{PeerHost} || $self->_update_peer;
-	$ctx->session_cache( $arg_hash->{SSL_session_key} ?
-	    ( $arg_hash->{SSL_session_key} ) :
-	    ( 
-		$arg_hash->{PeerAddr} || $arg_hash->{PeerHost},
-		$arg_hash->{PeerPort} || $arg_hash->{PeerService}
-	    ),
+	$ctx->{session_cache}->add_session(
+	    $arg_hash->{SSL_session_key} || join(':',
+		$arg_hash->{PeerAddr} || $arg_hash->{PeerHost} || $self->_update_peer,
+		$arg_hash->{PeerPort} || $arg_hash->{PeerService}),
 	    $session
 	);
     }
@@ -870,6 +867,7 @@ sub connect_SSL {
 # called if PeerAddr is not set in ${*$self}{'_SSL_arguments'}
 # this can be the case if start_SSL is called with a normal IO::Socket::INET
 # so that PeerAddr|PeerPort are not set from args
+# returns PeerAddr
 sub _update_peer {
     my $self = shift;
     my $arg_hash = ${*$self}{'_SSL_arguments'};
@@ -879,12 +877,12 @@ sub _update_peer {
 	if( CAN_IPV6 && $af == AF_INET6 ) {
 	    my (undef, $host, $port) = _getnameinfo($sockaddr,
 		NI_NUMERICHOST | NI_NUMERICSERV);
-	    $arg_hash->{PeerAddr} = $host;
 	    $arg_hash->{PeerPort} = $port;
+	    $arg_hash->{PeerAddr} = $host;
 	} else {
 	    my ($port,$addr) = sockaddr_in( $sockaddr);
-	    $arg_hash->{PeerAddr} = inet_ntoa( $addr );
 	    $arg_hash->{PeerPort} = $port;
+	    $arg_hash->{PeerAddr} = inet_ntoa( $addr );
 	}
     }
 }
@@ -2739,16 +2737,6 @@ sub new {
     return $self;
 }
 
-
-sub session_cache {
-    my $self = shift;
-    my $cache = $self->{session_cache} || return;
-    my ($host,$port,$session) = @_;
-    $host .= ':'.$port if $port;
-    return defined($session)
-	? $cache->add_session($host, $session)
-	: $cache->get_session($host);
-}
 
 sub has_session_cache {
     return defined shift->{session_cache};

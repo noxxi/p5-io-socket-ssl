@@ -1,8 +1,16 @@
-2.029 2016/07/26
+2.030 2016/07/08
+- Utils::CERT_create - don't add given extensions again if they were already
+  added. Firefox croaks with sec_error_extension_value_invalid if (specific?)
+  extensions are given twice.
+- assume that Net::SSLeay::P_PKCS12_load_file will return the CA certificates
+  with the reverse order as in the PKCS12 file, because that's what it does.
+- support for creating ECC keys in Utils once supported by Net::SSLeay
+- remove internal sub session_cache and access cache directly (faster)
+2.029 2016/06/26
 - fix del_session method in case a single item was in the cache
 - use SSL_session_key as the real key for the cache and not some derivate of it,
   so that it works to remove the entry using the same key
-2.028 2016/07/26
+2.028 2016/06/26
 - add del_session method to session cache
 2.027 2016/04/20
 - only added Changes for 2.026

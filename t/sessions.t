@@ -48,37 +48,35 @@ unless (fork) {
     );
 
 
-    if (! defined $ctx->{'session_cache'}) {
+    my $cache = $ctx->{session_cache} or do {
 	print "not ok \# Context init\n";
 	exit;
-    }
+    };
     &ok("Context init");
 
 
     # Bogus session test
-    unless ($ctx->session_cache("bogus", "bogus", 0)) {
+    unless ($cache->add_session("bogus", 0)) {
 	print "not ";
     }
     &ok("Superficial Cache Addition Test");
 
-    unless ($ctx->session_cache("bogus1", "bogus1", 0)) {
+    unless ($cache->add_session("bogus1", 0)) {
 	print "not ";
     }
     &ok("Superficial Cache Addition Test 2");
-
-    my $cache = $ctx->{'session_cache'};
 
     if (keys(%$cache) != 4) {
 	print "not ";
     }
     &ok("Cache Keys Check 1");
 
-    unless ($cache->{'bogus1:bogus1'} and $cache->{'bogus:bogus'}) {
+    unless ($cache->{'bogus1'} and $cache->{'bogus'}) {
 	print "not ";
     }
     &ok("Cache Keys Check 2");
 
-    my ($bogus, $bogus1) = ($cache->{'bogus:bogus'}, $cache->{'bogus1:bogus1'});
+    my ($bogus, $bogus1) = ($cache->{'bogus'}, $cache->{'bogus1'});
     unless ($cache->{'_head'} eq $bogus1) {
 	print "not ";
     }
@@ -115,7 +113,7 @@ unless (fork) {
     }
     &ok("Cache Keys Check 3");
 
-    if ($cache->{'bogus:bogus'}) {
+    if ($cache->{'bogus'}) {
 	print "not ";
     }
     &ok("Cache Removal Test");
@@ -148,7 +146,7 @@ unless (fork) {
     }
     &ok("Cache Keys Check 4");
 
-    if (!$cache->{'bogus1:bogus1'}) {
+    if (!$cache->{'bogus1'}) {
 	print "not ";
     }
     &ok("Cache Keys Check 5");
