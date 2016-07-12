@@ -1,3 +1,9 @@
+2.032 2016/07/12
+- Set session id context only on the server side. Even if the documentation for
+  SSL_CTX_set_session_id_context makes clear that this function is server side
+  only it actually affects hndling of session reuse on the client side too and
+  can result in error "SSL3_GET_SERVER_HELLO:attempt to reuse session in
+  different context" at the client.
 2.031 2016/07/08
 - fix for bug in session handling introduced in 2.031, RT#115975
   Thanks to paul[AT]city-fan[DOT]org for reporting

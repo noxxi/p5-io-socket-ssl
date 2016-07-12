@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.031';
+our $VERSION = '2.032';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -1444,7 +1444,7 @@ sub pending {
 sub start_SSL {
     my ($class,$socket) = (shift,shift);
     return $class->_internal_error("Not a socket",9) if ! ref($socket);
-    my $arg_hash = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
+    my $arg_hash = @_ == 1 ? $_[0] : {@_};
     my %to = exists $arg_hash->{Timeout} ? ( Timeout => delete $arg_hash->{Timeout} ) :();
     my $original_class = ref($socket);
     if ( ! $original_class ) {
@@ -2309,8 +2309,9 @@ sub new {
 	# client session caching will fail
 	# if user does not provide explicit id just use the stringification
 	# of the context
-	if ( my $id = $arg_hash->{SSL_session_id_context}
-	    || ( $arg_hash->{SSL_verify_mode} & 0x01 ) && "$ctx" ) {
+	if($arg_hash->{SSL_server} and my $id = 
+	    $arg_hash->{SSL_session_id_context} || 
+	    ( $arg_hash->{SSL_verify_mode} & 0x01 ) && "$ctx" ) {
 	    Net::SSLeay::CTX_set_session_id_context($ctx,$id,length($id));
 	}
 
