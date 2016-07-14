@@ -1,3 +1,7 @@
+- support for session ticket reuse over multiple contexts and processes
+  (if supported by Net::SSLeay)
+- small optimizations, like saving various Net::SSLeay constants into variables
+  and access variables instead of calling the constant sub all the time
 2.032 2016/07/12
 - Set session id context only on the server side. Even if the documentation for
   SSL_CTX_set_session_id_context makes clear that this function is server side

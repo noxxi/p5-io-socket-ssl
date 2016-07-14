@@ -1310,6 +1310,74 @@ Note that some client implementations may encounter problems if both NPN and
 ALPN are specified. Since ALPN is intended as a replacement for NPN, try
 providing ALPN protocols then fall back to NPN if that fails.
 
+=item SSL_ticket_keycb => [$sub,$data] | $sub
+
+This is a callback used for stateless session reuse (Session Tickets, RFC 5077).
+
+This callback will be called as C<$sub->($data,[$key_name])> where C<$data> is
+the argument given to SSL_ticket_keycb (or undef) and C<$key_name> depends on
+the mode:
+
+=over 8
+
+=item encrypt ticket
+
+If a ticket needs to be encrypted the callback will be called without
+C<$key_name>. In this case it should return C<($current_key,$current_key_name>)
+where C<$current_key> is the current key (32 byte random data) and
+C<$current_key_name> the name associated with this key (exactly 16 byte). This
+C<$current_key_name> will be incorporated into the ticket.
+
+=item decrypt ticket
+
+If a ticket needs to be decrypted the callback will be called with C<$key_name>
+as found in the ticket. It should return C<($key,$current_key_name>) where
+C<$key> is the key associated with the given C<$key_name> and
+C<$current_key_name> the name associated with the currently active key.
+If C<$current_key_name> is different from the given C<$key_name> the callback
+will be called again to re-encrypt the ticket with the currently active key.
+
+If no key can be found which matches the given C<$key_name> then this function
+should return nothing (empty list).
+
+This mechanism should be used to limit the life time for each key encrypting the
+ticket. Compromise of a ticket encryption key might lead to decryption of SSL
+sessions which used session tickets protected by this key.
+
+=back
+
+Example:
+
+    Net::SSLeay::RAND_bytes(my $oldkey,32);
+    Net::SSLeay::RAND_bytes(my $newkey,32);
+    my $oldkey_name = pack("a16",'oldsecret');
+    my $newkey_name = pack("a16",'newsecret');
+
+    my @keys = (
+       [ $newkey_name, $newkey ], # current active key
+       [ $oldkey_name, $oldkey ], # already expired
+    );
+
+    my $keycb = sub {
+       my ($mykeys,$name) = @_;
+
+       # return (current_key, current_key_name) if no name given
+       return ($mykeys->[0][1],$mykeys->[0][0]) if ! $name;
+
+       # return (matching_key, current_key_name) if we find a key matching
+       # the given name
+       for(my $i = 0; $i<@$mykeys; $i++) {
+	   next if $name ne $mykeys->[$i][0];
+	   return ($mykeys->[$i][1],$mykeys->[0][0]);
+       }
+
+       # no matching key found
+       return;
+    },\@keys);
+
+    my $srv = IO::Socket::SSL->new(..., SSL_ticket_keycb => $keycb);
+
+
 =back
 
 =item B<accept>
