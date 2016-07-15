@@ -3,10 +3,6 @@
 # `make test'. After `make install' it should work as `perl t/dhe.t'
 
 # This tests the use of Diffie Hellman Key Exchange (DHE)
-# If you have only a 384bit RSA key you can not use RSA key exchange,
-# but DHE is usable. For an explanation see
-# http://groups.google.de/group/mailing.openssl.users/msg/d60330cfa7a6034b
-# So this test simple uses a 384bit RSA key to make sure that DHE is used.
 
 use strict;
 use warnings;
@@ -25,13 +21,9 @@ my $server = IO::Socket::SSL->new(
     LocalAddr => $addr,
     Listen => 2,
     ReuseAddr => 1,
-    SSL_cert_file => "certs/server-rsa384-dh.pem",
-    SSL_key_file  => "certs/server-rsa384-dh.pem",
-    SSL_dh_file   => "certs/server-rsa384-dh.pem",
-    # at least 0.9.8[ab] have problems if we don't explicitly disable
-    # RSA or EXPORT56, and 1.0.1 complains if we have RSA authentication
-    # enabled
-    SSL_cipher_list => 'ALL:RSA:!aRSA',
+    SSL_cert_file => "certs/server-cert.pem",
+    SSL_key_file  => "certs/server-key.pem",
+    SSL_cipher_list => 'DH:!aNULL',  # allow only DH ciphers
 ) || do {
     notok($!);
     exit
@@ -52,7 +44,6 @@ if ( !defined $pid ) {
     my $to_server = IO::Socket::SSL->new(
 	PeerAddr => $addr,
 	Domain => AF_INET,
-	SSL_cipher_list => 'ALL:RSA:!aRSA',
 	SSL_verify_mode => 0 ) || do {
 	notok( "connect failed: $SSL_ERROR" );
 	exit
