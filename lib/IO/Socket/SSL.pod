@@ -1358,7 +1358,7 @@ Example:
        [ $oldkey_name, $oldkey ], # already expired
     );
 
-    my $keycb = sub {
+    my $keycb = [ sub {
        my ($mykeys,$name) = @_;
 
        # return (current_key, current_key_name) if no name given
@@ -1373,7 +1373,7 @@ Example:
 
        # no matching key found
        return;
-    },\@keys);
+    },\@keys ];
 
     my $srv = IO::Socket::SSL->new(..., SSL_ticket_keycb => $keycb);
 
