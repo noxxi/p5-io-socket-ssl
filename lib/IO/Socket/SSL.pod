@@ -1196,8 +1196,8 @@ be shared between different SSL contextes. If not given a cache specific to the
 SSL context only will be used.
 
 You can either create a new cache with
-C<<IO::Socket::SSL::OCSP_Cache->new([size]) >> or implement your own cache,
-which needs to have methods C<put($key,\%entry)> and C<get($key)->\%entry>
+C<< IO::Socket::SSL::OCSP_Cache->new([size]) >> or implement your own cache,
+which needs to have methods C<put($key,\%entry)> and C<get($key)>
 where entry is the hash representation of the OCSP response with fields like
 C<nextUpdate>. The default implementation of the cache will consider responses
 valid as long as C<nextUpdate> is less then the current time.
@@ -1302,9 +1302,9 @@ as an array ref.
 See also method C<alpn_selected>.
 
 Application-Layer Protocol Negotiation (ALPN) is available with Net::SSLeay
-1.56+ and openssl-1.0.2+. More details about the extension are in RFC7301.  To
-check support you might call C< IO::Socket::SSL->can_alpn() >.  If you use this
-option with an unsupported Net::SSLeay/OpenSSL it will throw an error.
+1.56+ and openssl-1.0.2+. More details about the extension are in RFC7301. To
+check support you might call C<< IO::Socket::SSL->can_alpn() >>. If you use
+this option with an unsupported Net::SSLeay/OpenSSL it will throw an error.
 
 Note that some client implementations may encounter problems if both NPN and
 ALPN are specified. Since ALPN is intended as a replacement for NPN, try
@@ -1314,9 +1314,9 @@ providing ALPN protocols then fall back to NPN if that fails.
 
 This is a callback used for stateless session reuse (Session Tickets, RFC 5077).
 
-This callback will be called as C<$sub->($data,[$key_name])> where C<$data> is
-the argument given to SSL_ticket_keycb (or undef) and C<$key_name> depends on
-the mode:
+This callback will be called as C<< $sub->($data,[$key_name]) >> where C<$data>
+is the argument given to SSL_ticket_keycb (or undef) and C<$key_name> depends
+on the mode:
 
 =over 8
 
@@ -1779,8 +1779,8 @@ Because to create an OCSP request the certificate and its issuer certificate
 need to be known it is not possible to check certificates when the trust chain
 is incomplete or if the certificate is self-signed.
 
-The OCSP resolver gets created by calling C<$ssl->ocsp_resolver> and provides
-the following methods:
+The OCSP resolver gets created by calling C<< $ssl->ocsp_resolver >> and
+provides the following methods:
 
 =over 8
 
