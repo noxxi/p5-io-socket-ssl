@@ -564,6 +564,22 @@ with C<< openssl x509 -purpose >>, that the necessary root certificate is in the
 path specified by C<SSL_ca*> (or the default path) and that any intermediate
 certificates needed to build the trust chain are sent by the client.
 
+=item * 
+
+Validation of self-signed certificate fails even if it is given with
+C<SSL_ca*> argument.
+
+The C<SSL_ca*> arguments do not give a general trust store for arbitrary
+certificates but only specify a store for CA certificates which then can be used
+to verify other certificates.  This especially means that certificates which are
+not a CA get simply ignored, notably self-signed certificates which do not also
+have the CA-flag set.
+
+This behavior of OpenSSL differs from the more general trust-store concept which
+can be found in browsers and where it is possible to simply added arbitrary
+certificates (CA or not) as trusted.
+
+
 =back
 
 
@@ -1197,10 +1213,10 @@ SSL context only will be used.
 
 You can either create a new cache with
 C<< IO::Socket::SSL::OCSP_Cache->new([size]) >> or implement your own cache,
-which needs to have methods C<put($key,\%entry)> and C<get($key)>
-where entry is the hash representation of the OCSP response with fields like
-C<nextUpdate>. The default implementation of the cache will consider responses
-valid as long as C<nextUpdate> is less then the current time.
+which needs to have methods C<put($key,\%entry)> and C<get($key)> (returning
+C<\%entry>) where entry is the hash representation of the OCSP response with
+fields like C<nextUpdate>. The default implementation of the cache will consider
+responses valid as long as C<nextUpdate> is less then the current time.
 
 =item SSL_reuse_ctx
 
