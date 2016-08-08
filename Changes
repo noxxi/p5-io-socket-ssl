@@ -1,3 +1,6 @@
+2.034 2016/08/08
+- move handling of global SSL arguments into creation of context, so that these
+  get also applied when creating a context only.
 2.033 2016/07/15
 - support for session ticket reuse over multiple contexts and processes
   (if supported by Net::SSLeay)
