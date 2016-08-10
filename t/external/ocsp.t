@@ -4,33 +4,14 @@ use strict;
 use warnings;
 use Test::More;
 use IO::Socket::SSL;
+#$Net::SSLeay::trace=3;
 
 plan skip_all => "no OCSP support" if ! IO::Socket::SSL->can_ocsp;
 
-#$Net::SSLeay::trace=3;
-
-my @tests = (
-    {
-	# this should give us OCSP stapling
-	host => 'www.live.com',
-	port => 443,
-	fingerprint => 'sha1$69e85345bfa05c1beb1352dad0b8c61abe42f26c',
-	ocsp_staple => 1,
-    },
-    {
-	# no OCSP stapling yet
-	host => 'www.google.com',
-	port => 443,
-	fingerprint => 'sha1$93125bb97d02aa4536b4ec9a7ca01ad8927314db',
-    },
-    {
-	# this is revoked
-	host => 'revoked.grc.com',
-	port => 443,
-	fingerprint => 'sha1$34703c40093461ad3ce087e161c7b7f42abe770c',
-	expect_revoked => 1
-    },
-);
+my $fingerprints = do './fingerprint.pl' 
+    || do './t/external/fingerprint.pl' 
+    || die "no fingerprints for sites";
+my @tests = grep { $_->{ocsp} } @$fingerprints;
 
 plan tests => 0+@tests;
 
@@ -101,13 +82,13 @@ for my $test (@tests) {
 	$cl = eval { &$tcp_connect } or skip "TCP connect#3 failed: $@",1;
 	my $ok = IO::Socket::SSL->start_SSL($cl);
 	my $err = !$ok && $SSL_ERROR;
-	if (!$ok && !$test->{expect_revoked}) {
+	if (!$ok && !$test->{ocsp}{revoked}) {
 	    fail("SSL upgrade with OCSP stapling failed: $err");
 	    next TEST;
 	}
 
 	# we got usable stapling if _SSL_ocsp_verify is defined
-	if ($test->{ocsp_staple}) {
+	if ($test->{ocsp}{staple}) {
 	    if ( ! ${*$cl}{_SSL_ocsp_verify}) {
 		fail("did not get expected OCSP response with stapling");
 		next TEST;
@@ -128,7 +109,7 @@ for my $test (@tests) {
 	    $err = $ocsp_resolver->resolve_blocking(timeout => $timeout);
 	}
 
-	if ($test->{expect_revoked}) {
+	if ($test->{ocsp}{revoked}) {
 	    if ($err =~m/revoked/) {
 		my $where = ${*$cl}{_SSL_ocsp_verify} ? 'stapled':'asked OCSP server';
 		pass("revoked as expected ($where)");
@@ -140,7 +121,7 @@ for my $test (@tests) {
 	    } elsif ($err) {
 		# some other error
 		pass("maybe revoked, but got error: $err");
-	    } elsif (!$have_httptiny && !$test->{ocsp_staple}) {
+	    } elsif (!$have_httptiny && !$test->{ocsp}{staple}) {
 		# could not check because HTTP::Tiny is missing
 		pass("maybe revoked, but could not check because HTTP::Tiny is missing");
 	    } else {

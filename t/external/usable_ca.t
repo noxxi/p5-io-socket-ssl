@@ -11,17 +11,10 @@ for( qw( IO::Socket::IP IO::Socket::INET6  )) {
     last;
 }
 
-# host:port fingerprint_cert subject_hash_ca
-my @tests = qw(
-    www.google.com:443 sha1$93125bb97d02aa4536b4ec9a7ca01ad8927314db 578d5c04
-    www.yahoo.com:443 sha1$71167492535fbdaa3ab6fec242ce183930d27603 415660c1
-    www.comdirect.de:443 sha1$ca16159c49de301ab1ae69ef1d3c0205f54ebaaa 415660c1
-    meine.deutsche-bank.de:443 sha1$1331596b6ecfe54f2018b6d16046c7046dc84048 415660c1
-    www.twitter.com:443 sha1$add53f6680fe66e383cbac3e60922e3b4c412bed b204d74a
-    www.facebook.com:443 sha1$45bfee628eec0ba06dfb860c865ffdb71502a541 244b5494
-    www.live.com:443 sha1$69e85345bfa05c1beb1352dad0b8c61abe42f26c b204d74a
-);
-
+my $fingerprints = do './fingerprint.pl'
+    || do './t/external/fingerprint.pl'
+    || die "no fingerprints for sites";
+my @tests = grep { $_->{subject_hash_ca} } @$fingerprints;
 
 my %ca = IO::Socket::SSL::default_ca();
 plan skip_all => "no default CA store found" if ! %ca;
@@ -59,11 +52,14 @@ my $proxy = ( $ENV{https_proxy} || $ENV{http_proxy} || '' )
 
 my @cap = ('SSL_verifycn_name');
 push @cap, 'SSL_hostname' if IO::Socket::SSL->can_client_sni();
-plan tests => (1+@cap)*(@tests/3);
+plan tests => (1+@cap)*@tests;
 
-while ( @tests ) {
-    my ($host,$fp,$ca_hash) = splice(@tests,0,3);
-    my $port = $host =~s{:(\d+)$}{} && $1;
+for my $test (@tests) {
+    my $host = $test->{host};
+    my $port = $test->{port} || 443;
+    my $fp   = $test->{fingerprint};
+    my $ca_hash = $test->{subject_hash_ca};
+
     SKIP: {
 
 	# first check if we have the CA in store
@@ -115,8 +111,9 @@ while ( @tests ) {
 	my $cl = shift(@cl);
 	skip "ssl upgrade failed even without verification",1+@cap
 	    if ! IO::Socket::SSL->start_SSL($cl, SSL_verify_mode => 0 );
-	skip "fingerprint mismatch - probably SSL interception",1+@cap
-	    if $cl->get_fingerprint('sha1') ne $fp;
+	my $clfp = $cl->get_fingerprint('sha1');
+	skip "fingerprint mismatch ($clfp) - probably SSL interception or certificate changed",1+@cap
+	    if $clfp ne $fp;
 	diag("fingerprint $host matches");
 
 	# check if it can verify against builtin CA store

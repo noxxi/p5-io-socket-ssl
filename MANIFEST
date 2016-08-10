@@ -42,6 +42,7 @@ t/connectSSL-timeout.t
 t/core.t
 t/dhe.t
 t/ecdhe.t
+t/external/fingerprint.pl
 t/external/ocsp.t
 t/external/usable_ca.t
 t/io-socket-inet6.t
