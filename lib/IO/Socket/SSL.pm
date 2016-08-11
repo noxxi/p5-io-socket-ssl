@@ -582,7 +582,8 @@ sub configure_SSL {
     $FILTER_SSL_ARGS->($is_server,$arg_hash) if $FILTER_SSL_ARGS;
 
     # this adds defaults to $arg_hash as a side effect!
-    ${*$self}{'_SSL_ctx'} = IO::Socket::SSL::SSL_Context->new($arg_hash);
+    ${*$self}{'_SSL_ctx'} = IO::Socket::SSL::SSL_Context->new($arg_hash)
+	or return;
 
     ${*$self}{'_SSL_arguments'} = $arg_hash;
     ${*$self}{'_SSL_opened'} = 1 if $is_server;
