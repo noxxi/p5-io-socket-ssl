@@ -2127,12 +2127,9 @@ sub new {
     my $arg_hash = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
 
     my $is_server = $arg_hash->{SSL_server};
-    my %defaults = (
-	%$GLOBAL_SSL_ARGS,
-	$is_server 
-	    ? (%$GLOBAL_SSL_SERVER_ARGS, %DEFAULT_SSL_SERVER_ARGS) 
-	    : (%$GLOBAL_SSL_CLIENT_ARGS, %DEFAULT_SSL_CLIENT_ARGS),
-    );
+    my %defaults = $is_server
+	? (%DEFAULT_SSL_SERVER_ARGS, %$GLOBAL_SSL_ARGS, %$GLOBAL_SSL_SERVER_ARGS) 
+	: (%DEFAULT_SSL_CLIENT_ARGS, %$GLOBAL_SSL_ARGS, %$GLOBAL_SSL_CLIENT_ARGS);
     if ( $defaults{SSL_reuse_ctx} ) {
 	# ignore default context if there are args to override it
 	delete $defaults{SSL_reuse_ctx}
