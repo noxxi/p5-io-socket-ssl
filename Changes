@@ -1,3 +1,11 @@
+2.035 2016/08/11
+- fixes for issues introduced in 2.034
+  - return with error in configure_SSL if context creation failed. This
+    might otherwise result in an segmentation fault later.
+  - apply builtin defaults before any (user configurable) global settings
+    (i.e. done with set_defaults, set_default_context...) so that builtins
+    don't replace user settings
+    Thanks to joel[DOT]a[DOT]berger[AT]gmail[DOT]com for reporting
 2.034 2016/08/08
 - move handling of global SSL arguments into creation of context, so that these
   get also applied when creating a context only.
