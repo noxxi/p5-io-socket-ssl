@@ -1,16 +1,16 @@
 [
     {
         # this should give us OCSP stapling
-        host => 'www.live.com',
+        host => 'www.microsoft.com',
         port => 443,
-        fingerprint => 'sha1$0e37dc9b320d2526e93e360a26c824b202d1f3af',
+        fingerprint => 'sha1$5f0b37e633840ca02468552ea3b1197e5e118f7b',
 	ocsp => { staple => 1 },
     },
     {
-        # no OCSP stapling yet
-        host => 'www.google.com',
+        # no OCSP stapling 
+        host => 'www.spiegel.de',
         port => 443,
-        fingerprint => 'sha1$89380c438a076d9d5fac228a8f680ff452487f30',
+        fingerprint => 'sha1$ad737048455485d8c817b7d0f7403553a7b9f65b',
 	ocsp => { staple => 0 },
 	subject_hash_ca => '578d5c04',
     },
