@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.035';
+our $VERSION = '2.036';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -71,7 +71,9 @@ BEGIN {
 	# http://rt.openssl.org/Ticket/Display.html?id=2975
 	( Net::SSLeay::OPENSSL_VERSION_NUMBER() != 0x1000104f
 	|| length(pack("P",0)) == 4 );
-    $can_ocsp        = defined &Net::SSLeay::OCSP_cert2ids;
+    $can_ocsp        = defined &Net::SSLeay::OCSP_cert2ids
+	# OCSP got broken in 1.75..1.77
+	&& ($Net::SSLeay::VERSION < 1.75 || $Net::SSLeay::VERSION > 1.77);
     $can_ocsp_staple = $can_ocsp
 	&& defined &Net::SSLeay::set_tlsext_status_type;
     $can_tckt_keycb  = defined &Net::SSLeay::CTX_set_tlsext_ticket_getkey_cb;
