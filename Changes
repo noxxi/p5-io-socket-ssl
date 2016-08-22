@@ -1,3 +1,6 @@
+2.037 2016/08/22
+- fix session cache del_session: it freed the session but did not properly
+  remove it from the cache. Further reuse causes crash.
 2.036 2016/08/11
 - disable OCSP support when Net::SSLeay 1.75..1.77 is used, see RT#116795
 2.035 2016/08/11
