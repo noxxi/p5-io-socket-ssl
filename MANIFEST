@@ -60,6 +60,7 @@ t/public_suffix_lib_uri.t
 t/public_suffix_ssl.t
 t/readline.t
 t/sessions.t
+t/session_ticket.t
 t/signal-readline.t
 t/sni.t
 t/sni_verify.t

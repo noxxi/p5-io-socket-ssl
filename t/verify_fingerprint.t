@@ -6,7 +6,7 @@ use IO::Socket::SSL::Utils;
 use File::Temp 'tempfile';
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
-plan tests => 12;
+plan tests => 13;
 
 my ($ca1,$cakey1) = CERT_create( CA => 1, subject => { CN => 'ca1' });
 my ($cert1,$key1) = CERT_create( 
@@ -26,9 +26,12 @@ my ($cert2,$key2) = CERT_create(
 
 my ($saddr1,$fp1) = _server([$cert1],$key1);
 my ($saddr2,$fp2,$ifp2) = _server([$cert2,$ica2],$key2);
+my $fp1pub = $fp1->[1];
+$_ = $_->[0] for($fp1,$fp2,$ifp2);
 
 for my $test (
     [ $saddr1, undef, $fp1, "accept fp1 for saddr1", 1 ],
+    [ $saddr1, undef, $fp1pub, "accept fp1 pubkey for saddr1", 1 ],
     [ $saddr2, undef, $fp2, "accept fp2 for saddr2", 1 ],
     [ $saddr2, undef, $ifp2, "reject ifp2 for saddr2", 0 ],
     [ $saddr1, undef, $fp2, "reject fp2 for saddr1", 0 ],
@@ -66,6 +69,7 @@ while ( @child && ( my $pid = waitpid(-1,0))>0 ) {
     @child = grep { $_ != $pid } @child
 }
 
+
 sub _server {
     my ($certs,$key) = @_;
     my $sock = IO::Socket::INET->new( LocalAddr => '0.0.0.0', Listen => 10 )
@@ -75,7 +79,11 @@ sub _server {
 	push @child,$pid;
 	return (
 	    '127.0.0.1:'.$sock->sockport,
-	    map { 'sha1$'.Net::SSLeay::X509_get_fingerprint($_,'sha1') } @$certs
+	    map { [ 
+		'sha1$'.Net::SSLeay::X509_get_fingerprint($_,'sha1'),
+		'sha1$pub$'.unpack("H*",Net::SSLeay::X509_pubkey_digest($_,
+		    Net::SSLeay::EVP_get_digestbyname('sha1')))
+	    ]} @$certs
 	);
     }
 

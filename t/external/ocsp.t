@@ -66,21 +66,28 @@ for my $test (@tests) {
 	my $cl = eval { &$tcp_connect } or skip "TCP connect#1 failed: $@",1;
 	diag("tcp connect to $test->{host}:$test->{port} ok");
 	skip "SSL upgrade w/o validation failed: $SSL_ERROR",1
-	    if ! IO::Socket::SSL->start_SSL($cl, SSL_verify_mode => 0);
+	    if ! IO::Socket::SSL->start_SSL($cl, 
+		SSL_hostname => $test->{host}, 
+		SSL_verify_mode => 0
+	    );
+	my $pubkey_fp = $test->{fingerprint} =~m{\$pub\$};
 	skip "fingerprints do not match",1
-	    if $cl->get_fingerprint('sha1') ne $test->{fingerprint};
+	    if $cl->get_fingerprint('sha1',undef,$pubkey_fp) ne $test->{fingerprint};
 	diag("fingerprint matches");
 
 	# then check if we can use the default CA path for successful
 	# validation without OCSP yet
 	$cl = eval { &$tcp_connect } or skip "TCP connect#2 failed: $@",1;
 	skip "SSL upgrade w/o OCSP failed: $SSL_ERROR",1
-	    if ! IO::Socket::SSL->start_SSL($cl, SSL_ocsp_mode => SSL_OCSP_NO_STAPLE );
+	    if ! IO::Socket::SSL->start_SSL($cl, 
+		SSL_hostname => $test->{host}, 
+		SSL_ocsp_mode => SSL_OCSP_NO_STAPLE 
+	    );
 	diag("validation with default CA w/o OCSP ok");
 
 	# check with default settings
 	$cl = eval { &$tcp_connect } or skip "TCP connect#3 failed: $@",1;
-	my $ok = IO::Socket::SSL->start_SSL($cl);
+	my $ok = IO::Socket::SSL->start_SSL($cl, SSL_hostname => $test->{host});
 	my $err = !$ok && $SSL_ERROR;
 	if (!$ok && !$test->{ocsp}{revoked}) {
 	    fail("SSL upgrade with OCSP stapling failed: $err");
@@ -144,6 +151,7 @@ for my $test (@tests) {
 	$cl = eval { &$tcp_connect } or skip "TCP connect#4 failed: $@",1;
 	my $cache = IO::Socket::SSL::OCSP_Cache->new;
 	if (! IO::Socket::SSL->start_SSL($cl,
+	    SSL_hostname => $test->{host},
 	    SSL_ocsp_mode => SSL_OCSP_FULL_CHAIN,
 	    SSL_ocsp_cache => $cache
 	)) {

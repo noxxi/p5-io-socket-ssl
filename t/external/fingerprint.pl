@@ -1,9 +1,9 @@
 [
     {
         # this should give us OCSP stapling
-        host => 'www.microsoft.com',
+        host => 'www.chksum.de',
         port => 443,
-        fingerprint => 'sha1$5f0b37e633840ca02468552ea3b1197e5e118f7b',
+	fingerprint => 'sha1$pub$1047d24a7e2da2e369b4748d2309bc10c4ee2af0',
 	ocsp => { staple => 1 },
     },
     {

@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.037';
+our $VERSION = '2.038';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -76,7 +76,8 @@ BEGIN {
 	&& ($Net::SSLeay::VERSION < 1.75 || $Net::SSLeay::VERSION > 1.77);
     $can_ocsp_staple = $can_ocsp
 	&& defined &Net::SSLeay::set_tlsext_status_type;
-    $can_tckt_keycb  = defined &Net::SSLeay::CTX_set_tlsext_ticket_getkey_cb;
+    $can_tckt_keycb  = defined &Net::SSLeay::CTX_set_tlsext_ticket_getkey_cb
+	&& $Net::SSLeay::VERSION > 1.78;
 }
 
 my $algo2digest = do {
@@ -1804,16 +1805,18 @@ sub get_servername {
 }
 
 sub get_fingerprint_bin {
-    my ($self,$algo,$cert) = @_;
+    my ($self,$algo,$cert,$key_only) = @_;
     $cert ||= $self->peer_certificate;
-    return Net::SSLeay::X509_digest($cert, $algo2digest->($algo || 'sha256'));
+    return $key_only 
+	? Net::SSLeay::X509_pubkey_digest($cert, $algo2digest->($algo || 'sha256'))
+	: Net::SSLeay::X509_digest($cert, $algo2digest->($algo || 'sha256'));
 }
 
 sub get_fingerprint {
-    my ($self,$algo,$cert) = @_;
+    my ($self,$algo,$cert,$key_only) = @_;
     $algo ||= 'sha256';
-    my $fp = get_fingerprint_bin($self,$algo,$cert) or return;
-    return $algo.'$'.unpack('H*',$fp);
+    my $fp = get_fingerprint_bin($self,$algo,$cert,$key_only) or return;
+    return $algo.'$'.($key_only ? 'pub$':'').unpack('H*',$fp);
 }
 
 sub get_cipher {
@@ -1937,6 +1940,7 @@ sub can_alpn       { return $can_alpn }
 sub can_ecdh       { return $can_ecdh }
 sub can_ipv6       { return CAN_IPV6 }
 sub can_ocsp       { return $can_ocsp }
+sub can_ticket_keycb { return $can_tckt_keycb }
 
 sub DESTROY {
     my $self = shift or return;
@@ -2569,12 +2573,12 @@ sub new {
     my @accept_fp;
     if ( my $fp = $arg_hash->{SSL_fingerprint} ) {
 	for( ref($fp) ? @$fp : $fp) {
-	    my ($algo,$digest) = m{^([\w-]+)\$([a-f\d:]+)$}i;
+	    my ($algo,$pubkey,$digest) = m{^([\w-]+)\$(pub\$)?([a-f\d:]+)$}i;
 	    return IO::Socket::SSL->_internal_error("invalid fingerprint '$_'",9)
 		if ! $algo;
 	    $algo = lc($algo);
 	    ( $digest = lc($digest) ) =~s{:}{}g;
-	    push @accept_fp,[ $algo, pack('H*',$digest) ]
+	    push @accept_fp,[ $algo, $pubkey || '', pack('H*',$digest) ]
 	}
     }
     my $verify_fingerprint = @accept_fp && do {
@@ -2586,9 +2590,10 @@ sub new {
 	    # Check fingerprint only from top certificate.
 	    my %fp;
 	    for(@accept_fp) {
-		my $fp = $fp{$_->[0]} ||=
-		    Net::SSLeay::X509_digest($cert,$algo2digest->($_->[0]));
-		next if $fp ne $_->[1];
+		my $fp = $fp{$_->[0],$_->[1]} ||= $_->[1]
+		    ? Net::SSLeay::X509_pubkey_digest($cert,$algo2digest->($_->[0]))
+		    : Net::SSLeay::X509_digest($cert,$algo2digest->($_->[0]));
+		next if $fp ne $_->[2];
 		return 1;
 	    }
 	    return ! $fail;

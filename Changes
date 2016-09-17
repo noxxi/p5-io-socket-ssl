@@ -1,3 +1,9 @@
+2.038 2016/09/17
+- restrict session ticket callback to Net::SSLeay 1.79+ since version before
+  contains bug. Add test for session reuse
+- extend SSL fingerprint to pubkey digest, i.e. 'sha1$pub$xxxxxx....'
+- fix t/external/ocsp.t to use different server (under my control) to check 
+  OCSP stapling
 2.037 2016/08/22
 - fix session cache del_session: it freed the session but did not properly
   remove it from the cache. Further reuse causes crash.

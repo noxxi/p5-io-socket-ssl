@@ -386,7 +386,7 @@ C<SSL_ca_path> to specify a different CA store.
 
 If the validation fails because the certificate is self-signed and that's what
 you expect, you can use the C<SSL_fingerprint> option to accept specific
-certificates by their certificate fingerprint.
+certificates by their certificate or pubkey fingerprint.
 
 =item *
 
@@ -871,6 +871,8 @@ verification at all. In this case you can specify the fingerprint of the
 certificate as C<'algo$hex_fingerprint'>. C<algo> is a fingerprint algorithm
 supported by OpenSSL, e.g. 'sha1','sha256'... and C<hex_fingerprint> is the
 hexadecimal representation of the binary fingerprint.
+If you want to use the fingerprint of the pubkey inside the certificate instead
+of the certificate use the syntax C<'algo$pub$hex_fingerprint'> instead.
 To get the fingerprint of an established connection you can use
 C<get_fingerprint>.
 
@@ -1501,17 +1503,22 @@ This function gives you the number of bytes available without reading from the
 underlying socket object. This function is essential if you work with event
 loops, please see the section about polling SSL sockets.
 
-=item B<get_fingerprint([algo,certificate])>
+=item B<get_fingerprint([algo,certificate,pubkey])>
 
 This methods returns the fingerprint of the given certificate in the form
 C<algo$digest_hex>, where C<algo> is the used algorithm, default 'sha256'.
 If no certificate is given the peer certificate of the connection is used.
+If C<pubkey> is true it will not return the fingerprint of the certificate but
+instead the fingerprint of the pubkey inside the certificate as
+C<algo$pub$digest_hex>.
 
-=item B<get_fingerprint_bin([algo,certificate])>
+=item B<get_fingerprint_bin([algo,certificate,pubkey])>
 
 This methods returns the binary fingerprint of the given certificate by using
 the algorithm C<algo>, default 'sha256'.
 If no certificate is given the peer certificate of the connection is used.
+If C<pubkey> is true it will not return the fingerprint of the certificate but
+instead the fingerprint of the pubkey inside the certificate.
 
 =item B<get_cipher()>
 
