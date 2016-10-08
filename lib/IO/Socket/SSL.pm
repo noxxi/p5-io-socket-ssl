@@ -407,8 +407,7 @@ my $CHECK_SSL_PATH = sub {
 
 	next if ref($path) eq 'SCALAR' && ! $$path;
 	if ($type eq 'SSL_ca_file') {
-	    die "SSL_ca_file $path does not exist" if ! -f $path;
-	    die "SSL_ca_file $path is not accessible: $!"
+	    die "SSL_ca_file $path can't be used: $!"
 		if ! open(my $fh,'<',$path);
 	} elsif ($type eq 'SSL_ca_path') {
 	    $path = [ split($OPENSSL_LIST_SEPARATOR,$path) ] if !ref($path);
@@ -2192,7 +2191,7 @@ sub new {
     for(qw(SSL_cert_file SSL_key_file)) {
 	 defined( my $file = $arg_hash->{$_} ) or next;
 	for my $f (ref($file) eq 'HASH' ? values(%$file):$file ) {
-	    die "$_ $f does not exist" if ! -f $f;
+	    die "$_ $f can't be used: $!" if ! open(my $fh,'<',$f)
 	}
     }
 
