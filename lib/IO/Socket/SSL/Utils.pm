@@ -129,7 +129,7 @@ sub CERT_asHash {
 	version => Net::SSLeay::X509_get_version($cert),
 	not_before => _asn1t2t(Net::SSLeay::X509_get_notBefore($cert)),
 	not_after => _asn1t2t(Net::SSLeay::X509_get_notAfter($cert)),
-	serial => Net::SSLeay::ASN1_INTEGER_get(
+	serial => Net::SSLeay::P_ASN1_INTEGER_get_dec(
 	    Net::SSLeay::X509_get_serialNumber($cert)),
 	crl_uri  => [ Net::SSLeay::P_X509_get_crl_distribution_points($cert) ],
 	keyusage => [ Net::SSLeay::P_X509_get_key_usage($cert) ],
