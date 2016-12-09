@@ -131,6 +131,8 @@ sub CERT_asHash {
 	not_after => _asn1t2t(Net::SSLeay::X509_get_notAfter($cert)),
 	serial => Net::SSLeay::P_ASN1_INTEGER_get_dec(
 	    Net::SSLeay::X509_get_serialNumber($cert)),
+	signature_alg => Net::SSLeay::OBJ_obj2txt (
+	    Net::SSLeay::P_X509_get_signature_alg($cert)),
 	crl_uri  => [ Net::SSLeay::P_X509_get_crl_distribution_points($cert) ],
 	keyusage => [ Net::SSLeay::P_X509_get_key_usage($cert) ],
 	extkeyusage => {
