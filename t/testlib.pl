@@ -73,6 +73,7 @@ sub fork_sub {
     defined( my $pid = fork() ) || die $!;
     if ( ! $pid ) {
 	# CHILD, exec sub
+	$SIG{ __DIE__ } = undef;
 	close($rh);
 	local *STDOUT = local *STDERR = $wh;
 	$wh->autoflush;
