@@ -1,3 +1,7 @@
+2.040 2016/12/17
+- fix detection of default CA path for OpenSSL 1.1.x
+- Utils::CERT_asHash now includes the signature algorithm used
+- Utils::CERT_asHash can now deal with large serial numbers
 2.039 2016/11/20
 - OpenSSL 1.1.0c changed the behavior of SSL_read so that it now returns -1 on
   EOF without proper SSL shutdown. Since it looks like that this behavior will

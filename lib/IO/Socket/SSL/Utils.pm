@@ -595,6 +595,10 @@ fingerprint_sha256 if (the default) SHA-256 was used. Contrary to digest_* this
 is an ASCII string with a list if hexadecimal numbers, e.g.
 "73:59:75:5C:6D...".
 
+=item signature_alg
+
+Algorithm used to sign certificate, e.g. C<sha256WithRSAEncryption>.
+
 =item ext
 
 List of extensions.
