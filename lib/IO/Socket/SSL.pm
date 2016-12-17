@@ -450,8 +450,13 @@ my $CHECK_SSL_PATH = sub {
 	}
 	return %default_ca if defined $ca_detected;
 
-	$openssldir ||= Net::SSLeay::SSLeay_version(5)
-	    =~m{^OPENSSLDIR: "(.+)"$} && $1 || '';
+	# SSLEAY_DIR was 5 up to OpenSSL 1.1, then switched to 4 and got
+	# renamed to OPENSSL_DIR. Unfortunately it is not exported as constant
+	# by Net::SSLeay so we use the fixed number.
+	$openssldir ||=
+	    Net::SSLeay::SSLeay_version(5) =~m{^OPENSSLDIR: "(.+)"$} ? $1 :
+	    Net::SSLeay::SSLeay_version(4) =~m{^OPENSSLDIR: "(.+)"$} ? $1 :
+	    'cannot-determine-openssldir-from-ssleay-version';
 
 	# (re)detect according to openssl crypto/cryptlib.h
 	my $dir = $ENV{SSL_CERT_DIR}
