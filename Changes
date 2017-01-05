@@ -1,3 +1,5 @@
+2.042 2017/01/05
+- enable session ticket callback with Net::SSLeay>=1.80
 2.041 2017/01/04
 - leave session ticket callback off for now until the needed patch is
   included in Net::SSLeay. See

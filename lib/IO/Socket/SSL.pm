@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.041';
+our $VERSION = '2.042';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -78,8 +78,7 @@ BEGIN {
     $can_ocsp_staple = $can_ocsp
 	&& defined &Net::SSLeay::set_tlsext_status_type;
     $can_tckt_keycb  = defined &Net::SSLeay::CTX_set_tlsext_ticket_getkey_cb
-	# leave it off for now since the feature is still broken in Net::SSLeay 1.79
-	&& 0; # $Net::SSLeay::VERSION > 1.78;  
+	&& $Net::SSLeay::VERSION >= 1.80;  
 }
 
 my $algo2digest = do {
