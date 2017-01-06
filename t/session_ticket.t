@@ -54,7 +54,8 @@ my $client = sub {
     my $reuse = $cl && Net::SSLeay::session_reused($cl->_get_ssl_object);
     diag("connect to $i: ".
 	($cl ? "success reuse=$reuse" : "error: $!,$SSL_ERROR"));
-    is($reuse,$expect_reuse,$desc)
+    is($reuse,$expect_reuse,$desc);
+    close($cl);
 };
 
 
