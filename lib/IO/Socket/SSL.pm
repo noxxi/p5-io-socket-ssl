@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.043';
+our $VERSION = '2.044';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -24,9 +24,11 @@ use Carp;
 use strict;
 
 BEGIN {
-    eval { require Scalar::Util; Scalar::Util->import("weaken"); 1 }
-	|| eval { require WeakRef; WeakRef->import("weaken"); 1 }
-	|| die "no support for weaken - please install Scalar::Util";
+    die "no support for weaken - please install Scalar::Util" if ! do {
+	local $SIG{__DIE__};
+	eval { require Scalar::Util; Scalar::Util->import("weaken"); 1 }
+	    || eval { require WeakRef; WeakRef->import("weaken"); 1 }
+    };
 }
 
 
@@ -240,10 +242,10 @@ my $FILTER_SSL_ARGS = undef;
 
 # non-XS Versions of Scalar::Util will fail
 BEGIN{
-    local $SIG{__DIE__}; local $SIG{__WARN__}; # be silent
-    eval { use Scalar::Util 'dualvar'; dualvar(0,'') };
-    die "You need the XS Version of Scalar::Util for dualvar() support"
-	if $@;
+    die "You need the XS Version of Scalar::Util for dualvar() support" if !do {
+	local $SIG{__DIE__}; local $SIG{__WARN__}; # be silent
+	eval { use Scalar::Util 'dualvar'; dualvar(0,''); 1 };
+    };
 }
 
 # get constants for SSL_OP_NO_* now, instead calling the related functions
@@ -252,6 +254,7 @@ my %SSL_OP_NO;
 for(qw( SSLv2 SSLv3 TLSv1 TLSv1_1 TLSv11:TLSv1_1 TLSv1_2 TLSv12:TLSv1_2 )) {
     my ($k,$op) = m{:} ? split(m{:},$_,2) : ($_,$_);
     my $sub = "Net::SSLeay::OP_NO_$op";
+    local $SIG{__DIE__};
     $SSL_OP_NO{$k} = eval { no strict 'refs'; &$sub } || 0;
 }
 
@@ -267,7 +270,10 @@ if (!defined &Net::SSLeay::CTX_clear_options) {
 
 # Try to work around problems with alternative trust path by default, RT#104759
 my $DEFAULT_X509_STORE_flags = 0;
-eval { $DEFAULT_X509_STORE_flags |= Net::SSLeay::X509_V_FLAG_TRUSTED_FIRST() };
+{
+    local $SIG{__DIE__};
+    eval { $DEFAULT_X509_STORE_flags |= Net::SSLeay::X509_V_FLAG_TRUSTED_FIRST() };
+}
 
 our $DEBUG;
 use vars qw(@ISA $SSL_ERROR @EXPORT);
@@ -481,8 +487,10 @@ my $CHECK_SSL_PATH = sub {
 	    }
 	}
 
-	$default_ca{SSL_ca_file} = Mozilla::CA::SSL_ca_file()
-	    if ! %default_ca && eval { require Mozilla::CA };
+	$default_ca{SSL_ca_file} = Mozilla::CA::SSL_ca_file() if ! %default_ca && do {
+		local $SIG{__DIE__};
+		eval { require Mozilla::CA; 1 };
+	    };
 
 	$ca_detected = 1;
 	return %default_ca;

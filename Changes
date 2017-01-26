@@ -1,3 +1,8 @@
+2.044 2017/01/26
+- protect various 'eval'-based capability detections at startup with a localized
+  __DIE__ handler. This way dynamically requiring IO::Socket::SSL as done by
+  various third party software should cause less problems even if there is a
+  global __DIE__ handler which does not properly deal with 'eval'.
 2.043 2017/01/06
 - make t/session_ticket.t work with OpenSSL 1.1.0. With this version the
   session does not get reused any longer if it was not properly closed which
