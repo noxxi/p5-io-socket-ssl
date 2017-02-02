@@ -1889,10 +1889,11 @@ sub errstr {
 sub fatal_ssl_error {
     my $self = shift;
     my $error_trap = ${*$self}{'_SSL_arguments'}->{'SSL_error_trap'};
+    my $sh = ${*$self}{_SSL_arguments}{SSL_startHandshake};
     $@ = $self->errstr;
     if (defined $error_trap and ref($error_trap) eq 'CODE') {
 	$error_trap->($self, $self->errstr()."\n".$self->get_ssleay_error());
-    } elsif ( ${*$self}{'_SSL_ioclass_upgraded'} ) {
+    } elsif ( ${*$self}{'_SSL_ioclass_upgraded'} || (defined $sh && ! $sh) ) {
 	# downgrade only
 	$self->stop_SSL;
     } else {
