@@ -587,7 +587,7 @@ certificates (CA or not) as trusted.
 =head1 Using Non-Blocking Sockets
 
 If you have a non-blocking socket, the expected behavior on read, write, accept
-or connect is to set C<$!> to EWOULDBLOCK if the operation can not be completed
+or connect is to set C<$!> to EWOULDBLOCK if the operation cannot be completed
 immediately. Note that EWOULDBLOCK is the same as EAGAIN on UNIX systems, but
 is different on Windows.
 
@@ -698,10 +698,10 @@ to upgrade and stop_SSL to downgrade:
     my $sock = IO::Socket::INET->new(...) or die $!;
     ... exchange plain data on $sock until starttls command ...
     IO::Socket::SSL->start_SSL($sock,%sslargs) or die $SSL_ERROR;
-    ... now $sock is a IO::Socket::SSL object ...
+    ... now $sock is an IO::Socket::SSL object ...
     ... exchange data with SSL on $sock until stoptls command ...
     $sock->stop_SSL or die $SSL_ERROR;
-    ... now $sock is again a IO::Socket::INET object ...
+    ... now $sock is again an IO::Socket::INET object ...
 
 But, lots of modules just derive directly from L<IO::Socket::INET>.
 While this base class can be replaced with L<IO::Socket::SSL>, these modules cannot
@@ -719,10 +719,10 @@ C<stop_SSL> to talk plain again:
     ) or die $!;
     ... exchange plain data on $sock until starttls command ...
     $sock->connect_SSL or die $SSL_ERROR;
-    ... now $sock is a IO::Socket::SSL object ...
+    ... now $sock is an IO::Socket::SSL object ...
     ... exchange data with SSL on $sock until stoptls command ...
     $sock->stop_SSL or die $SSL_ERROR;
-    ... $sock is still a IO::Socket::SSL object ...
+    ... $sock is still an IO::Socket::SSL object ...
     ... but data exchanged again in plain ...
 
 
@@ -887,7 +887,7 @@ If you create a server you usually need to specify a server certificate which
 should be verified by the client. Same is true for client certificates, which
 should be verified by the server.
 The certificate can be given as a file with SSL_cert_file or as an internal
-representation of a X509* object (like you get from L<Net::SSLeay> or
+representation of an X509* object (like you get from L<Net::SSLeay> or
 L<IO::Socket::SSL::Utils::PEM_xxx2cert>) with SSL_cert.
 If given as a file it will automatically detect the format.
 Supported file formats are PEM, DER and PKCS#12, where PEM and PKCS#12 can
@@ -901,7 +901,7 @@ the servers certificate (e.g. the first) will not be consumed by openssl and
 thus must be freed by the application.
 
 For each certificate a key is need, which can either be given as a file with
-SSL_key_file or as an internal representation of a EVP_PKEY* object with
+SSL_key_file or as an internal representation of an EVP_PKEY* object with
 SSL_key (like you get from L<Net::SSLeay> or
 L<IO::Socket::SSL::Utils::PEM_xxx2key>).
 If a key was already given within the PKCS#12 file specified by SSL_cert_file
@@ -1828,7 +1828,7 @@ This returns the soft error(s) which occurred when asking the OCSP responders.
 
 This will return a hash consisting of C<(url,request)>-tuples, e.g. which
 contain the OCSP request string and the URL where it should be sent too. The
-usual way to send such a request is as HTTP POST request with an content-type
+usual way to send such a request is as HTTP POST request with a content-type
 of C<application/ocsp-request> or as a GET request with the base64 and
 url-encoded request is added to the path of the URL.
 
@@ -1836,7 +1836,7 @@ After you've handled all these requests and added the response with
 C<add_response> you should better call this method again to make sure, that no
 more requests are outstanding. IO::Socket::SSL will combine multiple OCSP
 requests for the same server inside a single request, but some server don't
-give an response to all these requests, so that one has to ask again with the
+give a response to all these requests, so that one has to ask again with the
 remaining requests.
 
 =item add_response($uri,$response)
@@ -1915,7 +1915,7 @@ mod_perl scripts).
 You may use this to make IO::Socket::SSL automatically re-use a given session
 cache (unless specifically overridden in a call to new()).
 It accepts one argument, which should be an IO::Socket::SSL::Session_Cache
-object or similar (e.g something which implements get_session, add_session and
+object or similar (e.g. something which implements get_session, add_session and
 maybe del_session like IO::Socket::SSL::Session_Cache does).
 See the SSL_session_cache option of new() for more details.
 Note that this sets the default cache globally, so use with caution.
