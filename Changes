@@ -1,3 +1,5 @@
+- fixed memory leak caused by not destroying CREATED_IN_THIS_THREAD for SSL
+  objects -> github pull#55
 2.044 2017/01/26
 - protect various 'eval'-based capability detections at startup with a localized
   __DIE__ handler. This way dynamically requiring IO::Socket::SSL as done by

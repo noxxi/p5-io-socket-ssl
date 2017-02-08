@@ -1967,7 +1967,7 @@ sub DESTROY {
     my $self = shift or return;
     my $ssl = ${*$self}{_SSL_object} or return;
     delete $SSL_OBJECT{$ssl};
-    if ($CREATED_IN_THIS_THREAD{$ssl}) {
+    if (delete $CREATED_IN_THIS_THREAD{$ssl}) {
 	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
 	    if ${*$self}{'_SSL_opened'};
 	delete(${*$self}{'_SSL_ctx'});
