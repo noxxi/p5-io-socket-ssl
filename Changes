@@ -39,7 +39,7 @@
 2.035 2016/08/11
 - fixes for issues introduced in 2.034
   - return with error in configure_SSL if context creation failed. This
-    might otherwise result in an segmentation fault later.
+    might otherwise result in a segmentation fault later.
   - apply builtin defaults before any (user configurable) global settings
     (i.e. done with set_defaults, set_default_context...) so that builtins
     don't replace user settings
@@ -92,7 +92,7 @@
   available). Since IO::Socket::IP sets AI_ADDRCONFIG by default connect to
   localhost would fail on this systems. This happened at least for the tests,
   see https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=813796
-  Workaround is to explicitely set GetAddrInfoFlags to 0 if no GetAddrInfoFlags
+  Workaround is to explicitly set GetAddrInfoFlags to 0 if no GetAddrInfoFlags
   is set but the Family/Domain is given. In this case AI_ADDRCONFIG would not
   be useful anyway but would cause at most harm.
 2.023 2016/01/30
@@ -107,7 +107,7 @@
   Thanks to Mark.Martinec[AT]ijs[DOT]si for reporting in #110253
 2.021 2015/12/02
 - Fixes for documentation and typos thanks to DavsX and jwilk.
-- Update PublicSuffx with latest version from publicsuffix.org
+- Update PublicSuffix with latest version from publicsuffix.org
 2.020 2015/09/20
 - support multiple directories in SSL_ca_path as proposed in RT#106711
   by dr1027[AT]evocat[DOT]ne. Directories can be given as array or as string
@@ -316,7 +316,7 @@
   because of bad setup of the socket. Otherwise we get an endless calling
   of the OCSP callback.
 - consider an OCSP response which is not yet or no longer valid a soft error
-  instead of an hard error
+  instead of a hard error
 - fix skip in t/external/ocsp.t in case fingerprint does not match
 - RT#95633 call EVP_PKEY_free not EVP_KEY_free in
   IO::Socket::SSL::Utils::KEY_free. Thanks to paul[AT]city-fan[DOT]org
@@ -913,7 +913,7 @@ v1.24 2009.04.01
 - renew test certificates again (root CA expired, now valid for 10 years)
 
 v1.23 2009.02.23
-- if neither SSL_ca_file nor SSL_ca_path are known (e.g not given and the
+- if neither SSL_ca_file nor SSL_ca_path are known (e.g. not given and the
   default values have no existing file|path) disable checking of
   certificates, but carp about the problem
 - new test certificates, the old ones expired and caused tests to fail
@@ -1022,7 +1022,7 @@ v1.10
   IO::Socket is used
 
 v1.09
-- new method stop_SSL as opposite of start_SSL based on a idea
+- new method stop_SSL as opposite of start_SSL based on an idea
   of Bron Gondwana <brong[AT]fastmail[DOT]fm>
   To support this method the SSL_shutdown handling had to be
   fixed, e.g. in close a proper unidirectional shutdown

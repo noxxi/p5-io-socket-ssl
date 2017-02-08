@@ -28,7 +28,7 @@ unless( IO::Socket::SSL->CAN_IPV6 eq "IO::Socket::IP" ) {
 }
 
 my $addr = '::1';
-# check if we can use ::1, e.g if the computer has IPv6 enabled
+# check if we can use ::1, e.g. if the computer has IPv6 enabled
 if ( ! IO::Socket::IP->new(
     Listen => 10,
     LocalAddr => $addr,

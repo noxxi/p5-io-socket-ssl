@@ -4,7 +4,7 @@
 
 # Tests the use if SSL_cert instead of SSL_cert_file
 # because Net::SSLeay does not implement the necessary functions
-# to create a X509 from file/string (PEM_read_bio_X509) I just
+# to create an X509 from file/string (PEM_read_bio_X509) I just
 # create a server with SSL_cert_file and get the X509 from it using
 # Net::SSLeay::get_certificate.
 # Test should also test if SSL_cert is an array of X509*

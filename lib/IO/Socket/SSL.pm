@@ -222,7 +222,7 @@ DH
 	);
     }
     # Call it once at compile time and try it at INIT.
-    # This should catch all cases of including the module, e.g 'use' (INIT) or
+    # This should catch all cases of including the module, e.g. 'use' (INIT) or
     # 'require' (compile time) and works also with perlcc
     {
 	no warnings;
@@ -563,7 +563,7 @@ sub configure {
     # socket and later call connect explicitly
     my $blocking = delete $arg_hash->{Blocking};
 
-    # because Net::HTTPS simple redefines blocking() to {} (e.g
+    # because Net::HTTPS simple redefines blocking() to {} (e.g.
     # return undef) and IO::Socket::INET does not like this we
     # set Blocking only explicitly if it was set
     $arg_hash->{Blocking} = 1 if defined ($blocking);
@@ -1746,7 +1746,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	    my $pattern;
 	    ### IMPORTANT!
 	    # We accept only a single wildcard and only for a single part of the FQDN
-	    # e.g *.example.org does match www.example.org but not bla.www.example.org
+	    # e.g. *.example.org does match www.example.org but not bla.www.example.org
 	    # The RFCs are in this regard unspecific but we don't want to have to
 	    # deal with certificates like *.com, *.co.uk or even *
 	    # see also http://nils.toedtmann.net/pub/subjectAltName.txt .
@@ -1909,7 +1909,7 @@ sub get_ssleay_error {
     return Net::SSLeay::print_errs('SSL error: ') || '';
 }
 
-# internal errors, e.g unsupported features, hostname check failed etc
+# internal errors, e.g. unsupported features, hostname check failed etc
 # _SSL_last_err contains severity so that on error chains we can decide if one
 # error should replace the previous one or if this is just a less specific
 # follow-up error, e.g. configuration failed because certificate failed because
@@ -3013,7 +3013,7 @@ sub add_response {
 	@soft_error = "http request for OCSP failed; subject: ".
 	    join("; ",@{$todo->{subj}});
 
-    # is it an valid OCSP_RESPONSE
+    # is it a valid OCSP_RESPONSE
     } elsif ( ! eval { $resp = Net::SSLeay::d2i_OCSP_RESPONSE($resp) }) {
 	@soft_error = "invalid response (no OCSP_RESPONSE); subject: ".
 	    join("; ",@{$todo->{subj}});
