@@ -1971,6 +1971,7 @@ sub DESTROY {
 	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
 	    if ${*$self}{'_SSL_opened'};
 	delete(${*$self}{'_SSL_ctx'});
+	delete($CREATED_IN_THIS_THREAD{$ssl});
     }
 }
 
