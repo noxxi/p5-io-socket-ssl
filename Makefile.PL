@@ -134,7 +134,7 @@ WriteMakefile(
     'DISTNAME' => 'IO-Socket-SSL',
     'VERSION_FROM' => 'lib/IO/Socket/SSL.pm',
     'PREREQ_PM' => {
-	'Net::SSLeay' => 1.46,
+	'Net::SSLeay' => 1.58,
 	'Scalar::Util' => 0,
 	! %usable_ca ? ( 'Mozilla::CA' => 0 ):(),
     },
