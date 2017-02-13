@@ -835,6 +835,13 @@ handshake yet. This has to be done later with C<accept_SSL> or C<connect_SSL>.
 Before the handshake is started read/write/etc. can be used to exchange plain
 data.
 
+=item SSL_keepSocketOnError
+
+If this option is set to true (defaults to false) it will not close the
+underlying TCP socket on errors. In most cases there is no real use for this
+behavior since both sides of the TCP connection will probably have a
+different idea of the current state of the connection.
+
 =item SSL_ca | SSL_ca_file | SSL_ca_path
 
 Usually you want to verify that the peer certificate has been signed by a

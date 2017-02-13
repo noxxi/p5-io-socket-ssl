@@ -1893,11 +1893,11 @@ sub errstr {
 sub fatal_ssl_error {
     my $self = shift;
     my $error_trap = ${*$self}{'_SSL_arguments'}->{'SSL_error_trap'};
-    my $sh = ${*$self}{_SSL_arguments}{SSL_startHandshake};
     $@ = $self->errstr;
     if (defined $error_trap and ref($error_trap) eq 'CODE') {
 	$error_trap->($self, $self->errstr()."\n".$self->get_ssleay_error());
-    } elsif ( ${*$self}{'_SSL_ioclass_upgraded'} || (defined $sh && ! $sh) ) {
+    } elsif ( ${*$self}{'_SSL_ioclass_upgraded'}
+	|| ${*$self}{_SSL_arguments}{SSL_keepSocketOnError}) {
 	# downgrade only
 	$DEBUG>=3 && DEBUG('downgrading SSL only, not closing socket' );
 	$self->stop_SSL;
