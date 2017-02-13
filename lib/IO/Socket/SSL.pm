@@ -23,12 +23,15 @@ use Errno qw( EWOULDBLOCK EAGAIN ETIMEDOUT EINTR );
 use Carp;
 use strict;
 
+my $use_threads;
 BEGIN {
     die "no support for weaken - please install Scalar::Util" if ! do {
 	local $SIG{__DIE__};
 	eval { require Scalar::Util; Scalar::Util->import("weaken"); 1 }
 	    || eval { require WeakRef; WeakRef->import("weaken"); 1 }
     };
+    require Config;
+    $use_threads = $Config::Config{usethreads};
 }
 
 
@@ -671,7 +674,7 @@ sub connect_SSL {
 	$ctx = ${*$self}{'_SSL_ctx'};  # Reference to real context
 	$ssl = ${*$self}{'_SSL_object'} = Net::SSLeay::new($ctx->{context})
 	    || return $self->error("SSL structure creation failed");
-	$CREATED_IN_THIS_THREAD{$ssl} = 1;
+	$CREATED_IN_THIS_THREAD{$ssl} = 1 if $use_threads;
 	$SSL_OBJECT{$ssl} = [$self,0];
 	weaken($SSL_OBJECT{$ssl}[0]);
 
@@ -952,7 +955,7 @@ sub accept_SSL {
 	$ssl = ${*$socket}{_SSL_object} =
 	    Net::SSLeay::new(${*$socket}{_SSL_ctx}{context})
 	    || return $socket->error("SSL structure creation failed");
-	$CREATED_IN_THIS_THREAD{$ssl} = 1;
+	$CREATED_IN_THIS_THREAD{$ssl} = 1 if $use_threads;
 	$SSL_OBJECT{$ssl} = [$socket,1];
 	weaken($SSL_OBJECT{$ssl}[0]);
 
@@ -1970,7 +1973,7 @@ sub DESTROY {
     my $self = shift or return;
     my $ssl = ${*$self}{_SSL_object} or return;
     delete $SSL_OBJECT{$ssl};
-    if (delete $CREATED_IN_THIS_THREAD{$ssl}) {
+    if ($use_threads and delete $CREATED_IN_THIS_THREAD{$ssl}) {
 	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
 	    if ${*$self}{'_SSL_opened'};
 	delete(${*$self}{'_SSL_ctx'});
@@ -2335,7 +2338,7 @@ sub new {
 	# replace value in %ctx with real context
 	my $ctx = $ctx_new_sub->() or return
 	    IO::Socket::SSL->error("SSL Context init failed");
-	$CTX_CREATED_IN_THIS_THREAD{$ctx} = 1;
+	$CTX_CREATED_IN_THIS_THREAD{$ctx} = 1 if $use_threads;
 
 	# SSL_OP_CIPHER_SERVER_PREFERENCE
 	$ssl_op |= 0x00400000 if $arg_hash->{SSL_honor_cipher_order};
@@ -2804,8 +2807,7 @@ sub DESTROY {
     my $self = shift;
     if ( my $ctx = $self->{context} ) {
 	$DEBUG>=3 && DEBUG("free ctx $ctx open=".join( " ",keys %CTX_CREATED_IN_THIS_THREAD ));
-	if ( %CTX_CREATED_IN_THIS_THREAD and
-	    delete $CTX_CREATED_IN_THIS_THREAD{$ctx} ) {
+	if ($use_threads and delete $CTX_CREATED_IN_THIS_THREAD{$ctx} ) {
 	    # remove any verify callback for this context
 	    if ( $self->{verify_mode}) {
 		$DEBUG>=3 && DEBUG("free ctx $ctx callback" );

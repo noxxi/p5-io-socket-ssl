@@ -131,7 +131,7 @@ while (select( my $rvs = $vs,undef,undef,15 )) {
     };
     $XDEBUG && diag("SSL accept done");
     if ($expect) {
-	is($expect,$cl->get_sslversion,"accept $ver with $expect");
+	is($cl->get_sslversion,$expect,"accept $ver with $expect");
     } else {
 	pass("accept $ver with any, got ".$cl->get_sslversion);
     }
