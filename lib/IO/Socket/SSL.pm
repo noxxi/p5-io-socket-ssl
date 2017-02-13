@@ -655,6 +655,7 @@ sub connect {
 sub connect_SSL {
     my $self = shift;
     my $args = @_>1 ? {@_}: $_[0]||{};
+    return $self if ${*$self}{'_SSL_opened'};  # already connected
 
     my ($ssl,$ctx);
     if ( ! ${*$self}{'_SSL_opening'} ) {
@@ -1889,11 +1890,13 @@ sub errstr {
 sub fatal_ssl_error {
     my $self = shift;
     my $error_trap = ${*$self}{'_SSL_arguments'}->{'SSL_error_trap'};
+    my $sh = ${*$self}{_SSL_arguments}{SSL_startHandshake};
     $@ = $self->errstr;
     if (defined $error_trap and ref($error_trap) eq 'CODE') {
 	$error_trap->($self, $self->errstr()."\n".$self->get_ssleay_error());
-    } elsif ( ${*$self}{'_SSL_ioclass_upgraded'} ) {
+    } elsif ( ${*$self}{'_SSL_ioclass_upgraded'} || (defined $sh && ! $sh) ) {
 	# downgrade only
+	$DEBUG>=3 && DEBUG('downgrading SSL only, not closing socket' );
 	$self->stop_SSL;
     } else {
 	# kill socket
