@@ -1,10 +1,13 @@
-- when setting SSL_keepSocketOnError to true the socket will not be closed
-  on fatal error. This is a modified version of 
-  https://github.com/noxxi/p5-io-socket-ssl/pull/53/
+2.045 2017/02/13
 - fixed memory leak caused by not destroying CREATED_IN_THIS_THREAD for SSL
   objects -> github pull#55
 - optimization: don't track SSL objects and CTX in *CREATED_IN_THIS_THREAD
   if perl is compiled w/o thread support
+- small fix in t/protocol_version.t to use older versions of Net::SSLeay
+  with openssl build w/o SSLv3 support
+- when setting SSL_keepSocketOnError to true the socket will not be closed
+  on fatal error. This is a modified version of
+  https://github.com/noxxi/p5-io-socket-ssl/pull/53/
 2.044 2017/01/26
 - protect various 'eval'-based capability detections at startup with a localized
   __DIE__ handler. This way dynamically requiring IO::Socket::SSL as done by

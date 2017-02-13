@@ -49,11 +49,11 @@ if ($pid == 0) {
 	) or do {
 	    # Might bail out before the starttls if we provide a known-unsupported
 	    # version, for example SSLv3 on openssl 1.0.2+
-	    if($SSL_ERROR =~ /$ver not supported/) {
+	    if($SSL_ERROR =~ /$ver not supported|null ssl method passed/) {
 	        $XDEBUG && diag("SSL connect failed with $ver: $SSL_ERROR");
 	        return;
 	    }
-	    die "TCP connection failed to server: $! (SSL error: $SSL_ERROR)";
+	    die "connection with $ver failed: $! (SSL error: $SSL_ERROR)";
 	};
 	$XDEBUG && diag("TCP connected");
 	print $cl "starttls $ver $expect\n";
