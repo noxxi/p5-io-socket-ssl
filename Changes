@@ -1,3 +1,7 @@
+2.046 2017/02/15
+- cleanup everything in DESTROY and make sure to start with a fresh %{*self}
+  in configure_SSL because it can happen that a GLOB gets used again without
+  calling DESTROY (https://github.com/noxxi/p5-io-socket-ssl/issues/56)
 2.045 2017/02/13
 - fixed memory leak caused by not destroying CREATED_IN_THIS_THREAD for SSL
   objects -> github pull#55

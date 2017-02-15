@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.045';
+our $VERSION = '2.046';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -600,12 +600,14 @@ sub configure_SSL {
     # add user defined defaults, maybe after filtering
     $FILTER_SSL_ARGS->($is_server,$arg_hash) if $FILTER_SSL_ARGS;
 
+    %{*$self} = (
+	_SSL_arguments => $arg_hash,
+	_SSL_opened    => $is_server,
+    );
+
     # this adds defaults to $arg_hash as a side effect!
     ${*$self}{'_SSL_ctx'} = IO::Socket::SSL::SSL_Context->new($arg_hash)
 	or return;
-
-    ${*$self}{'_SSL_arguments'} = $arg_hash;
-    ${*$self}{'_SSL_opened'} = 1 if $is_server;
 
     return $self;
 }
@@ -1976,8 +1978,8 @@ sub DESTROY {
     if ($use_threads and delete $CREATED_IN_THIS_THREAD{$ssl}) {
 	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
 	    if ${*$self}{'_SSL_opened'};
-	delete(${*$self}{'_SSL_ctx'});
     }
+    %{*$self} = ();
 }
 
 
