@@ -1,3 +1,5 @@
+2.047 2017/02/16
+- better fix for problem which 2.046 tried to fix but broke LWP this way
 2.046 2017/02/15
 - cleanup everything in DESTROY and make sure to start with a fresh %{*self}
   in configure_SSL because it can happen that a GLOB gets used again without

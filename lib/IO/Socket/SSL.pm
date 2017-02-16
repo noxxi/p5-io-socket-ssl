@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.046';
+our $VERSION = '2.047';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -542,6 +542,23 @@ my %SSL_OBJECT;
 my %CREATED_IN_THIS_THREAD;
 sub CLONE { %CREATED_IN_THIS_THREAD = (); }
 
+# all keys used internally, these should be cleaned up at end
+my @all_my_keys = qw(
+    _SSL_arguments
+    _SSL_certificate
+    _SSL_ctx
+    _SSL_fileno
+    _SSL_in_DESTROY
+    _SSL_ioclass_downgrade
+    _SSL_ioclass_upgraded
+    _SSL_last_err
+    _SSL_object
+    _SSL_ocsp_verify
+    _SSL_opened
+    _SSL_opening
+    _SSL_servername
+);
+
 
 # we have callbacks associated with contexts, but have no way to access the
 # current SSL object from these callbacks. To work around this
@@ -600,10 +617,9 @@ sub configure_SSL {
     # add user defined defaults, maybe after filtering
     $FILTER_SSL_ARGS->($is_server,$arg_hash) if $FILTER_SSL_ARGS;
 
-    %{*$self} = (
-	_SSL_arguments => $arg_hash,
-	_SSL_opened    => $is_server,
-    );
+    delete @{*$self}{@all_my_keys};
+    ${*$self}{_SSL_opened} = $is_server;
+    ${*$self}{_SSL_arguments} = $arg_hash;
 
     # this adds defaults to $arg_hash as a side effect!
     ${*$self}{'_SSL_ctx'} = IO::Socket::SSL::SSL_Context->new($arg_hash)
@@ -1979,7 +1995,7 @@ sub DESTROY {
 	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
 	    if ${*$self}{'_SSL_opened'};
     }
-    %{*$self} = ();
+    delete @{*$self}{@all_my_keys};
 }
 
 
