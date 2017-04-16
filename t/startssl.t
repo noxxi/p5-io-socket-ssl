@@ -1,6 +1,4 @@
 #!perl
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl t/nonblock.t'
 
 use strict;
 use warnings;
@@ -9,11 +7,6 @@ use Socket;
 use IO::Socket::SSL;
 use IO::Select;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
-
-if ( ! eval "use 5.006; use IO::Select; return 1" ) {
-    print "1..0 # Skipped: no support for nonblocking sockets\n";
-    exit;
-}
 
 $|=1;
 print "1..21\n";

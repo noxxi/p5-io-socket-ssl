@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.047';
+our $VERSION = '2.048';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -1991,7 +1991,7 @@ sub DESTROY {
     my $self = shift or return;
     my $ssl = ${*$self}{_SSL_object} or return;
     delete $SSL_OBJECT{$ssl};
-    if ($use_threads and delete $CREATED_IN_THIS_THREAD{$ssl}) {
+    if (!$use_threads or delete $CREATED_IN_THIS_THREAD{$ssl}) {
 	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
 	    if ${*$self}{'_SSL_opened'};
     }
@@ -2825,7 +2825,7 @@ sub DESTROY {
     my $self = shift;
     if ( my $ctx = $self->{context} ) {
 	$DEBUG>=3 && DEBUG("free ctx $ctx open=".join( " ",keys %CTX_CREATED_IN_THIS_THREAD ));
-	if ($use_threads and delete $CTX_CREATED_IN_THIS_THREAD{$ctx} ) {
+	if (!$use_threads or delete $CTX_CREATED_IN_THIS_THREAD{$ctx} ) {
 	    # remove any verify callback for this context
 	    if ( $self->{verify_mode}) {
 		$DEBUG>=3 && DEBUG("free ctx $ctx callback" );

@@ -1,3 +1,5 @@
+2.048 2017/04/16
+- fixed small memory leaks during destruction of socket and context, RT#120643
 2.047 2017/02/16
 - better fix for problem which 2.046 tried to fix but broke LWP this way
 2.046 2017/02/15
