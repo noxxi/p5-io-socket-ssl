@@ -617,7 +617,7 @@ sub configure_SSL {
     # add user defined defaults, maybe after filtering
     $FILTER_SSL_ARGS->($is_server,$arg_hash) if $FILTER_SSL_ARGS;
 
-    delete @{*$self}{@all_my_keys};
+    delete @{*$self}{@all_my_keys} unless ${*$self}{'_SSL_opening'};
     ${*$self}{_SSL_opened} = $is_server;
     ${*$self}{_SSL_arguments} = $arg_hash;
 
