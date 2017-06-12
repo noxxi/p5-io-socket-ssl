@@ -1,3 +1,7 @@
+2.049 2017/06/12A
+- fixed problem caused by typo in the context of session cache
+  https://github.com/noxxi/p5-io-socket-ssl/issues/60
+- update PublicSuffix information from publicsuffix.org
 2.048 2017/04/16
 - fixed small memory leaks during destruction of socket and context, RT#120643
 2.047 2017/02/16

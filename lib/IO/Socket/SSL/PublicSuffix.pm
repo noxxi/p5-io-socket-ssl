@@ -4755,6 +4755,7 @@ name
 // nc : http://www.cctld.nc/
 nc
 asso.nc
+nom.nc
 
 // ne : https://en.wikipedia.org/wiki/.ne
 ne
@@ -9394,9 +9395,6 @@ orange
 // organic : 2014-03-27 Afilias Limited
 organic
 
-// orientexpress : 2015-02-05
-orientexpress
-
 // origins : 2015-10-01 The Estée Lauder Companies Inc.
 origins
 
@@ -10833,6 +10831,12 @@ zuerich
 // ===BEGIN PRIVATE DOMAINS===
 // (Note: these are in alphabetical order by company name)
 
+// 1GB LLC : https://www.1gb.ua/
+// Submitted by 1GB LLC <noc@1gb.com.ua>
+cc.ua
+inf.ua
+ltd.ua
+
 // Agnat sp. z o.o. : https://domena.pl
 // Submitted by Przemyslaw Plewa <it-admin@domena.pl>
 beep.pl
@@ -11459,6 +11463,11 @@ dyn.home-webserver.de
 myhome-server.de
 ddnss.org
 
+// Definima : http://www.definima.com/
+// Submitted by Maxence Bitterli <maxence@definima.com>
+definima.net
+definima.io
+
 // dynv6 : https://dynv6.com
 // Submitted by Dominik Menke <dom@digineo.de>
 dynv6.net
@@ -11789,6 +11798,7 @@ blogspot.tw
 blogspot.ug
 blogspot.vn
 cloudfunctions.net
+cloud.goog
 codespot.com
 googleapis.com
 googlecode.com
@@ -12320,12 +12330,6 @@ za.org
 // Zeit, Inc. : https://zeit.domains/
 // Submitted by Olli Vanhoja <olli@zeit.co>
 now.sh
-
-// 1GB LLC : https://www.1gb.ua/
-// Submitted by 1GB LLC <noc@1gb.com.ua>
-cc.ua
-inf.ua
-ltd.ua
 
 // ===END PRIVATE DOMAINS===
 END_BUILTIN_DATA

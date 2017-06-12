@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.048';
+our $VERSION = '2.049';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -881,7 +881,7 @@ sub connect_SSL {
 	$ctx->{session_cache}->add_session(
 	    $arg_hash->{SSL_session_key} || do {
 		my $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost}
-		    || self->_update_peer;
+		    || $self->_update_peer;
 		my $port = $arg_hash->{PeerPort} || $arg_hash->{PeerService};
 		$port ? "$host:$port" : $host;
 	    },
