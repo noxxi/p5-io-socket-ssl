@@ -36,6 +36,19 @@ my $expected_peer = do {
 
 plan tests => $numtests;
 
+# We need to detect the best TLS version supported by the server since we can
+# not offer SSLv23 for for a reliable SSL_error_trap because of how the old
+# SSLv2 compatible works. On the other side we can no longer rely on all systems
+# supporting TLS 1.0 either.
+my $tls_version;
+for(qw(TLSv1_2 TLSv1_1 TLSv1)) {
+    my $method = sprintf("Net::SSLeay::CTX_%s_new",lc($_));
+    next if ! defined &$method;
+    $tls_version = $_;
+    last;
+}
+die "no TLS support" if ! $tls_version;
+
 my $error_trapped = 0;
 my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',
@@ -45,18 +58,16 @@ my $server = IO::Socket::SSL->new(
     ReuseAddr => 1,
     SSL_verify_mode => 0x00,
     SSL_ca_file => "certs/test-ca.pem",
-    SSL_use_cert => 1,
-    SSL_cert_file => "certs/client-cert.pem",
-    SSL_version => 'TLSv1',
-    SSL_cipher_list => 'HIGH:!aNULL',
+    SSL_version => $tls_version,
     SSL_error_trap => sub {
 	my $self = shift;
 	print $self "This server is SSL only";
 	$error_trapped = 1;
 	$self->close;
     },
-    SSL_key_file => "certs/client-key.enc",
-    SSL_passwd_cb => sub { return "opossum" }
+    SSL_cert_file => "certs/server-cert.pem",
+    SSL_key_file => "certs/server-key.enc",
+    SSL_passwd_cb => sub { return "bluebell" },
 );
 
 ok( $server, "Server Initialization");
@@ -80,11 +91,9 @@ unless (fork) {
 	SSL_verify_mode => 0x01,
 	SSL_ca_file => "certs/test-ca.pem",
 	SSL_use_cert => 1,
-	SSL_cert_file => "certs/server-cert.pem",
-	SSL_version => 'TLSv1',
-	SSL_cipher_list => 'HIGH',
-	SSL_key_file => "certs/server-key.enc",
-	SSL_passwd_cb => sub { return "bluebell" },
+	SSL_cert_file => "certs/client-cert.pem",
+	SSL_key_file => "certs/client-key.enc",
+	SSL_passwd_cb => sub { return "opossum" },
 	SSL_verify_callback => \&verify_sub,
     );
 
@@ -179,13 +188,11 @@ unless (fork) {
 	    PeerAddr => $saddr,
 	    Domain => AF_INET,
 	    SSL_verify_mode => 0x01,
-	    SSL_version => 'TLSv1',
-	    SSL_cipher_list => 'HIGH',
 	    SSL_ca_file => "certs/test-ca.pem",
 	    SSL_use_cert => 1,
-	    SSL_cert_file => "certs/server-cert.pem",
-	    SSL_key_file => "certs/server-key.enc",
-	    SSL_passwd_cb => sub { return "bluebell" },
+	    SSL_cert_file => "certs/client-cert.pem",
+	    SSL_key_file => "certs/client-key.enc",
+	    SSL_passwd_cb => sub { return "opossum" },
 	    Blocking => 0,
 	);
 

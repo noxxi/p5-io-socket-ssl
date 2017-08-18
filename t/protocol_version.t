@@ -81,10 +81,12 @@ if ($pid == 0) {
     }
     die "best protocol version server supports is $ver" if $supported{foo};
 
-    # Check if the OpenSSL was compiled without SSLv3 support
-    if ( ! $check->('SSLv3','')) {
-	diag("looks like OpenSSL was compiled without SSLv3 support");
-	delete $supported{SSLv3};
+    # Check if the OpenSSL was compiled without support for specific protocols
+    for(qw(SSLv3 TLSv1 TLSv1_1)) {
+	if ( ! $check->($_,'')) {
+	    diag("looks like OpenSSL was compiled without $_ support");
+	    delete $supported{$_};
+	}
     }
 
     for my $ver (@versions) {

@@ -15,7 +15,7 @@ Test::More->builder->no_ending(1);
 
 $SIG{'CHLD'} = "IGNORE";
 
-IO::Socket::SSL::context_init(SSL_verify_mode => 0x01, SSL_version => 'TLSv1' );
+IO::Socket::SSL::context_init(SSL_verify_mode => 0x01);
 
 my $server = IO::Socket::INET->new(
     LocalAddr => '127.0.0.1',

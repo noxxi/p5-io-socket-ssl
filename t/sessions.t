@@ -42,8 +42,6 @@ unless (fork) {
 	 SSL_verify_mode => SSL_VERIFY_PEER,
 	 SSL_ca_file => "certs/test-ca.pem",
 	 SSL_ca_path => '',
-	 SSL_version => 'TLSv1',
-	 SSL_cipher_list => 'HIGH',
 	 SSL_session_cache_size => 4,
     );
 

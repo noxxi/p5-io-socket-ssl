@@ -32,8 +32,6 @@ if ( $pid == 0 ) {
     ok( "client tcp connect" );
 
     unless ( IO::Socket::SSL->start_SSL( $client,
-	SSL_version => 'TLSv1',
-	SSL_cipher_list => 'HIGH',
 	SSL_verify_mode => 0,
 	SSL_cert_file => "certs/client-cert.pem",
 	SSL_key_file => "certs/client-key.enc",
@@ -79,8 +77,6 @@ IO::Socket::SSL->start_SSL( $csock,
     SSL_verify_mode => SSL_VERIFY_PEER|SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
     SSL_ca_file => "certs/test-ca.pem",
     SSL_cert_file => "certs/server-cert.pem",
-    SSL_version => 'TLSv1',
-    SSL_cipher_list => 'HIGH:!ADH',
     SSL_key_file => "certs/server-key.enc",
     SSL_passwd_cb => sub { return "bluebell" },
 ) || print "not ";

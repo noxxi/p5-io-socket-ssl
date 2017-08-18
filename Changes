@@ -1,4 +1,8 @@
-2.049 2017/06/12A
+2.050 2017/08/18
+- removed unecessary settings of SSL_version and SSL_cipher_list from tests
+- protocol_version.t can now deal when TLS 1.0 and/or TLS 1.1 are not supported
+  as is the case with openssl versions in latest Debian (buster)
+2.049 2017/06/12
 - fixed problem caused by typo in the context of session cache
   https://github.com/noxxi/p5-io-socket-ssl/issues/60
 - update PublicSuffix information from publicsuffix.org
