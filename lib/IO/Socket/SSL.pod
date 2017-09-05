@@ -1490,9 +1490,9 @@ This functions behaves from the outside the same as B<syswrite> in other
 L<IO::Socket> objects, e.g. it will write at most LEN bytes to the socket, but
 there is no guarantee, that all LEN bytes are written. It will return the number
 of bytes written.
-syswrite will write all the data within a single SSL frame, which means, that
-no more than 16.384 bytes, which is the maximum size of an SSL frame, can be
-written at once.
+Because it basically just calls SSL_write from OpenSSL syswrite will write at
+most a single SSL frame. This means, that no more than 16.384 bytes, which is
+the maximum size of an SSL frame, will be written at once.
 
 For non-blocking sockets SSL specific behavior applies.
 Pease read the specific section in this documentation.
