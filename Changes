@@ -1,3 +1,7 @@
+2.051 2017/09/05
+- syswrite: if SSL_write sets SSL_ERROR_SYSCALL but no $! (as seen with
+  OpenSSL 1.1.0 on Windows) set $! to EPIPE to propagate a useful error up
+  https://github.com/noxxi/p5-io-socket-ssl/issues/62
 2.050 2017/08/18
 - removed unecessary settings of SSL_version and SSL_cipher_list from tests
 - protocol_version.t can now deal when TLS 1.0 and/or TLS 1.1 are not supported

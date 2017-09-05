@@ -13,13 +13,13 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.050';
+our $VERSION = '2.051';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
 use IO::Socket::SSL::PublicSuffix;
 use Exporter ();
-use Errno qw( EWOULDBLOCK EAGAIN ETIMEDOUT EINTR );
+use Errno qw( EWOULDBLOCK EAGAIN ETIMEDOUT EINTR EPIPE );
 use Carp;
 use strict;
 
@@ -1163,6 +1163,8 @@ sub _generic_write {
     }
     if ( !defined($written) ) {
 	if ( my $err = $self->_skip_rw_error( $ssl,-1 )) {
+	    # if $! is not set with ERROR_SYSCALL then report as EPIPE
+	    $! ||= EPIPE if $err == $Net_SSLeay_ERROR_SYSCALL;
 	    $self->error("SSL write error ($err)");
 	}
 	return;
