@@ -1,3 +1,10 @@
+2.052 2017/10/22
+- disable NPN support if LibreSSL>=2.6.1 is detected since they've replaced the
+  functions with dummies instead of removing NPN completly or setting
+  OPENSSL_NO_NEXTPROTONEG
+- t/01loadmodule.t shows more output helpful in debugging problems
+- update fingerprints for extenal tests
+- update documentation to make behavior of syswrite more clear
 2.051 2017/09/05
 - syswrite: if SSL_write sets SSL_ERROR_SYSCALL but no $! (as seen with
   OpenSSL 1.1.0 on Windows) set $! to EPIPE to propagate a useful error up

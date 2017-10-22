@@ -7,9 +7,10 @@ plan tests => 3;
 
 ok( eval { require IO::Socket::SSL },"loaded");
 
-diag( sprintf( "openssl version compiled=0x%0x linked=0x%0x", 
+diag( sprintf( "openssl version compiled=0x%0x linked=0x%0x -- %s", 
     Net::SSLeay::OPENSSL_VERSION_NUMBER(),
-    Net::SSLeay::SSLeay()));
+    Net::SSLeay::SSLeay(),
+    Net::SSLeay::SSLeay_version(0)));
 
 diag( sprintf( "Net::SSLeay version=%s", $Net::SSLeay::VERSION));
 diag( sprintf( "parent %s version=%s", $_, $_->VERSION))
