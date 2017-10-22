@@ -135,7 +135,7 @@ for my $test (@tests) {
 	    } elsif ( $SSL_ERROR =~m{verify failed} ) {
 		fail("SSL upgrade $host with default CA and $cap: $SSL_ERROR");
 	    } else {
-		pass("SSL upgrade $host with no CA failed but not because of verify problem: $SSL_ERROR");
+		pass("SSL upgrade $host with default CA and $cap failed but not because of verify problem: $SSL_ERROR");
 	    }
 	}
 
