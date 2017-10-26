@@ -392,7 +392,7 @@ certificates by their certificate or pubkey fingerprint.
 
 If the validation failed because the hostname does not match and you cannot
 access the host with the name given in the certificate, you can use
-C<SSL_verifycn_name> to specify they hostname you expect in the certificate.
+C<SSL_verifycn_name> to specify the hostname you expect in the certificate.
 
 =back
 
@@ -1217,7 +1217,7 @@ revoked.
 =item SSL_ocsp_cache
 
 With this option a cache can be given for caching OCSP responses, which could
-be shared between different SSL contextes. If not given a cache specific to the
+be shared between different SSL contexts. If not given a cache specific to the
 SSL context only will be used.
 
 You can either create a new cache with
