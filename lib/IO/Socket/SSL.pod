@@ -386,7 +386,7 @@ C<SSL_ca_path> to specify a different CA store.
 
 If the validation fails because the certificate is self-signed and that's what
 you expect, you can use the C<SSL_fingerprint> option to accept specific
-certificates by their certificate or pubkey fingerprint.
+leaf certificates by their certificate or pubkey fingerprint.
 
 =item *
 
@@ -885,8 +885,8 @@ C<get_fingerprint>.
 
 You can specify a list of fingerprints in case you have several acceptable
 certificates.
-If a fingerprint matches the topmost certificate no additional validations
-can make the verification fail.
+If a fingerprint matches the topmost (i.e. leaf) certificate no additional
+validations can make the verification fail.
 
 =item SSL_cert_file | SSL_cert | SSL_key_file | SSL_key
 

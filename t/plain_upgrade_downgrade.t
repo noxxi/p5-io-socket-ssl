@@ -7,7 +7,7 @@ use Test::More;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 # create listener
-IO::Socket::SSL::default_ca('certs/my-ca.pem');
+IO::Socket::SSL::default_ca('certs/test-ca.pem');
 my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',
     LocalPort => 0,

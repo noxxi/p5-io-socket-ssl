@@ -26,13 +26,13 @@ my $server = IO::Socket::SSL->new(
     SSL_ca_file => "certs/test-ca.pem",
     SSL_cert_file => {
 	'server.local' => 'certs/server-cert.pem',
-	'client.local' => 'certs/client-cert.pem',
+	'server2.local' => 'certs/server2-cert.pem',
 	'smtp.mydomain.local' => "certs/server-wildcard.pem",
 	'' => "certs/server-wildcard.pem",
     },
     SSL_key_file => {
 	'server.local' => 'certs/server-key.pem',
-	'client.local' => 'certs/client-key.pem',
+	'server2.local' => 'certs/server2-key.pem',
 	'smtp.mydomain.local' => "certs/server-wildcard.pem",
 	'' => "certs/server-wildcard.pem",
     },
@@ -47,7 +47,7 @@ my $saddr = $server->sockhost.':'.$server->sockport;
 # all other should match the specific entries
 my @tests = qw(
     server.local
-    client.local
+    server2.local
     smtp.mydomain.local
     www13.other.local
 );
@@ -62,7 +62,7 @@ if ( $pid == 0 ) {
 	    Domain => AF_INET,
 	    SSL_verify_mode => 1,
 	    SSL_hostname => $host,
-	    SSL_ca_file => 'certs/my-ca.pem',
+	    SSL_ca_file => 'certs/test-ca.pem',
 	) || print "not ";
 	print "ok # client ssl connect $host\n";
 

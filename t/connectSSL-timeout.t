@@ -62,7 +62,7 @@ sub client {
     print "Connected\n";
     if ( IO::Socket::SSL->start_SSL( $c,
 	Timeout => 5,
-	SSL_ca_file => 'certs/my-ca.pem',
+	SSL_ca_file => 'certs/test-ca.pem',
     )) {
 	print "Client SSL Handshake OK\n";
 	print <$c>

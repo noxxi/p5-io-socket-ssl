@@ -27,8 +27,8 @@ my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',
     LocalPort => 0,
     Listen => 2,
-    SSL_cert_file => "certs/client-cert.pem",
-    SSL_key_file => "certs/client-key.pem",
+    SSL_cert_file => "certs/server-cert.pem",
+    SSL_key_file => "certs/server-key.pem",
 );
 print "not ok: $!\n", exit if !$server;
 ok("Server Initialization");

@@ -45,7 +45,7 @@ my $cl = IO::Socket::SSL->new(
     PeerAddr => $saddr,
     Domain => AF_INET,
     SSL_verify_mode => 1,
-    SSL_ca_file => 'certs/my-ca.pem',
+    SSL_ca_file => 'certs/test-ca.pem',
 );
 ssl_ok($cl,"ssl connected to server");
 ok( $cl->peer_certificate('subject') =~ m{server\.local}, "subject w/o mitm");
@@ -83,7 +83,7 @@ sub proxy {
 	    PeerAddr => $saddr,
 	    Domain => AF_INET,
 	    SSL_verify_mode => 1,
-	    SSL_ca_file => 'certs/my-ca.pem',
+	    SSL_ca_file => 'certs/test-ca.pem',
 	) or die "failed connect to server: $!, $SSL_ERROR";
 	my ($cert,$key) = $mitm->clone_cert($tos->peer_certificate);
 	$toc = IO::Socket::SSL->start_SSL( $toc,

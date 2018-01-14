@@ -2695,7 +2695,7 @@ sub new {
 	for (values %ctx);
 
     my $staple_callback = $arg_hash->{SSL_ocsp_staple_callback};
-    if ( !$is_server && $can_ocsp_staple ) {
+    if ( !$is_server && $can_ocsp_staple && ! $verify_fingerprint) {
 	$self->{ocsp_cache} = $arg_hash->{SSL_ocsp_cache};
 	my $status_cb = sub {
 	    my ($ssl,$resp) = @_;
