@@ -353,7 +353,6 @@ Like with normal sockets, neither forking nor threading servers scale well.
 It is recommended to use non-blocking sockets instead, see
 L</"Using Non-Blocking Sockets">
 
-
 =head1 Common Usage Errors
 
 This is a list of typical errors seen with the use of L<IO::Socket::SSL>:
@@ -464,6 +463,26 @@ Use of constants as strings.
 
 Constants like C<SSL_VERIFY_PEER> or C<SSL_WANT_READ> should be used as
 constants and not be put inside quotes, because they represent numerical values.
+
+=item *
+
+Forking and handling the socket in parent and child.
+
+A B<fork> of the process will duplicate the internal user space SSL state of the
+socket. If both master and child interact with the socket by using their own SSL
+state strange error messages will happen. Such interaction includes explicit or
+implicit B<close> of the SSL socket. To avoid this the socket should be explicitly
+closed with B<SSL_no_shutdown>.
+
+=item *
+
+Forking and executing a new process.
+
+Since the SSL state is stored in user space it will be duplicated by a B<fork> but
+it will be lost when doing B<exec>. This means it is not possible to simply
+redirect stdin and stdout for the new process to the SSL socket by duplicating
+the relevant file handles. Instead explicitly exchanging plain data between
+child-process and SSL socket are needed.
 
 =back
 
@@ -658,6 +677,13 @@ TCP socket in a non-blocking way with C<start_SSL> and C<accept_SSL>.
     }
 
 
+Additionally there are differences to plain sockets when using select, poll,
+kqueue or similar technologies to get notified if data are available.
+Relying only on these calls is not sufficient in all cases since unread data
+might be internally buffered in the SSL stack. To detect such buffering
+B<pending()> need to be used. Alternativly the buffering can be avoided by using
+B<sysread> with the maximum size of an SSL frame. See L</"Common Usage Errors">
+for details.
 
 =head1 Advanced Usage
 
