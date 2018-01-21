@@ -9,64 +9,64 @@ use IO::Socket::SSL;
 my $fingerprints= [
   {
     _ => 'this should give us OCSP stapling',
-    fingerprint => 'sha1$cc7084a0fb728b432fd78ae52da4a1980c81a6cf',
+    fingerprint => 'sha1$pub$39d64bbaea90c6035e25ff990ba4ce565350bac5',
     host => 'www.chksum.de',
     ocsp => {
-	      staple => 1
-	    },
+              staple => 1
+            },
     port => 443
   },
   {
     _ => 'no OCSP stapling',
-    fingerprint => 'sha1$ad737048455485d8c817b7d0f7403553a7b9f65b',
-    host => 'www.spiegel.de',
+    fingerprint => 'sha1$pub$f8c51d37c070c423ccc5f6065e080b94ce03494c',
+    host => 'www.bild.de',
     ocsp => {
-	      staple => 0
-	    },
+              staple => 0
+            },
     port => 443,
-    subject_hash_ca => '2c543cd1'
+    subject_hash_ca => 'e2799e36'
   },
   {
     _ => 'this is revoked',
-    fingerprint => 'sha1$f9e8b1854e627c2f261b92b6de4a9bb0b139dcc3',
+    fingerprint => 'sha1$pub$75f8bfe5feac656c894c06011422b6455854b4e5',
     host => 'revoked.grc.com',
     ocsp => {
-	      revoked => 1
-	    },
+              revoked => 1
+            },
     port => 443
   },
   {
-    fingerprint => 'sha1$dc0866cdf51594fd85ccf249d507164552828ad2',
+    fingerprint => 'sha1$pub$92447765c3dde2634366d661b86810f301961c9b',
     host => 'www.yahoo.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$cda53778d01ff728fe90fe0399b17586f1aef0bf',
+    fingerprint => 'sha1$pub$83ac9a7311a410d3d819a45ec1f7460c7adfe4c0',
     host => 'www.comdirect.de',
     port => 443,
     subject_hash_ca => '02265526'
   },
   {
-    fingerprint => 'sha1$27d647fd859bf824d9f537a09aa98e4923fb6942',
+    fingerprint => 'sha1$pub$458e905cd62b9ce9f8c5eb7298f62871de89c81f',
     host => 'meine.deutsche-bank.de',
     port => 443,
     subject_hash_ca => 'c01cdfa2'
   },
   {
-    fingerprint => 'sha1$682d7ff1b13e095bf5daaa632ece51f4df5bb155',
+    fingerprint => 'sha1$pub$9f627bb2880eee1b79e06924e5ba3f47a60b02f0',
     host => 'www.twitter.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$936f912bafad216fa515256e572cdc35a1451aa5',
+    fingerprint => 'sha1$pub$c0fd74f57dcbc627f103d362a245d7841c152108',
     host => 'www.facebook.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$3b9e5cc01313b6f86709646f1be4a057ed75bcc9',
+    fingerprint => 'sha1$pub$0a2a638d8484c2be34fd9534cf111d48b91885b0',
     host => 'www.live.com',
     port => 443,
     subject_hash_ca => '653b494a'
@@ -90,6 +90,7 @@ sub update_fingerprints {
 	} elsif (!IO::Socket::SSL->start_SSL($cl,
 	    Timeout => 10,
 	    SSL_ocsp_mode => 0,
+	    SSL_hostname => $fp->{host},
 	    SSL_verify_callback => sub {
 		my ($cert,$depth) = @_[4,5];
 		$root ||= $cert;
@@ -98,7 +99,7 @@ sub update_fingerprints {
 	)) {
 	    warn "E $fp->{host}:$fp->{port} - SSL handshake failed: $SSL_ERROR\n";
 	} else {
-	    my $sha1 = $cl->get_fingerprint('sha1');
+	    my $sha1 = $cl->get_fingerprint('sha1',undef,1);
 	    if ($sha1 eq $fp->{fingerprint}) {
 		warn "N $fp->{host}:$fp->{port} - fingerprint as expected\n";
 	    } else {

@@ -111,7 +111,8 @@ for my $test (@tests) {
 	my $cl = shift(@cl);
 	skip "ssl upgrade failed even without verification",1+@cap
 	    if ! IO::Socket::SSL->start_SSL($cl, SSL_verify_mode => 0 );
-	my $clfp = $cl->get_fingerprint('sha1');
+	my $pubkey_fp = $test->{fingerprint} =~m{\$pub\$};
+	my $clfp = $cl->get_fingerprint('sha1',undef,$pubkey_fp);
 	skip "fingerprint mismatch ($clfp) - probably SSL interception or certificate changed",1+@cap
 	    if $clfp ne $fp;
 	diag("fingerprint $host matches");
