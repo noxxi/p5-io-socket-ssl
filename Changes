@@ -1,3 +1,18 @@
+2.053 2018/01/21
+- small behavior fixes
+  - if SSL_fingerprint is used and matches don't check for OCSP
+  - Utils::CERT_create - small fixes to properly specific purpose, ability to
+    use predefined complex purpose but disable some features
+- update PublicSuffix
+- updates for documentation, especially regarding pitfalls with forking or using
+  non-blocking sockets. Spelling fixes.
+- test fixes and improvements
+  - stability improvements for live tests
+  - regenerate certificate in certs/ and make sure they are limited to the
+    correct purpose. Checkin program used to generate certificates.
+  - adjust tests since certificates have changed and some tests used
+    certificates intended for client authentication as server certificates,
+    which now no longer works
 2.052 2017/10/22
 - disable NPN support if LibreSSL>=2.6.1 is detected since they've replaced the
   functions with dummies instead of removing NPN completly or setting
