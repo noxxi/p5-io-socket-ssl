@@ -1,3 +1,5 @@
+2.054 2018/01/22
+- added missing test certificates to MANIFEST
 2.053 2018/01/21
 - small behavior fixes
   - if SSL_fingerprint is used and matches don't check for OCSP
