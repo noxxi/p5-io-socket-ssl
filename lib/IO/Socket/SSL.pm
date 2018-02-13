@@ -723,7 +723,7 @@ sub connect_SSL {
 		# implicitly given
 		$host =~s{:[a-zA-Z0-9_\-]+$}{};
 		# should be hostname, not IPv4/6
-		$host = undef if $host !~m{[a-z_]} or $host =~m{:};
+		$host = undef if $host !~m{[a-z_]}i or $host =~m{:};
 	    }
 	    # define SSL_CTRL_SET_TLSEXT_HOSTNAME 55
 	    # define TLSEXT_NAMETYPE_host_name 0
