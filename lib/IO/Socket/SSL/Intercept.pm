@@ -88,7 +88,7 @@ sub clone_cert {
     }
     my ($clone,$key) = CERT_create(
 	%$hash,
-	serial => $self->{serial}++,
+	serial => rand(2**32), # $self->{serial}++,
 	issuer_cert => $self->{cacert},
 	issuer_key => $self->{cakey},
 	key => $self->{certkey},
