@@ -375,7 +375,7 @@ BEGIN {
     if ( ! $ip6 ) {
 	@ISA = qw(IO::Socket::INET);
 	$IOCLASS = "IO::Socket::INET";
-	constant->import( CAN_IPV6 => '' );
+	constant->import(CAN_IPV6 => '', NI_NUMERICHOST => 1, NI_NUMERICSERV => 2);
     }
 
     #Make $DEBUG another name for $Net::SSLeay::trace
