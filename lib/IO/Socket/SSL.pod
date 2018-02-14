@@ -681,7 +681,7 @@ Additionally there are differences to plain sockets when using select, poll,
 kqueue or similar technologies to get notified if data are available.
 Relying only on these calls is not sufficient in all cases since unread data
 might be internally buffered in the SSL stack. To detect such buffering
-B<pending()> need to be used. Alternativly the buffering can be avoided by using
+B<pending()> need to be used. Alternatively the buffering can be avoided by using
 B<sysread> with the maximum size of an SSL frame. See L</"Common Usage Errors">
 for details.
 
