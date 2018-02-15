@@ -3,14 +3,12 @@ certs/client-cert.pem
 certs/client-key.enc
 certs/client-key.pem
 certs/create-certs.pl
-certs/my-ca.pem
 certs/proxyca.pem
 certs/server-cert.der
 certs/server-cert.pem
 certs/server-key.der
 certs/server-key.enc
 certs/server-key.pem
-certs/server-rsa384-dh.pem
 certs/server-wildcard.pem
 certs/server.p12
 certs/server2-cert.pem
