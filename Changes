@@ -1,3 +1,15 @@
+2.055 2018/02/15
+- use SNI also if hostname was given all-uppercase
+- Utils::CERT_create - don't add authority key for issuer since Chrome does
+  not like this
+- Intercept: 
+  - change behavior of code based cache to better support synchronizing
+    within multiprocess/threaded setups
+  - don't use counter for serial number but somehow base it on original
+    certificate in order to avoid conflicts with reuse of serial numbers
+    after restart
+- RT#124431 - better support platforms w/o IPv6
+- RT#124306 - spelling fixes in documentation
 2.054 2018/01/22
 - added missing test certificates to MANIFEST
 2.053 2018/01/21
