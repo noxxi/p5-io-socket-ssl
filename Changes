@@ -1,3 +1,8 @@
+2.056 2018/02/19
+- Intercept - fix creation of serial number: base it on binary digest instead of
+  treating hex fingerprint as binary. Allow use of own serial numbers again.
+- t/io-socket-ip.t - skip test if no IPv6 support on system RT#124464
+- update PublicSuffix
 2.055 2018/02/15
 - use SNI also if hostname was given all-uppercase
 - Utils::CERT_create - don't add authority key for issuer since Chrome does

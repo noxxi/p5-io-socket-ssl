@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.055';
+our $VERSION = '2.056';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -327,22 +327,22 @@ BEGIN {
     my $ip6 = eval {
 	require Socket;
 	Socket->VERSION(1.95);
-	my $ok = Socket::inet_pton( AF_INET6(),'::1') && AF_INET6();
-	$ok && Socket->import( qw/inet_pton NI_NUMERICHOST NI_NUMERICSERV/ );
+	Socket::inet_pton( AF_INET6(),'::1') && AF_INET6() or die;
+	Socket->import( qw/inet_pton NI_NUMERICHOST NI_NUMERICSERV/ );
 	# behavior different to Socket6::getnameinfo - wrap
 	*_getnameinfo = sub { 
 	    my ($err,$host,$port) = Socket::getnameinfo(@_) or return; 
 	    return if $err;
 	    return ($host,$port);
 	};
-	$ok;
+	1;
     } || eval {
 	require Socket6;
-	my $ok = Socket6::inet_pton( AF_INET6(),'::1') && AF_INET6();
-	$ok && Socket6->import( qw/inet_pton NI_NUMERICHOST NI_NUMERICSERV/ );
+	Socket6::inet_pton( AF_INET6(),'::1') && AF_INET6() or die;
+	Socket6->import( qw/inet_pton NI_NUMERICHOST NI_NUMERICSERV/ );
 	# behavior different to Socket::getnameinfo - wrap
 	*_getnameinfo = sub { return Socket6::getnameinfo(@_); };
-	$ok;
+	1;
     };
 
     # try IO::Socket::IP or IO::Socket::INET6 for IPv6 support

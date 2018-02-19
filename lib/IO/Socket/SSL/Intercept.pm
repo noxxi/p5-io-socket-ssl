@@ -6,7 +6,8 @@ use Carp 'croak';
 use IO::Socket::SSL::Utils;
 use Net::SSLeay;
 
-our $VERSION = '2.014';
+our $VERSION = '2.056';
+
 
 sub new {
     my ($class,%args) = @_;
@@ -64,6 +65,7 @@ sub new {
 	cakey => $cakey,
 	certkey => $certkey,
 	cache => $cache,
+	serial => delete $args{serial},
     };
     return $self;
 }
@@ -87,10 +89,10 @@ sub DESTROY {
 sub clone_cert {
     my ($self,$old_cert,$clone_key) = @_;
 
+    my $hash = CERT_asHash($old_cert);
     my $create_cb = sub {
 	# if not in cache create new certificate based on original
 	# copy most but not all extensions
-	my $hash = CERT_asHash($old_cert);
 	if (my $ext = $hash->{ext}) {
 	    @$ext = grep {
 		defined($_->{sn}) && $_->{sn} !~m{^(?:
@@ -102,19 +104,18 @@ sub clone_cert {
 		)$}x
 	    } @$ext;
 	}
-	my $new_serial = unpack("L",$hash->{x509_digest_sha256});
 	my ($clone,$key) = CERT_create(
 	    %$hash,
-	    serial => $new_serial,
 	    issuer_cert => $self->{cacert},
 	    issuer_key => $self->{cakey},
 	    key => $self->{certkey},
+	    serial => defined($self->{serial}) ? ++$self->{serial} : 
+		(unpack('L',$hash->{x509_digest_sha256}))[0],
 	);
 	return ($clone,$key);
     };
 
-    $clone_key ||= substr(unpack("H*",
-	Net::SSLeay::X509_get_fingerprint($old_cert,'sha1')),0,16);
+    $clone_key ||= substr(unpack("H*", $hash->{x509_digest_sha256}),0,32);
     my $c = $self->{cache};
     return $c->($clone_key,$create_cb) if ref($c) eq 'CODE';
 
@@ -318,7 +319,8 @@ If not given it will create a new public key on each call of C<new>.
 =item serial INTEGER
 
 This optional argument gives the starting point for the serial numbers of the
-newly created certificates. Default to 1.
+newly created certificates. If not set the serial number will be created based
+on the digest of the original certificate.
 
 =item cache HASH | SUBROUTINE
 

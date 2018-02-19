@@ -21,6 +21,8 @@ unless( IO::Socket::SSL->CAN_IPV6 eq "IO::Socket::IP" ) {
 	IO::Socket::IP->VERSION(0.31)
     }) {
 	print "1..0 # Skipped: usable IO::Socket::IP is not available\n";
+    } elsif (! defined &IO::Socket::SSL::_getnameinfo) {
+	print "1..0 # Skipped: no IPv6 support despite IO::Socket::IP\n";
     } else {
 	print "1..1\nnot ok # automatic use of IO::Socket::IP\n";
     }
