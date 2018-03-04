@@ -2463,12 +2463,14 @@ sub new {
 	    # no CA path given, continue with system defaults
 	    my $dir = $ca{SSL_ca_path};
 	    $dir = join($OPENSSL_LIST_SEPARATOR,@$dir) if ref($dir);
-	    if (! Net::SSLeay::CTX_load_verify_locations( $ctx,
+      if ( $verify_mode != $Net_SSLeay_VERIFY_NONE) {
+	      if (! Net::SSLeay::CTX_load_verify_locations( $ctx,
 		$ca{SSL_ca_file} || '',$dir || '')
-		&& $verify_mode != $Net_SSLeay_VERIFY_NONE) {
+		) {
 		return IO::Socket::SSL->error(
 		    "Invalid default certificate authority locations")
-	    }
+	      }
+      }
 	}
 
 	if ($is_server && ($verify_mode & $Net_SSLeay_VERIFY_PEER)) {
