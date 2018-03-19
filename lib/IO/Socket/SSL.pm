@@ -1903,6 +1903,11 @@ sub get_sslversion_int {
     return Net::SSLeay::version($ssl);
 }
 
+sub get_session_reused {
+    return Net::SSLeay::session_reused(
+	shift()->_get_ssl_object || return);
+}
+
 if ($can_ocsp) {
     no warnings 'once';
     *ocsp_resolver = sub {

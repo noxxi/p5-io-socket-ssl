@@ -1567,6 +1567,12 @@ connection.
 Returns the integer representation of the SSL version of an established
 connection.
 
+=item B<get_session_reused()>
+
+This returns true if the session got reused and false otherwise. Note that with
+a reused session no certificates are send within the handshake and no ciphers
+are offered and thus functions which rely on this might not work.
+
 =item B<dump_peer_certificate()>
 
 Returns a parsable string with select fields from the peer SSL certificate.
