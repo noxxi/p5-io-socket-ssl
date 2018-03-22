@@ -138,6 +138,9 @@ WriteMakefile(
 	'Scalar::Util' => 0,
 	! %usable_ca ? ( 'Mozilla::CA' => 0 ):(),
     },
+	'TEST_REQUIRES' => {
+	'URI' => 1.50
+	},
     'dist' => { COMPRESS => 'gzip', SUFFIX => 'gz', },
     $xt eq 'y' ? ( test => { TESTS => 't/*.t t/external/*.t' }):(),
     $ExtUtils::MakeMaker::VERSION >= 6.46 ? (
