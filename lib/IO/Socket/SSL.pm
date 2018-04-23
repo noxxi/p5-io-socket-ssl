@@ -335,19 +335,19 @@ BEGIN {
 	    return if $err;
 	    return ($host,$port);
 	};
-	1;
+	'Socket';
     } || eval {
 	require Socket6;
 	Socket6::inet_pton( AF_INET6(),'::1') && AF_INET6() or die;
 	Socket6->import( qw/inet_pton NI_NUMERICHOST NI_NUMERICSERV/ );
 	# behavior different to Socket::getnameinfo - wrap
 	*_getnameinfo = sub { return Socket6::getnameinfo(@_); };
-	1;
-    };
+	'Socket6';
+    } || undef;
 
     # try IO::Socket::IP or IO::Socket::INET6 for IPv6 support
     $family_key = 'Domain'; # traditional
-    if ( $ip6 ) {
+    if ($ip6) {
 	# if we have IO::Socket::IP >= 0.31 we will use this in preference
 	# because it can handle both IPv4 and IPv6
 	if ( eval { 
@@ -367,17 +367,19 @@ BEGIN {
 	    constant->import( CAN_IPV6 => "IO::Socket::INET6" );
 	    $IOCLASS = "IO::Socket::INET6";
 	} else {
-	    $ip6 = 0;
+	    $ip6 = ''
 	}
     }
 
     # fall back to IO::Socket::INET for IPv4 only
-    if ( ! $ip6 ) {
+    if (!$ip6) {
 	@ISA = qw(IO::Socket::INET);
 	$IOCLASS = "IO::Socket::INET";
 	constant->import(CAN_IPV6 => '');
-	constant->import(NI_NUMERICHOST => 1);
-	constant->import(NI_NUMERICSERV => 2);
+	if (!defined $ip6) {
+	    constant->import(NI_NUMERICHOST => 1);
+	    constant->import(NI_NUMERICSERV => 2);
+	}
     }
 
     #Make $DEBUG another name for $Net::SSLeay::trace
