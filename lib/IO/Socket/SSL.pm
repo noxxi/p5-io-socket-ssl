@@ -1429,11 +1429,12 @@ sub stop_SSL {
 	# destroy allocated objects for SSL and untie
 	# do not destroy CTX unless explicitly specified
 	Net::SSLeay::free($ssl);
-	delete ${*$self}{_SSL_object};
 	if (my $cert = delete ${*$self}{'_SSL_certificate'}) {
 	    Net::SSLeay::X509_free($cert);
 	}
+	delete ${*$self}{_SSL_object};
 	${*$self}{'_SSL_opened'} = 0;
+	delete $SSL_OBJECT{$ssl};
 	untie(*$self);
     }
 
@@ -2014,11 +2015,12 @@ sub can_ticket_keycb { return $can_tckt_keycb }
 
 sub DESTROY {
     my $self = shift or return;
-    my $ssl = ${*$self}{_SSL_object} or return;
-    delete $SSL_OBJECT{$ssl};
-    if (!$use_threads or delete $CREATED_IN_THIS_THREAD{$ssl}) {
-	$self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
-	    if ${*$self}{'_SSL_opened'};
+    if (my $ssl = ${*$self}{_SSL_object}) {
+	delete $SSL_OBJECT{$ssl};
+	if (!$use_threads or delete $CREATED_IN_THIS_THREAD{$ssl}) {
+	    $self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
+		if ${*$self}{'_SSL_opened'};
+	}
     }
     delete @{*$self}{@all_my_keys};
 }
