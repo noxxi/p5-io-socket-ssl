@@ -1,3 +1,13 @@
+2.057 2018/07/18
+- fix memory leak which occured with explicit stop_SSL in connection with
+  non-blocking sockets or timeout - https://rt.cpan.org/Ticket/Display.html?id=125867
+  Thanks to Paul Evans for reporting
+- fix redefine warnings in case Socket6 is installed but neither IO::Socket::IP
+  nor IO::Socket::INET6 - https://rt.cpan.org/Ticket/Display.html?id=124963
+- IO::Socket::SSL::Intercept - optional 'serial' argument can be starting number
+  or callback to create serial number based on the original certificate
+- new function get_session_reused to check if a session got reused
+- IO::Socket::SSL::Utils::CERT_asHash: fingerprint_xxx now set to the correct value
 2.056 2018/02/19
 - Intercept - fix creation of serial number: base it on binary digest instead of
   treating hex fingerprint as binary. Allow use of own serial numbers again.
