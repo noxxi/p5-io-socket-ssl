@@ -1,3 +1,7 @@
+2.058 2018/07/19
+- fix t/session_ticket.t: it failed with OpenSSL 1.1.* since this version
+  expects the extKeyUsage of clientAuth in the client cert also to be allowed
+  by the CA if CA uses extKeyUsage
 2.057 2018/07/18
 - fix memory leak which occured with explicit stop_SSL in connection with
   non-blocking sockets or timeout - https://rt.cpan.org/Ticket/Display.html?id=125867

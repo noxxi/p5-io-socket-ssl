@@ -14,13 +14,17 @@ plan tests => 6;
 
 # create some self signed certificate
 my ($cert,$key) = CERT_create(CA => 1,
-    subject => { CN => 'server' },
-    purpose => { ca => 1, server => 1 }
+    subject => { CN => 'ca' },
 );
 my ($client_cert,$client_key) = CERT_create(
     issuer => [ $cert,$key],
     subject => { CN => 'client' },
     purpose => { client => 1 }
+);
+my ($server_cert,$server_key) = CERT_create(
+    issuer => [ $cert,$key],
+    subject => { CN => 'server' },
+    purpose => { server => 1 }
 );
 
 # create two servers with the same session ticket callback
@@ -111,8 +115,8 @@ sub _server {
     for(@server) {
 	$_->{sslctx} = IO::Socket::SSL::SSL_Context->new(
 	    SSL_server => 1,
-	    SSL_cert => $cert,
-	    SSL_key => $key,
+	    SSL_cert => $server_cert,
+	    SSL_key => $server_key,
 	    SSL_ca => [ $cert ],
 	    SSL_verify_mode => SSL_VERIFY_PEER|SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
 	    SSL_ticket_keycb => $get_ticket_key,
