@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.058';
+our $VERSION = '2.059';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -1435,6 +1435,7 @@ sub stop_SSL {
 	delete ${*$self}{_SSL_object};
 	${*$self}{'_SSL_opened'} = 0;
 	delete $SSL_OBJECT{$ssl};
+	delete $CREATED_IN_THIS_THREAD{$ssl};
 	untie(*$self);
     }
 

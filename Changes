@@ -1,3 +1,9 @@
+2.058 2018/08/15
+- fix memleak when CRL are used.
+  Thanks to Franz Skale for report and patch
+  https://rt.cpan.org/Ticket/Display.html?id=125867
+- fix memleak when using stop_SSL and threads, reported by Paul Evans
+  https://rt.cpan.org/Ticket/Display.html?id=125867#txn-1797132
 2.058 2018/07/19
 - fix t/session_ticket.t: it failed with OpenSSL 1.1.* since this version
   expects the extKeyUsage of clientAuth in the client cert also to be allowed
