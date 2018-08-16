@@ -13,7 +13,7 @@ plan skip_all => "Test::More has no done_testing"
 $|=1;
 
 my $XDEBUG = 0;
-my @versions = qw(SSLv3 TLSv1 TLSv1_1 TLSv1_2);
+my @versions = qw(SSLv3 TLSv1 TLSv1_1 TLSv1_2 TLSv1_3);
 
 my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',
@@ -82,7 +82,7 @@ if ($pid == 0) {
     die "best protocol version server supports is $ver" if $supported{foo};
 
     # Check if the OpenSSL was compiled without support for specific protocols
-    for(qw(SSLv3 TLSv1 TLSv1_1)) {
+    for(qw(SSLv3 TLSv1 TLSv1_1 TLSv1_2 TLSv1_3)) {
 	if ( ! $check->($_,'')) {
 	    diag("looks like OpenSSL was compiled without $_ support");
 	    delete $supported{$_};

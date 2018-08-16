@@ -268,7 +268,8 @@ BEGIN{
 # get constants for SSL_OP_NO_* now, instead calling the related functions
 # every time we setup a connection
 my %SSL_OP_NO;
-for(qw( SSLv2 SSLv3 TLSv1 TLSv1_1 TLSv11:TLSv1_1 TLSv1_2 TLSv12:TLSv1_2 )) {
+for(qw( SSLv2 SSLv3 TLSv1 TLSv1_1 TLSv11:TLSv1_1 TLSv1_2 TLSv12:TLSv1_2
+        TLSv1_3 TLSv13:TLSv1_3 )) {
     my ($k,$op) = m{:} ? split(m{:},$_,2) : ($_,$_);
     my $sub = "Net::SSLeay::OP_NO_$op";
     local $SIG{__DIE__};
@@ -1893,6 +1894,7 @@ sub get_sslversion {
     my $ssl = shift()->_get_ssl_object || return;
     my $version = Net::SSLeay::version($ssl) or return;
     return
+	$version == 0x0304 ? 'TLSv1_3' :
 	$version == 0x0303 ? 'TLSv1_2' :
 	$version == 0x0302 ? 'TLSv1_1' :
 	$version == 0x0301 ? 'TLSv1'   :
@@ -2338,7 +2340,7 @@ sub new {
 
     my $ver;
     for (split(/\s*:\s*/,$arg_hash->{SSL_version})) {
-	m{^(!?)(?:(SSL(?:v2|v3|v23|v2/3))|(TLSv1(?:_?[12])?))$}i
+	m{^(!?)(?:(SSL(?:v2|v3|v23|v2/3))|(TLSv1(?:_?[123])?))$}i
 	or croak("invalid SSL_version specified");
 	my $not = $1;
 	( my $v = lc($2||$3) ) =~s{^(...)}{\U$1};
@@ -2385,6 +2387,17 @@ sub new {
 	my $ctx = $ctx_new_sub->() or return
 	    IO::Socket::SSL->error("SSL Context init failed");
 	$CTX_CREATED_IN_THIS_THREAD{$ctx} = 1 if $use_threads;
+
+	# There is no CTX_tlsv1_3_new(). Create TLSv1.3 only context using
+	# a flexible method.
+	if ($ver eq 'TLSv1_3') {
+	    if (!Net::SSLeay::CTX_set_min_proto_version($ctx,
+		    Net::SSLeay::TLS1_3_VERSION()) or
+		!Net::SSLeay::CTX_set_max_proto_version($ctx,
+		    Net::SSLeay::TLS1_3_VERSION())) {
+		IO::Socket::SSL->error("TLSv1_3 context init failed");
+	    }
+	}
 
 	# SSL_OP_CIPHER_SERVER_PREFERENCE
 	$ssl_op |= 0x00400000 if $arg_hash->{SSL_honor_cipher_order};

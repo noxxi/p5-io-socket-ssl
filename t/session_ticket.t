@@ -73,6 +73,8 @@ my $client = sub {
 };
 
 
+# FIXME: TLSv1.3 requires to use SSL_CTX_sess_set_new_cb() by clients instead
+# of SSL_get1_session(). Missing from Net::SSLeay.
 $client->(0,0,"no initial session -> no reuse");
 $client->(0,1,"reuse with the next session and secret[0]");
 $client->(1,1,"reuse even though server changed, since they share ticket secret");

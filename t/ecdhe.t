@@ -53,12 +53,18 @@ if ( !defined $pid ) {
     };
     ok( "client connected" );
 
-    my $cipher = $to_server->get_cipher();
-    if ( $cipher !~m/^ECDHE-/ ) {
-	notok("bad key exchange: $cipher");
-	exit;
+    my $protocol = $to_server->get_sslversion;
+    if ($protocol eq 'TLSv1_3') {
+        # <https://www.openssl.org/blog/blog/2017/05/04/tlsv1.3/>
+        ok("# SKIP TLSv1.3 doesn't advertize key exchange in a chipher name");
+    } else {
+        my $cipher = $to_server->get_cipher();
+        if ( $cipher !~m/^ECDHE-/ ) {
+            notok("bad key exchange: $cipher");
+            exit;
+        }
+        ok("ecdh key exchange: $cipher");
     }
-    ok("ecdh key exchange: $cipher");
 
 } else {                ###### Server
 
