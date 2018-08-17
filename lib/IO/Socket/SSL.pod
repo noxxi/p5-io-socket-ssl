@@ -1339,7 +1339,7 @@ as an array ref.
 See also method C<next_proto_negotiated>.
 
 Next Protocol Negotiation (NPN) is available with Net::SSLeay 1.46+ and
-openssl-1.0.1+.
+openssl-1.0.1+. NPN is unavailable in TLSv1.3 protocol.
 To check support you might call C<< IO::Socket::SSL->can_npn() >>.
 If you use this option with an unsupported Net::SSLeay/OpenSSL it will
 throw an error.
