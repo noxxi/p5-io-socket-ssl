@@ -14,11 +14,12 @@ my $printfp = sub {
     print $w.' sha256$'.unpack('H*',Net::SSLeay::X509_digest($cert, $sha256))."\n"
 };
 
+my %time_valid = (not_before => $now, not_after => $later);
+
 my @ca = CERT_create(
     CA => 1,
     subject => { CN => 'IO::Socket::SSL Demo CA' },
-    not_before => $now,
-    not_after => $later,
+    %time_valid,
 );
 save('test-ca.pem',PEM_cert2string($ca[0]));
 
@@ -27,6 +28,7 @@ my @server = CERT_create(
     subject => { CN => 'server.local' },
     purpose => 'server',
     issuer => \@ca,
+    %time_valid,
 );
 save('server-cert.pem',PEM_cert2string($server[0]));
 save('server-key.pem',PEM_key2string($server[1]));
@@ -37,6 +39,7 @@ $printfp->(server => $server[0]);
     subject => { CN => 'server2.local' },
     purpose => 'server',
     issuer => \@ca,
+    %time_valid,
 );
 save('server2-cert.pem',PEM_cert2string($server[0]));
 save('server2-key.pem',PEM_key2string($server[1]));
@@ -48,6 +51,7 @@ my @client = CERT_create(
     subject => { CN => 'client.local' },
     purpose => 'client',
     issuer => \@ca,
+    %time_valid,
 );
 save('client-cert.pem',PEM_cert2string($client[0]));
 save('client-key.pem',PEM_key2string($client[1]));
@@ -65,6 +69,7 @@ my @swc = CERT_create(
 	[ DNS => 'smtp.mydomain.local' ],
 	[ DNS => 'xn--lwe-sna.idntest.local' ]
     ],
+    %time_valid,
 );
 save('server-wildcard.pem',PEM_cert2string($swc[0]),PEM_key2string($swc[1]));
 
@@ -72,8 +77,7 @@ save('server-wildcard.pem',PEM_cert2string($swc[0]),PEM_key2string($swc[1]));
 my @cap = CERT_create(
     CA => 1,
     subject => { CN => 'IO::Socket::SSL::Intercept' },
-    not_before => $now,
-    not_after => $later,
+    %time_valid,
 );
 save('proxyca.pem',PEM_cert2string($cap[0]).PEM_key2string($cap[1]));
 

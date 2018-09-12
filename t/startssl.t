@@ -50,7 +50,7 @@ if ( $pid == 0 ) {
     $client->sock_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
     ok("client local certificate issuer");
     $client->get_fingerprint('sha256',$client->sock_certificate)
-	eq 'sha256$b3d1ab7ee6bd10d30238b6d03d8bc4504ceed0fde2a27ae9976d1a8b03b0aaaf'
+	eq 'sha256$f89986e895758f788a66d340bb3d849999c9ab7b7b14f23e67fb28226a4c4b2e'
 	or print "not ";
     ok("client local certificate fingerprint");
 
@@ -59,7 +59,7 @@ if ( $pid == 0 ) {
     $client->peer_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
     ok("client peer certificate issuer");
     $client->get_fingerprint()
-	eq 'sha256$7245f05f400e7459daa9de46db93e9957ee715f8ab4a0fb3d297b6916f617fde'
+	eq 'sha256$422658660b5e5f2a2c657d960e71a1b98a97158c728cdbd377076de8a0f1a568'
 	or print "not ";
     ok("client peer certificate fingerprint");
 
@@ -91,7 +91,7 @@ ok("server local certificate subject");
 $csock->sock_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
 ok("server local certificate issuer");
 $csock->get_fingerprint('sha256',$csock->sock_certificate)
-    eq 'sha256$7245f05f400e7459daa9de46db93e9957ee715f8ab4a0fb3d297b6916f617fde'
+    eq 'sha256$422658660b5e5f2a2c657d960e71a1b98a97158c728cdbd377076de8a0f1a568'
     or print "not ";
 ok("server local certificate fingerprint");
 
@@ -100,7 +100,7 @@ ok("server peer certificate subject");
 $csock->peer_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
 ok("server peer certificate issuer");
 $csock->get_fingerprint()
-    eq 'sha256$b3d1ab7ee6bd10d30238b6d03d8bc4504ceed0fde2a27ae9976d1a8b03b0aaaf'
+    eq 'sha256$f89986e895758f788a66d340bb3d849999c9ab7b7b14f23e67fb28226a4c4b2e'
     or print "not ";
 ok("server peer certificate fingerprint");
 
