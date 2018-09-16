@@ -27,6 +27,8 @@ my ($server_cert,$server_key) = CERT_create(
     purpose => { server => 1 }
 );
 
+$SIG{PIPE} = 'IGNORE';
+
 # create two servers with the same session ticket callback
 my (@server,@saddr);
 for (1,2) {
@@ -52,6 +54,8 @@ $SIG{ALRM} = sub { die "test takes too long" };
 END{ kill 9,$pid if $pid };
 
 my $clctx = IO::Socket::SSL::SSL_Context->new(
+    # FIXME - add session ticket support for TLS 1.3 too
+    SSL_version => 'SSLv23:!TLSv1_3',
     SSL_session_cache_size => 10,
     SSL_cert => $client_cert,
     SSL_key => $client_key,

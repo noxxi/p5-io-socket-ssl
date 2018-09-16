@@ -430,6 +430,23 @@ See also L</"Using Non-Blocking Sockets">.
 
 =item *
 
+Expecting exactly the same behavior as plain sockets.
+
+IO::Socket::SSL tries to emulate the usual socket behavior as good as possible,
+but full emulation can not be done. Specifically a read on the SSL socket might
+also result in a write on the TCP socket or a write on the SSL socket might
+result in a read on the TCP socket. Also C<accept> and B<close> on the SSL
+socket will result in writing and reading data to the TCP socket too.
+
+Especially the hidden writes might result in a connection reset if the
+underlying TCP socket is already closed by the peer. Unless signal PIPE is
+explicitly handled by the application this will ususally result in the
+application crashing. It is thus recommended to explicitly IGNORE signal PIPE so
+that the errors get propagated as EPIPE instead of causing a crash of the
+application.
+
+=item *
+
 Set 'SSL_version' or 'SSL_cipher_list' to a "better" value.
 
 L<IO::Socket::SSL> tries to set these values to reasonable, secure values which
@@ -1450,40 +1467,26 @@ upgrade an established TCP socket to SSL.
 
 =item B<close(...)>
 
-There are a number of nasty traps that lie in wait if you are not careful about
-using close().  The first of these will bite you if you have been using
-shutdown() on your sockets.  Since the SSL protocol mandates that a SSL "close
-notify" message be sent before the socket is closed, a shutdown() that closes
-the socket's write channel will cause the close() call to hang.  For a similar
-reason, if you try to close a copy of a socket (as in a forking server) you will
-affect the original socket as well.
-To get around these problems, call close with an object-oriented syntax
-(e.g. $socket->close(SSL_no_shutdown => 1))
-and one or more of the following parameters:
+Contrary to a close for a simple INET socket a close in SSL also mandates a
+proper shutdown of the SSL part. This is done by sending a close notify message
+by both peers.
 
-=over 2
+A naive implementation would thus wait until it receives the
+close notify message from the peer - which conflicts with the commonly expected
+semantic that a close will not block. The default behavior is thus to only send
+a close notify but not  wait for the close notify of the peer. If this is
+required C<SSL_fast_shutdown> need to be explicitly set to false.
 
-=item SSL_no_shutdown
+There are also cases where a SSL shutdown should not be done at all. This is
+true for example when forking to let a child deal with the socket and closing
+the socket in the parent process. A naive explicit C<close> or an implicit close
+when destroying the socket in the parent would send a close notify to the peer
+which would make the SSL socket in the client process unusable. In this case an
+explicit C<close> with C<SSL_no_shutdown> set to true should be done in the
+parent process.
 
-If set to a true value, this option will make close() not use the SSL_shutdown()
-call on the socket in question so that the close operation can complete without
-problems if you have used shutdown() or are working on a copy of a socket.
-
-Not using a real ssl shutdown on a socket will make session caching unusable.
-
-=item SSL_fast_shutdown
-
-If set to true only a unidirectional shutdown will be done, e.g. only the
-close_notify (see SSL_shutdown(3)) will be sent. Otherwise a bidirectional
-shutdown will be done where it waits for the close_notify of the peer too.
-
-Because a unidirectional shutdown is enough to keep session cache working it
-defaults to fast shutdown inside close.
-
-=item SSL_ctx_free
-
-If you want to make sure that the SSL context of the socket is destroyed when
-you close it, set this option to a true value.
+For more details and other arguments see C<stop_SSL> which gets called from
+C<close> to shutdown the SSL state of the socket.
 
 =back
 
@@ -2103,6 +2106,7 @@ If you have a server and it looks like you have a memory leak you might
 check the size of your session cache. Default for Net::SSLeay seems to be
 20480, see the example for SSL_create_ctx_callback for how to limit it.
 
+TLS 1.3 support regarding session reuse is incomplete.
 
 =head1 SEE ALSO
 
