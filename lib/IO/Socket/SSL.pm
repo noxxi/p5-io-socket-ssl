@@ -112,6 +112,20 @@ my $algo2digest = do {
     }
 };
 
+my $CTX_tlsv1_3_new;
+if ( defined &Net::SSLeay::CTX_set_min_proto_version
+    and defined &Net::SSLeay::CTX_set_max_proto_version
+    and my $tls13 = eval { Net::SSLeay::TLS1_3_VERSION() }
+) {
+    $CTX_tlsv1_3_new = sub {
+	my $ctx = Net::SSLeay::CTX_new();
+	return $ctx if Net::SSLeay::CTX_set_min_proto_version($ctx,$tls13)
+	    && Net::SSLeay::CTX_set_max_proto_version($ctx,$tls13);
+	Net::SSLeay::CTX_free($ctx);
+	return;
+    };
+}
+
 
 # global defaults
 my %DEFAULT_SSL_ARGS = (
@@ -2355,14 +2369,17 @@ sub new {
 	}
     }
 
-    my $ctx_new_sub =  UNIVERSAL::can( 'Net::SSLeay',
-	$ver eq 'SSLv2'   ? 'CTX_v2_new' :
-	$ver eq 'SSLv3'   ? 'CTX_v3_new' :
-	$ver eq 'TLSv1'   ? 'CTX_tlsv1_new' :
-	$ver eq 'TLSv1_1' ? 'CTX_tlsv1_1_new' :
-	$ver eq 'TLSv1_2' ? 'CTX_tlsv1_2_new' :
-	'CTX_new'
-    ) or return IO::Socket::SSL->_internal_error("SSL Version $ver not supported",9);
+    my $ctx_new_sub =
+	$ver eq 'TLSv1_3' ? $CTX_tlsv1_3_new :
+	UNIVERSAL::can( 'Net::SSLeay',
+	    $ver eq 'SSLv2'   ? 'CTX_v2_new' :
+	    $ver eq 'SSLv3'   ? 'CTX_v3_new' :
+	    $ver eq 'TLSv1'   ? 'CTX_tlsv1_new' :
+	    $ver eq 'TLSv1_1' ? 'CTX_tlsv1_1_new' :
+	    $ver eq 'TLSv1_2' ? 'CTX_tlsv1_2_new' :
+	    'CTX_new'
+	)
+	or return IO::Socket::SSL->_internal_error("SSL Version $ver not supported",9);
 
     # For SNI in server mode we need a separate context for each certificate.
     my %ctx;
@@ -2387,17 +2404,6 @@ sub new {
 	my $ctx = $ctx_new_sub->() or return
 	    IO::Socket::SSL->error("SSL Context init failed");
 	$CTX_CREATED_IN_THIS_THREAD{$ctx} = 1 if $use_threads;
-
-	# There is no CTX_tlsv1_3_new(). Create TLSv1.3 only context using
-	# a flexible method.
-	if ($ver eq 'TLSv1_3') {
-	    if (!Net::SSLeay::CTX_set_min_proto_version($ctx,
-		    Net::SSLeay::TLS1_3_VERSION()) or
-		!Net::SSLeay::CTX_set_max_proto_version($ctx,
-		    Net::SSLeay::TLS1_3_VERSION())) {
-		IO::Socket::SSL->error("TLSv1_3 context init failed");
-	    }
-	}
 
 	# SSL_OP_CIPHER_SERVER_PREFERENCE
 	$ssl_op |= 0x00400000 if $arg_hash->{SSL_honor_cipher_order};
