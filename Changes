@@ -1,4 +1,9 @@
-2.058 2018/08/15
+2.060 2018/09/16
+- support for TLS 1.3 with OpenSSL 1.1.1 (needs support in Net::SSLeay too)
+  Thanks to ppisar[AT]redhat.com for major help
+  see also https://rt.cpan.org/Ticket/Display.html?id=126899
+  TLS 1.3 support is not complete yet for session resume
+2.059 2018/08/15
 - fix memleak when CRL are used.
   Thanks to Franz Skale for report and patch
   https://rt.cpan.org/Ticket/Display.html?id=125867
