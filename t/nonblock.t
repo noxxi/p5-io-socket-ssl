@@ -9,15 +9,13 @@ use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 use IO::Select;
-use Errno qw( EWOULDBLOCK EAGAIN EINPROGRESS EPIPE ECONNRESET );
+use Errno qw( EWOULDBLOCK EAGAIN EINPROGRESS);
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 if ( ! eval "use 5.006; use IO::Select; return 1" ) {
     print "1..0 # Skipped: no support for nonblocking sockets\n";
     exit;
 }
-
-$SIG{PIPE} = 'IGNORE'; # use EPIPE not signal handler
 
 $|=1;
 print "1..27\n";

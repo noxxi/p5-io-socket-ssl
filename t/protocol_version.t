@@ -7,8 +7,6 @@ use Socket;
 use IO::Socket::SSL;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
-$SIG{PIPE} = 'IGNORE';
-
 plan skip_all => "Test::More has no done_testing"
     if !defined &done_testing;
 

@@ -17,8 +17,6 @@ if ( ! IO::Socket::SSL->can_client_sni() ) {
     exit;
 }
 
-$SIG{PIPE} = 'IGNORE';
-
 print "1..17\n";
 my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',

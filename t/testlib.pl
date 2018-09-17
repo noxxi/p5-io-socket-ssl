@@ -19,6 +19,8 @@ unless ( $Config::Config{d_fork} || $Config::Config{d_pseudofork} ||
     exit
 }
 
+# let IO errors result in EPIPE instead of crashing the test
+$SIG{PIPE} = 'IGNORE';
 
 # small implementations if not used from Test::More (09_fdleak.t)
 if ( ! defined &ok ) {

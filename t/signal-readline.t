@@ -50,7 +50,6 @@ if ( $pid == 0 ) {
 
 my $csock = $server->accept;
 ok("accept");
-$SIG{PIPE} = 'IGNORE';
 
 syswrite($csock,"foo") or print "not ";
 ok("wrote foo");

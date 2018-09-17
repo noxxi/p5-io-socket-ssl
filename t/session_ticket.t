@@ -27,8 +27,6 @@ my ($server_cert,$server_key) = CERT_create(
     purpose => { server => 1 }
 );
 
-$SIG{PIPE} = 'IGNORE';
-
 # create two servers with the same session ticket callback
 my (@server,@saddr);
 for (1,2) {
