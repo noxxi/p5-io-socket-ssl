@@ -1005,11 +1005,12 @@ For convenience it is also set if it was not given but a cert was given for use
 
 Sets the version of the SSL protocol used to transmit data.
 'SSLv23' uses a handshake compatible with SSL2.0, SSL3.0 and TLS1.x, while
-'SSLv2', 'SSLv3', 'TLSv1', 'TLSv1_1' or 'TLSv1_2' restrict handshake and
-protocol to the specified version.
-All values are case-insensitive.  Instead of 'TLSv1_1' and 'TLSv1_2' one can
-also use 'TLSv11' and 'TLSv12'.  Support for 'TLSv1_1' and 'TLSv1_2' requires
-recent versions of Net::SSLeay and openssl.
+'SSLv2', 'SSLv3', 'TLSv1', 'TLSv1_1', 'TLSv1_2', or 'TLSv1_3' restrict
+handshake and protocol to the specified version.
+All values are case-insensitive.  Instead of 'TLSv1_1', 'TLSv1_2', and
+'TLSv1_3' one can also use 'TLSv11', 'TLSv12', and 'TLSv13'.  Support for
+'TLSv1_1', 'TLSv1_2', and 'TLSv1_3' requires recent versions of Net::SSLeay
+and openssl.
 
 Independent from the handshake format you can limit to set of accepted SSL
 versions by adding !version separated by ':'.
