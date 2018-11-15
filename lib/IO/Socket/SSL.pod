@@ -1488,8 +1488,6 @@ parent process.
 For more details and other arguments see C<stop_SSL> which gets called from
 C<close> to shutdown the SSL state of the socket.
 
-=back
-
 =item B<sysread( BUF, LEN, [ OFFSET ] )>
 
 This function behaves from the outside the same as B<sysread> in other
