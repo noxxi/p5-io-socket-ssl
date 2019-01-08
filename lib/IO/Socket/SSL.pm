@@ -64,6 +64,7 @@ my $can_server_sni;  # do we support SNI on the server side
 my $can_npn;         # do we support NPN (obsolete)
 my $can_alpn;        # do we support ALPN
 my $can_ecdh;        # do we support ECDH key exchange
+my $set_groups_list; # SSL_CTX_set1_groups_list || SSL_CTX_set1_curves_list || undef
 my $can_ocsp;        # do we support OCSP
 my $can_ocsp_staple; # do we support OCSP stapling
 my $can_tckt_keycb;  # TLS ticket key callback
@@ -74,13 +75,21 @@ BEGIN {
     $can_npn = defined &Net::SSLeay::P_next_proto_negotiated &&
 	! Net::SSLeay::constant("LIBRESSL_VERSION_NUMBER");
 	# LibreSSL 2.6.1 disabled NPN by keeping the relevant functions
-	# available but remove the actual functionality from these functions.
-    $can_alpn       = defined &Net::SSLeay::CTX_set_alpn_protos;
-    $can_ecdh       = defined &Net::SSLeay::CTX_set_tmp_ecdh &&
-	# There is a regression with elliptic curves on 1.0.1d with 64bit
-	# http://rt.openssl.org/Ticket/Display.html?id=2975
-	( Net::SSLeay::OPENSSL_VERSION_NUMBER() != 0x1000104f
-	|| length(pack("P",0)) == 4 );
+	# available but removed the actual functionality from these functions.
+    $can_alpn = defined &Net::SSLeay::CTX_set_alpn_protos;
+    $can_ecdh =
+	(Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x1010000f) ? 'auto' :
+	defined(&Net::SSLeay::CTX_set_ecdh_auto) ? 'can_auto' :
+	(defined &Net::SSLeay::CTX_set_tmp_ecdh &&
+	    # There is a regression with elliptic curves on 1.0.1d with 64bit
+	    # http://rt.openssl.org/Ticket/Display.html?id=2975
+	    ( Net::SSLeay::OPENSSL_VERSION_NUMBER() != 0x1000104f
+	    || length(pack("P",0)) == 4 )) ? 'tmp_ecdh' :
+	    '';
+    $set_groups_list =
+	defined &Net::SSLeay::CTX_set1_groups_list ? \&Net::SSLeay::CTX_set1_groups_list :
+	defined &Net::SSLeay::CTX_set1_curves_list ? \&Net::SSLeay::CTX_set1_curves_list :
+	undef;
     $can_ocsp        = defined &Net::SSLeay::OCSP_cert2ids
 	# OCSP got broken in 1.75..1.77
 	&& ($Net::SSLeay::VERSION < 1.75 || $Net::SSLeay::VERSION > 1.77);
@@ -240,7 +249,12 @@ DH
 		$dh or die "no DH";
 		$dh;
 	    },
-	    $can_ecdh ? ( SSL_ecdh_curve => 'prime256v1' ):(),
+	    (
+		$can_ecdh eq 'auto' ? () : # automatically enabled by openssl
+		$can_ecdh eq 'can_auto' ? (SSL_ecdh_curve => 'auto') :
+		$can_ecdh eq 'tmp_ecdh' ? ( SSL_ecdh_curve => 'prime256v1' ) :
+		(),
+	    )
 	);
     }
     # Call it once at compile time and try it at INIT.
@@ -2612,7 +2626,7 @@ sub new {
 	$ctx{$host} = $ctx;
     }
 
-    if ($arg_hash->{'SSL_server'} || $arg_hash->{'SSL_use_cert'}) {
+    if ($arg_hash->{SSL_server}) {
 
 	if ( my $f = $arg_hash->{SSL_dh_file} ) {
 	    my $bio = Net::SSLeay::BIO_new_file( $f,'r' )
@@ -2634,26 +2648,50 @@ sub new {
 		    IO::Socket::SSL->error( "Failed to set DH from SSL_dh" );
 	    }
 	}
+    }
 
-	if ( my $curve = $arg_hash->{SSL_ecdh_curve} ) {
-	    return IO::Socket::SSL->_internal_error(
-		"ECDH curve needs Net::SSLeay>=1.56 and OpenSSL>=1.0",9)
-		if ! $can_ecdh;
-	    if ( $curve !~ /^\d+$/ ) {
-		# name of curve, find NID
-		$curve = Net::SSLeay::OBJ_txt2nid($curve)
-		    || return IO::Socket::SSL->error(
-		    "cannot find NID for curve name '$curve'");
-	    }
-	    my $ecdh = Net::SSLeay::EC_KEY_new_by_curve_name($curve) or
-		return IO::Socket::SSL->error(
-		"cannot create curve for NID $curve");
-	    for( values %ctx ) {
-		Net::SSLeay::CTX_set_tmp_ecdh($_,$ecdh) or
+    if ( my $curve = $arg_hash->{SSL_ecdh_curve} ) {
+	return IO::Socket::SSL->_internal_error(
+	    "ECDH curve needs Net::SSLeay>=1.56 and OpenSSL>=1.0",9)
+	    if ! $can_ecdh;
+
+	for(values %ctx) {
+	    if ($arg_hash->{SSL_server} and $curve eq 'auto') {
+		if ($can_ecdh eq 'can_auto') {
+			Net::SSLeay::CTX_set_ecdh_auto($_,1) or
+			    return IO::Socket::SSL->error(
+			    "failed to set ECDH curve context");
+		} elsif ($can_ecdh eq 'auto') {
+		    # automatically enabled anyway
+		} else {
 		    return IO::Socket::SSL->error(
-		    "failed to set ECDH curve context");
+			"SSL_CTX_set_ecdh_auto not implemented");
+		}
+
+	    } elsif ($set_groups_list) {
+		$set_groups_list->($_,$curve) or return IO::Socket::SSL->error(
+		    "failed to set ECDH groups/curves on context");
+	    } elsif ($curve =~m{:}) {
+		return IO::Socket::SSL->error(
+		    "SSL_CTX_groups_list or SSL_CTX_curves_list not implemented");
+
+	    } elsif ($arg_hash->{SSL_server}) {
+		if ( $curve !~ /^\d+$/ ) {
+		    # name of curve, find NID
+		    $curve = Net::SSLeay::OBJ_txt2nid($curve)
+			|| return IO::Socket::SSL->error(
+			"cannot find NID for curve name '$curve'");
+		}
+		my $ecdh = Net::SSLeay::EC_KEY_new_by_curve_name($curve) or
+		    return IO::Socket::SSL->error(
+		    "cannot create curve for NID $curve");
+		for( values %ctx ) {
+		    Net::SSLeay::CTX_set_tmp_ecdh($_,$ecdh) or
+			return IO::Socket::SSL->error(
+			"failed to set ECDH curve context");
+		}
+		Net::SSLeay::EC_KEY_free($ecdh);
 	    }
-	    Net::SSLeay::EC_KEY_free($ecdh);
 	}
     }
 

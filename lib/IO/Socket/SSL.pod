@@ -1055,13 +1055,15 @@ our secure cipher list setting.
 
 =item SSL_dh_file
 
-If you want Diffie-Hellman key exchange you need to supply a suitable file here
-or use the SSL_dh parameter. See dhparam command in openssl for more
-information.
 To create a server which provides forward secrecy you need to either give the DH
-parameters or (better, because faster) the ECDH curve.
+parameters or (better, because faster) the ECDH curve. This setting cares
+about DH parameters.
 
-If neither C<SSL_dh_file> not C<SSL_dh> is set a builtin DH parameter with a
+To support non-elliptic Diffie-Hellman key exchange a suitable file needs to
+be given here or the SSL_dh should be used with a appropriate value.
+See dhparam command in openssl for more information.
+
+If neither C<SSL_dh_file> nor C<SSL_dh> are set a builtin DH parameter with a
 length of 2048 bit is used to offer DH key exchange by default. If you don't
 want this (e.g. disable DH key exchange) explicitly set this or the C<SSL_dh>
 parameter to undef.
@@ -1073,13 +1075,26 @@ DH*.
 
 =item SSL_ecdh_curve
 
-If you want Elliptic Curve Diffie-Hellmann key exchange you need to supply the
-OID or NID of a suitable curve (like 'prime256v1') here.
 To create a server which provides forward secrecy you need to either give the DH
-parameters or (better, because faster) the ECDH curve.
+parameters or (better, because faster) the ECDH curve. This setting cares
+about the ECDH curve(s).
 
-This parameter defaults to 'prime256v1' (builtin of OpenSSL) to offer ECDH key
-exchange by default. If you don't want this explicitly set it to undef.
+To support Elliptic Curve Diffie-Hellmann key exchange the OID or NID of at
+least one suitable curve needs to be provided here.
+
+With OpenSSL 1.1.0+ this parameter defaults to C<auto>, which means that it
+lets OpenSSL pick the best settings. If support for CTX_set_ecdh_auto is
+implemented in Net::SSLeay (needs at least version 1.87) it will use this to
+implement the same default.  Otherwise it will default to C<prime256v1>
+(builtin of OpenSSL) in order to offer ECDH key exchange by default.
+
+If setting groups or curves is supported by Net::SSLeay (needs at least
+version 1.87) then multiple curves can be given here in the order of the
+preference, i.e.  C<P-521:P-384:P-256>. When used at the client side this
+will include the supported curves as extension in the TLS handshake.
+
+If you don't want to have ECDH key exchange this could be set to undef or
+set C<SSL_ciphers> to exclude all of these ciphers.
 
 You can check if ECDH support is available by calling
 C<< IO::Socket::SSL->can_ecdh >>.

@@ -9,7 +9,8 @@ use Socket;
 use IO::Socket::SSL;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
-if ( ! IO::Socket::SSL->can_ecdh ) {
+my $can_ecdh = IO::Socket::SSL->can_ecdh;
+if (! $can_ecdh) {
     print "1..0 # Skipped: no support for ecdh with this openssl/Net::SSLeay\n";
     exit
 }
@@ -26,7 +27,8 @@ my $server = IO::Socket::SSL->new(
     ReuseAddr => 1,
     SSL_cert_file => "certs/server-cert.pem",
     SSL_key_file  => "certs/server-key.pem",
-    SSL_ecdh_curve => 'prime256v1',
+    (defined &Net::SSLeay::CTX_set1_groups_list || defined &Net::SSLeay::CTX_set1_curves_list)
+	? (SSL_ecdh_curve => 'prime256v1' ) : (),
 ) || do {
     notok($!);
     exit
@@ -47,6 +49,8 @@ if ( !defined $pid ) {
     my $to_server = IO::Socket::SSL->new(
 	PeerAddr => $addr,
 	Domain => AF_INET,
+	(defined &Net::SSLeay::CTX_set1_groups_list || defined &Net::SSLeay::CTX_set1_curves_list)
+	    ? (SSL_ecdh_curve => 'prime256v1' ) : (),
 	SSL_verify_mode => 0 ) || do {
 	notok( "connect failed: $SSL_ERROR" );
 	exit

@@ -62,6 +62,7 @@ t/public_suffix_ssl.t
 t/readline.t
 t/session_ticket.t
 t/sessions.t
+t/set_curves.t
 t/signal-readline.t
 t/sni.t
 t/sni_verify.t
