@@ -67,6 +67,7 @@ my $can_ecdh;        # do we support ECDH key exchange
 my $can_ocsp;        # do we support OCSP
 my $can_ocsp_staple; # do we support OCSP stapling
 my $can_tckt_keycb;  # TLS ticket key callback
+my $can_pha;         # do we support PHA
 BEGIN {
     $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x01000000;
     $can_server_sni = defined &Net::SSLeay::get_servername;
@@ -87,6 +88,7 @@ BEGIN {
 	&& defined &Net::SSLeay::set_tlsext_status_type;
     $can_tckt_keycb  = defined &Net::SSLeay::CTX_set_tlsext_ticket_getkey_cb
 	&& $Net::SSLeay::VERSION >= 1.80;  
+    $can_pha         = defined &Net::SSLeay::CTX_set_post_handshake_auth;
 }
 
 my $algo2digest = do {
@@ -2018,6 +2020,7 @@ sub can_ecdh       { return $can_ecdh }
 sub can_ipv6       { return CAN_IPV6 }
 sub can_ocsp       { return $can_ocsp }
 sub can_ticket_keycb { return $can_tckt_keycb }
+sub can_pha        { return $can_pha }
 
 sub DESTROY {
     my $self = shift or return;
@@ -2601,6 +2604,9 @@ sub new {
 	    $havekey or return IO::Socket::SSL->error(
 		"Failed to load key from file (no PEM or DER)");
 	}
+
+        Net::SSLeay::CTX_set_post_handshake_auth($ctx,1)
+            if (!$is_server && $can_pha && $havecert && $havekey);
 
 	# replace arg_hash with created context
 	$ctx{$host} = $ctx;
