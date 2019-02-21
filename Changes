@@ -1,3 +1,12 @@
+- Support for TLS 1.3 session reuse, provided that a new (and currently
+  unreleased) Net::SSLeay gets used with support for SESSION_up_ref and
+  SSL_CTX_sess_set_(new|remove)_cb.
+  Note that the previous (and undocumented) API for the session cache has been
+  changed.
+- support for multiple curves, automatic setting of curves and setting of
+  supported curves in client
+- Enable Post-Handshake-Authentication (TLSv1.3 feature) client-side when
+  client certificates are provided. Thanks to jorton[AT]redhat[DOT]com
 2.060 2018/09/16
 - support for TLS 1.3 with OpenSSL 1.1.1 (needs support in Net::SSLeay too)
   Thanks to ppisar[AT]redhat.com for major help

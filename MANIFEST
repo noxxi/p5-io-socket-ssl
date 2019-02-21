@@ -61,6 +61,7 @@ t/public_suffix_lib_uri.t
 t/public_suffix_ssl.t
 t/readline.t
 t/session_ticket.t
+t/session_cache.t
 t/sessions.t
 t/set_curves.t
 t/signal-readline.t

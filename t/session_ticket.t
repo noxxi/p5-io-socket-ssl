@@ -52,12 +52,15 @@ $SIG{ALRM} = sub { die "test takes too long" };
 END{ kill 9,$pid if $pid };
 
 my $clctx = IO::Socket::SSL::SSL_Context->new(
-    # FIXME - add session ticket support for TLS 1.3 too
-    SSL_version => 'SSLv23:!TLSv1_3',
     SSL_session_cache_size => 10,
     SSL_cert => $client_cert,
     SSL_key => $client_key,
     SSL_ca => [ $cert ],
+
+    # versions of Net::SSLeay with support for SESSION_dup have also the other
+    # functionality needed for proper TLS 1.3 session handling
+    defined(&Net::SSLeay::SESSION_dup) ? ()
+	: (SSL_version => 'SSLv23:!TLSv1_3'),
 );
 
 my $client = sub {
@@ -67,16 +70,17 @@ my $client = sub {
 	SSL_reuse_ctx => $clctx,
 	SSL_session_key => 'server', # single key for both @saddr
     );
+    <$cl>; # read something, incl. TLS 1.3 ticket
     my $reuse = $cl && Net::SSLeay::session_reused($cl->_get_ssl_object);
-    diag("connect to $i: ".
-	($cl ? "success reuse=$reuse" : "error: $!,$SSL_ERROR"));
+    diag("connect to $i: ".  ($cl
+	? "success reuse=$reuse version=".$cl->get_sslversion()
+	: "error: $!,$SSL_ERROR"
+    ));
     is($reuse,$expect_reuse,$desc);
     close($cl);
 };
 
 
-# FIXME: TLSv1.3 requires to use SSL_CTX_sess_set_new_cb() by clients instead
-# of SSL_get1_session(). Missing from Net::SSLeay.
 $client->(0,0,"no initial session -> no reuse");
 $client->(0,1,"reuse with the next session and secret[0]");
 $client->(1,1,"reuse even though server changed, since they share ticket secret");
@@ -152,6 +156,7 @@ sub _server {
 		last;
 	    };
 
+	    print $cl "hi\n";
 	    my $reuse = Net::SSLeay::session_reused($cl->_get_ssl_object);
 	    print "server[$i] reused=$reuse\n";
 

@@ -69,6 +69,9 @@ my $can_ocsp;        # do we support OCSP
 my $can_ocsp_staple; # do we support OCSP stapling
 my $can_tckt_keycb;  # TLS ticket key callback
 my $can_pha;         # do we support PHA
+my $session_upref;   # SSL_SESSION_up_ref is implemented
+my %sess_cb;         # SSL_CTX_sess_set_(new|remove)_cb
+
 BEGIN {
     $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x01000000;
     $can_server_sni = defined &Net::SSLeay::get_servername;
@@ -98,6 +101,19 @@ BEGIN {
     $can_tckt_keycb  = defined &Net::SSLeay::CTX_set_tlsext_ticket_getkey_cb
 	&& $Net::SSLeay::VERSION >= 1.80;  
     $can_pha         = defined &Net::SSLeay::CTX_set_post_handshake_auth;
+
+    if (defined &Net::SSLeay::SESSION_up_ref) {
+	$session_upref = 1;
+    }
+
+    if ($session_upref
+	&& defined &Net::SSLeay::CTX_sess_set_new_cb
+	&& defined &Net::SSLeay::CTX_sess_set_remove_cb) {
+	%sess_cb = (
+	    new => \&Net::SSLeay::CTX_sess_set_new_cb,
+	    remove => \&Net::SSLeay::CTX_sess_set_remove_cb,
+	);
+    }
 }
 
 my $algo2digest = do {
@@ -734,6 +750,15 @@ sub connect_SSL {
 	$SSL_OBJECT{$ssl} = [$self,0];
 	weaken($SSL_OBJECT{$ssl}[0]);
 
+	if ($ctx->{session_cache}) {
+	    $arg_hash->{SSL_session_key} ||= do {
+		my $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost}
+		    || $self->_update_peer;
+		my $port = $arg_hash->{PeerPort} || $arg_hash->{PeerService};
+		$port ? "$host:$port" : $host;
+	    }
+	}
+
 	Net::SSLeay::set_fd($ssl, $fileno)
 	    || return $self->error("SSL filehandle association failed");
 
@@ -790,14 +815,9 @@ sub connect_SSL {
 	    $DEBUG>=2 && DEBUG("request OCSP stapling");
 	}
 
-	if ($ctx->{session_cache}
-	    and my $session = $ctx->{session_cache}->get_session(
-		$arg_hash->{SSL_session_key} || do {
-		    my $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost};
-		    my $port = $arg_hash->{PeerPort} || $arg_hash->{PeerService};
-		    $port ? "$host:$port" : $host;
-		}
-	    )) {
+	if ($ctx->{session_cache} and my $session =
+	    $ctx->{session_cache}->get_session($arg_hash->{SSL_session_key})
+	) {
 	    Net::SSLeay::set_session($ssl, $session);
 	}
     }
@@ -913,16 +933,10 @@ sub connect_SSL {
 	return $self->fatal_ssl_error();
     }
 
-    if ( $ctx->{session_cache}
+    if (!%sess_cb and $ctx->{session_cache}
 	and my $session = Net::SSLeay::get1_session($ssl)) {
-	my $arg_hash = ${*$self}{'_SSL_arguments'};
 	$ctx->{session_cache}->add_session(
-	    $arg_hash->{SSL_session_key} || do {
-		my $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost}
-		    || $self->_update_peer;
-		my $port = $arg_hash->{PeerPort} || $arg_hash->{PeerService};
-		$port ? "$host:$port" : $host;
-	    },
+	    ${*$self}{_SSL_arguments}{SSL_session_key},
 	    $session
 	);
     }
@@ -2892,6 +2906,33 @@ sub new {
 	$self->{session_cache} = IO::Socket::SSL::Session_Cache->new( $size );
     }
 
+
+    if ($self->{session_cache} and %sess_cb) {
+	Net::SSLeay::CTX_set_session_cache_mode($ctx,
+	    Net::SSLeay::SESS_CACHE_CLIENT());
+	my $cache = $self->{session_cache};
+	$sess_cb{new}($ctx, sub {
+	    my ($ssl,$session) = @_;
+	    my $self = ($SSL_OBJECT{$ssl} || do {
+		warn "callback session new: no known SSL object for $ssl";
+		return;
+	    })->[0];
+	    my $args = ${*$self}{_SSL_arguments};
+	    my $key = $args->{SSL_session_key} or do {
+		warn "callback session new: no known SSL_session_key for $ssl";
+		return;
+	    };
+	    $DEBUG>=3 && DEBUG("callback session new <$key> $session");
+	    Net::SSLeay::SESSION_up_ref($session);
+	    $cache->add_session($key,$session);
+	});
+	$sess_cb{remove}($ctx, sub {
+	    my ($ctx,$session) = @_;
+	    $DEBUG>=3 && DEBUG("callback session remove $session");
+	    $cache->del_session(undef,$session);
+	});
+    }
+
     return $self;
 }
 
@@ -2924,82 +2965,193 @@ sub DESTROY {
 }
 
 package IO::Socket::SSL::Session_Cache;
-use strict;
+*DEBUG = *IO::Socket::SSL::DEBUG;
+use constant {
+    SESSION => 0,
+    KEY     => 1,
+    GNEXT   => 2,
+    GPREV   => 3,
+    SNEXT   => 4,
+    SPREV   => 5,
+};
 
 sub new {
     my ($class, $size) = @_;
     $size>0 or return;
-    return bless { _maxsize => $size }, $class;
-}
-
-
-sub del_session {
-    my ($self, $key) = @_;
-    my $val = delete $self->{$key} or return;
-    Net::SSLeay::SESSION_free($val->{session});
-    $val->{prev}{next} = $val->{next};
-    $val->{next}{prev} = $val->{prev};
-    if ($val != $self->{_head}) {
-	# keep head
-    } elsif ($val == $val->{next}) {
-	# single element in cache, drop it
-	$self->{_head} = undef
-    } else {
-	# point to next element in cache
-	$self->{_head} = $val->{next}
-    }
-}
-
-sub get_session {
-    my ($self, $key) = @_;
-    my $session = $self->{$key} || return;
-    return $session->{session} if ($self->{'_head'} eq $session);
-    $session->{prev}->{next} = $session->{next};
-    $session->{next}->{prev} = $session->{prev};
-    $session->{next} = $self->{'_head'};
-    $session->{prev} = $self->{'_head'}->{prev};
-    $self->{'_head'}->{prev} = $self->{'_head'}->{prev}->{next} = $session;
-    $self->{'_head'} = $session;
-    return $session->{session};
+    return bless {
+	room  => $size,
+	ghead => undef,
+	shead => {},
+    }, $class;
 }
 
 sub add_session {
-    my ($self, $key, $val) = @_;
-    return if ($key eq '_maxsize' or $key eq '_head');
+    my ($self, $key, $session) = @_;
 
-    if ( my $have = $self->{$key} ) {
-	Net::SSLeay::SESSION_free( $have->{session} );
-	$have->{session} = $val;
-	return get_session($self,$key); # will put key on front
+    # create new
+    my $v = [];
+    $v->[SESSION] = $session;
+    $v->[KEY] = $key;
+    $DEBUG>=3 && DEBUG("add_session($key,$session)");
+    _add_entry($self,$v);
+}
+
+sub replace_session {
+    my ($self, $key, $session) = @_;
+    $self->del_session($key);
+    $self->add_session($key, $session);
+}
+
+sub del_session {
+    my ($self, $key, $session) = @_;
+    my ($head,$inext) = $key
+	? ($self->{shead}{$key},SNEXT) : ($self->{ghead},GNEXT);
+    my $v = $head;
+    my @del;
+    while ($v) {
+	if (!$session) {
+	    push @del,$v
+	} elsif ($v->[SESSION] == $session) {
+	    push @del, $v;
+	    last;
+	}
+	$v = $v->[$inext];
+	last if $v == $head;
+    }
+    $DEBUG>=3 && DEBUG("del_session("
+	. ($key ? $key : "undef")
+	. ($session ? ",$session) -> " : ") -> ")
+	.  (~~@del || 'none'));
+    for (@del) {
+	_del_entry($self,$_);
+	Net::SSLeay::SESSION_free($_->[SESSION]) if $_->[SESSION];
+    }
+    return ~~@del;
+}
+
+sub get_session {
+    my ($self, $key, $session) = @_;
+    my $v = $self->{shead}{$key};
+    if ($session) {
+	my $shead = $v;
+	while ($v) {
+	    $DEBUG>=3 && DEBUG("check $session - $v->[SESSION]");
+	    last if $v->[SESSION] == $session;
+	    $v = $v->[SNEXT];
+	    $v = undef if $v == $shead; # session not found
+	}
+    }
+    if ($v) {
+	_del_entry($self, $v); # remove
+	_add_entry($self, $v); # and add back on top
+    }
+    $DEBUG>=3 && DEBUG("get_session($key"
+	. ( $session ? ",$session) -> " : ") -> ")
+	. ($v? $v->[SESSION]:"none"));
+    return $v && $v->[SESSION];
+}
+
+sub _add_entry {
+    my ($self,$v) = @_;
+    for(
+	[ SNEXT, SPREV, \$self->{shead}{$v->[KEY]} ],
+	[ GNEXT, GPREV, \$self->{ghead} ],
+    ) {
+	my ($inext,$iprev,$rhead) = @$_;
+	if ($$rhead) {
+	    $v->[$inext] = $$rhead;
+	    $v->[$iprev] = ${$rhead}->[$iprev];
+	    ${$rhead}->[$iprev][$inext] = $v;
+	    ${$rhead}->[$iprev] = $v;
+	} else {
+	    $v->[$inext] = $v->[$iprev] = $v;
+	}
+	$$rhead = $v;
     }
 
-    my $session = $self->{$key} = { session => $val, key => $key };
+    $self->{room}--;
 
-    if ( keys(%$self) > $self->{_maxsize}+2) {
-	my $last = $self->{'_head'}->{prev};
-	Net::SSLeay::SESSION_free($last->{session});
-	delete($self->{$last->{key}});
-	$self->{'_head'}->{prev} = $self->{'_head'}->{prev}->{prev};
-	delete($self->{'_head'}) if ($self->{'_maxsize'} == 1);
+    # drop old entries if necessary
+    if ($self->{room}<0) {
+	my $l = $self->{ghead}[GPREV];
+	_del_entry($self,$l);
+	Net::SSLeay::SESSION_free($l->[SESSION]) if $l->[SESSION];
+    }
+}
+
+sub _del_entry {
+    my ($self,$v) = @_;
+    for(
+	[ SNEXT, SPREV, \$self->{shead}{$v->[KEY]} ],
+	[ GNEXT, GPREV, \$self->{ghead} ],
+    ) {
+	my ($inext,$iprev,$rhead) = @$_;
+	$$rhead or return;
+	$v->[$inext][$iprev] = $v->[$iprev];
+	$v->[$iprev][$inext] = $v->[$inext];
+	if ($v != $$rhead) {
+	    # not removed from top of list
+	} elsif ($v->[$inext] == $v) {
+	    # was only element on list, drop list
+	    if ($inext == SNEXT) {
+		delete $self->{shead}{$v->[KEY]};
+	    } else {
+		$$rhead = undef;
+	    }
+	} else {
+	    # was top element, keep others
+	    $$rhead = $v->[$inext];
+	}
+    }
+    $self->{room}++;
+}
+
+sub _dump {
+    my $self = shift;
+
+    my %v2i;
+    my $v = $self->{ghead};
+    while ($v) {
+	exists $v2i{$v} and die;
+	$v2i{$v} = int(keys %v2i);
+	$v = $v->[GNEXT];
+	last if $v == $self->{ghead};
     }
 
-    if ($self->{'_head'}) {
-	$session->{next} = $self->{'_head'};
-	$session->{prev} = $self->{'_head'}->{prev};
-	$self->{'_head'}->{prev}->{next} = $session;
-	$self->{'_head'}->{prev} = $session;
-    } else {
-	$session->{next} = $session->{prev} = $session;
+    my $out = "room: $self->{room}\nghead:\n";
+    $v = $self->{ghead};
+    while ($v) {
+	$out .= sprintf(" - [%d] <%d,%d> '%s' <%s>\n",
+	    $v2i{$v}, $v2i{$v->[GPREV]}, $v2i{$v->[GNEXT]},
+	    $v->[KEY], $v->[SESSION]);
+	$v = $v->[GNEXT];
+	last if $v == $self->{ghead};
     }
-    $self->{'_head'} = $session;
-    return $session;
+    $out .= "shead:\n";
+    for my $key (sort keys %{$self->{shead}}) {
+	$out .= " - '$key'\n";
+	my $shead = $self->{shead}{$key};
+	my $v = $shead;
+	while ($v) {
+	    $out .= sprintf("   - [%d] <%d,%d> '%s' <%s>\n",
+		$v2i{$v}, $v2i{$v->[SPREV]}, $v2i{$v->[SNEXT]},
+		$v->[KEY], $v->[SESSION]);
+	    $v = $v->[SNEXT];
+	    last if $v == $shead;
+	}
+    }
+    return $out;
 }
 
 sub DESTROY {
     my $self = shift;
-    delete(@{$self}{'_head','_maxsize'});
-    for (values %$self) {
-	Net::SSLeay::SESSION_free($_->{session} || next);
+    delete $self->{shead};
+    my $v = delete $self->{ghead};
+    while ($v) {
+	Net::SSLeay::SESSION_free($v->[SESSION]) if $v->[SESSION];
+	my $next = $v->[GNEXT];
+	@$v = ();
+	$v = $next;
     }
 }
 

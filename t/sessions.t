@@ -2,6 +2,8 @@
 # Before `make install' is performed this script should be runnable with
 # `make test'. After `make install' it should work as `perl t/core.t'
 
+my $DEBUG = 0;
+
 use strict;
 use warnings;
 use Net::SSLeay;
@@ -10,21 +12,19 @@ use IO::Socket::SSL;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 $|=1;
-my $numtests = 35;
+my $numtests = 17;
 print "1..$numtests\n";
 
+my $what = 'server';
 my @servers = map {
     IO::Socket::SSL->new(
 	LocalAddr => '127.0.0.1',
 	LocalPort => 0,
 	Listen => 2,
 	Timeout => 30,
-	ReuseAddr => 1,
-	SSL_key_file => "certs/server-key.enc",
-	SSL_passwd_cb => sub { return "bluebell" },
-	SSL_verify_mode => SSL_VERIFY_NONE,
-	SSL_ca_file => "certs/test-ca.pem",
 	SSL_cert_file => "certs/server-cert.pem",
+	SSL_key_file => "certs/server-key.pem",
+	SSL_ca_file => "certs/test-ca.pem",
     )
 } (1..3);
 
@@ -32,179 +32,114 @@ if ( grep { !$_ } @servers > 0 ) {
     print "not ok # Server init\n";
     exit;
 }
-&ok("Server initialization");
+ok("Server initialization");
 
 my @saddr = map { $_->sockhost.':'.$_->sockport } @servers;
-unless (fork) {
+defined(my $pid = fork()) or die "fork failed: $!";
+if ($pid == 0) {
+    server();
+    exit(0);
+}
+client();
+wait;
+
+sub client {
+    $what = 'client';
     @servers = ();
     my $ctx = IO::Socket::SSL::SSL_Context->new(
-	 SSL_passwd_cb => sub { return "opossum" },
-	 SSL_verify_mode => SSL_VERIFY_PEER,
+	 #SSL_version => 'TLSv1_2',
 	 SSL_ca_file => "certs/test-ca.pem",
-	 SSL_ca_path => '',
-	 SSL_session_cache_size => 4,
+	 # make cache large enough since we get multiple tickets with TLS 1.3
+	 SSL_session_cache_size => 100,
     );
-
 
     my $cache = $ctx->{session_cache} or do {
 	print "not ok \# Context init\n";
 	exit;
     };
-    &ok("Context init");
-
-
-    # Bogus session test
-    unless ($cache->add_session("bogus", 0)) {
-	print "not ";
-    }
-    &ok("Superficial Cache Addition Test");
-
-    unless ($cache->add_session("bogus1", 0)) {
-	print "not ";
-    }
-    &ok("Superficial Cache Addition Test 2");
-
-    if (keys(%$cache) != 4) {
-	print "not ";
-    }
-    &ok("Cache Keys Check 1");
-
-    unless ($cache->{'bogus1'} and $cache->{'bogus'}) {
-	print "not ";
-    }
-    &ok("Cache Keys Check 2");
-
-    my ($bogus, $bogus1) = ($cache->{'bogus'}, $cache->{'bogus1'});
-    unless ($cache->{'_head'} eq $bogus1) {
-	print "not ";
-    }
-    &ok("Cache Head Check");
-
-    unless ($bogus1->{prev} eq $bogus and
-	    $bogus1->{next} eq $bogus and
-	    $bogus->{prev} eq $bogus1 and
-	    $bogus->{next} eq $bogus1) {
-	print "not ";
-    }
-    &ok("Cache Link Check");
-
+    ok("Context init");
+    my $dump_cache = $DEBUG ? sub { diag($cache->_dump) } : sub {};
 
     IO::Socket::SSL::set_default_context($ctx);
-
     my $sock3 = IO::Socket::INET->new($saddr[2]);
     my @clients = (
 	IO::Socket::SSL->new(PeerAddr => $saddr[0], Domain => AF_INET),
 	IO::Socket::SSL->new(PeerAddr => $saddr[1], Domain => AF_INET),
-	IO::Socket::SSL->start_SSL( $sock3 ),
+	IO::Socket::SSL->start_SSL($sock3),
     );
 
     if ( grep { !$_ } @clients >0 ) {
 	print "not ok \# Client init $SSL_ERROR\n";
 	exit;
     }
-    &ok("Client init");
+    ok("Client init, version=".$clients[0]->get_sslversion);
 
-    # Make sure that first 'bogus' entry has been removed
-    if (keys(%$cache) != 6) {
-	warn Dumper($cache); use Data::Dumper;
-	print "not ";
+    for(@clients) {
+	<$_>; # read ping
+	print $_ "pong!\n";
     }
-    &ok("Cache Keys Check 3");
+    &$dump_cache;
 
-    if ($cache->{'bogus'}) {
-	print "not ";
+    print "not " if $cache->{room} >97;
+    ok(">=3 entries in cache: ". (100- $cache->{room}));
+    for(@saddr) {
+	$cache->{shead}{$_} or print "not ";
+	ok("$_ in cache");
     }
-    &ok("Cache Removal Test");
-
-    if ($cache->{'_head'}->{prev} ne $bogus1) {
-	print "not ";
-    }
-    &ok("Cache Tail Check");
-
-    if ($cache->{'_head'} ne $cache->{$saddr[2]}) {
-	print "not ";
-    }
-    &ok("Cache Insertion Test");
+    $cache->{ghead}[1] eq $saddr[2] or print "not ";
+    ok("latest ($saddr[2]) on top of cache");
 
     for (0..2) {
-	if (Net::SSLeay::get_session($clients[$_]->_get_ssl_object) ne
-	    $cache->{$saddr[$_]}->{session}) {
-	    print "not ";
-	}
-	&ok("Cache Entry Test $_");
+	# check if current session is cached
+	$cache->get_session($saddr[$_],
+	    Net::SSLeay::get_session($clients[$_]->_get_ssl_object))
+	    or print "not ";
+	ok("session in client $_");
 	close $clients[$_];
     }
 
-    @clients = map {
-	IO::Socket::SSL->new(PeerAddr => $_, Domain => AF_INET)
-    } @saddr;
-
-    if (keys(%$cache) != 6) {
-	print "not ";
+    # check if sessions get reused
+    @clients = map { IO::Socket::SSL->new(PeerAddr => $_, Domain => AF_INET) }
+	@saddr;
+    for(@clients) {
+	print "not " if ! $_->get_session_reused;
+	ok("client $_ reused");
+	<$_>; # read ping
+	print $_ "pong!\n";
     }
-    &ok("Cache Keys Check 4");
-
-    if (!$cache->{'bogus1'}) {
-	print "not ";
-    }
-    &ok("Cache Keys Check 5");
-
-    for (0..2) {
-	if (Net::SSLeay::get_session($clients[$_]->_get_ssl_object) ne
-	    $cache->{$saddr[$_]}->{session}) {
-	    print "not ";
-	}
-	&ok("Second Cache Entry Test $_");
-	unless ($clients[$_]->print("Test $_\n")) {
-	    print "not ";
-	}
-	&ok("Write Test $_");
-	unless ($clients[$_]->readline eq "Ok $_\n") {
-	    print "not ";
-	}
-	&ok("Read Test $_");
-	close $clients[$_];
-    }
-
-    exit(0);
+    &$dump_cache;
 }
 
-my @clients = map { scalar $_->accept } @servers;
-if ( grep { !$_ } @clients > 0 ) {
-    print "not ok \# Client init\n";
-    exit;
-}
-&ok("Client init");
-close($_) for @clients;
-
-@clients = map { scalar $_->accept } @servers;
-if ( grep { !$_ } @clients > 0 ) {
-    print $SSL_ERROR;
-    print "not ok \# Client init 2\n";
-    exit;
-}
-&ok("Client init 2");
-
-for (0..2) {
-    unless ($clients[$_]->readline eq "Test $_\n") {
-	print "not ";
+sub server {
+    my @clients = map { scalar $_->accept } @servers;
+    if ( grep { !$_ } @clients > 0 ) {
+	print "not ok \# Client init\n";
+	exit;
     }
-    &ok("Server Read $_");
-    unless ($clients[$_]->print("Ok $_\n")) {
-	print "not ";
+    ok("Client init");
+    for(@clients) {
+	print $_ "ping!\n";
+	<$_>; # read pong
     }
-    &ok("Server Write $_");
-    close $clients[$_];
-    close $servers[$_];
+    ok("Server send pong, received ping");
+    close($_) for @clients;
+
+    @clients = map { scalar $_->accept } @servers;
+    for(@clients) {
+	print $_ "ping!\n";
+	<$_>; # read pong
+    }
+    ok("Client again init + write + read");
 }
 
-wait;
 
 
 sub ok {
-    print "ok #$_[0]\n";
+    my $line = (caller)[2];
+    print "ok # [$what]:$line $_[0]\n";
 }
-
-sub bail {
-	print "Bail Out! $IO::Socket::SSL::ERROR";
+sub diag {
+    my $msg = shift;
+    $msg =~s{^}{ #  [$what] }mg;
+    print STDERR $msg;
 }
