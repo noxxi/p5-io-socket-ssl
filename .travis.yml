@@ -1,14 +1,74 @@
-branches:
-  except:
-    - gh-pages
+os: linux
+dist: trusty
+sudo: false
+
 language: perl
+
 perl:
-  - "5.26"
-  - "5.24"
-  - "5.22"
-  - "5.20"
-  - "5.18"
-  - "5.16"
-  - "5.14"
-  - "5.12"
-  - "5.10"
+  - "5.28"
+
+env:
+  global:
+    - JOBS=3
+    - PERL_MM_USE_DEFAULT=1
+    - AUTOMATED_TESTING=1
+    - RELEASE_TESTING=0
+    - NET_SSLEAY=1.85
+  matrix:
+    - OPENSSL_VERSION=1.1.1a  NET_SSLEAY=mylatest
+    - OPENSSL_VERSION=1.1.1a
+    - OPENSSL_VERSION=1.1.0j
+    - OPENSSL_VERSION=1.0.2q
+
+cache:
+  directories:
+  - openssl_version_cache
+  - net_ssleay_cache
+
+before_install:
+  - mkdir -p openssl_version_cache/src
+  - mkdir -p openssl_version_cache/build
+  - mkdir -p net_ssleay_cache/src
+  - mkdir -p net_ssleay_cache/build
+
+install:
+  - if [ ! -f openssl_version_cache/src/openssl-$OPENSSL_VERSION.tar.gz ]; then wget -k -P openssl_version_cache/src https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz; fi
+  - if [ ! -f net_ssleay_cache/src/$NET_SSLEAY.zip ]; then wget -k -P net_ssleay_cache/src https://github.com/noxxi/p5-net-ssleay/archive/$NET_SSLEAY.zip; fi
+
+script:
+  - |
+    if [ ! -d openssl_version_cache/build/openssl-$OPENSSL_VERSION ]; then
+      if [ ! -d openssl_version_cache/src/openssl-$OPENSSL_VERSION ]; then
+        cd openssl_version_cache/src
+        tar xzf openssl-$OPENSSL_VERSION.tar.gz || exit 1
+        cd ../..
+      fi
+      if [ ! -d openssl_version_cache/src/openssl-$OPENSSL_VERSION ]; then
+        echo "ERROR Dir openssl_version_cache/src/openssl-$OPENSSL_VERSION does not exist" && exit 1
+      fi
+      cd openssl_version_cache/src/openssl-$OPENSSL_VERSION
+      if [ "$OPENSSL_VERSION" = "1.0.0s" ] || [ "$OPENSSL_VERSION" = "0.9.8zh" ]; then
+        ./Configure linux-x86_64 --prefix=$PWD/../../build/openssl-$OPENSSL_VERSION --openssldir=$PWD/../../build/openssl-$OPENSSL_VERSION/ssl shared -Wa,--noexecstack > build.log 2>&1 || (cat build.log && exit 1)
+        make > build.log 2>&1 || (cat build.log && exit 1)
+      else
+        ./Configure linux-x86_64 --prefix=$PWD/../../build/openssl-$OPENSSL_VERSION --openssldir=$PWD/../../build/openssl-$OPENSSL_VERSION/ssl enable-shared -Wa,--noexecstack > build.log 2>&1 || (cat build.log && exit 1)
+        make -j$JOBS > build.log 2>&1 || (cat build.log && exit 1)
+      fi
+      make install_sw > build.log 2>&1 || (cat build.log && exit 1)
+      make install_ssldirs > build.log 2>&1 || (cat build.log && exit 1)
+      cd ../../..
+    fi
+  - grep -H OPENSSL_VERSION_NUMBER $PWD/openssl_version_cache/build/openssl-$OPENSSL_VERSION/include/openssl/opensslv.h # show what version it thinks it is
+  - |
+    DIR=$PWD
+    cd net_ssleay_cache/build/
+    rm -rf p5-net-ssleay-$NET_SSLEAY
+    unzip ../src/$NET_SSLEAY.zip
+    cd p5-net-ssleay-$NET_SSLEAY
+    OPENSSL_PREFIX=$DIR/openssl_version_cache/build/openssl-$OPENSSL_VERSION LD_LIBRARY_PATH=$DIR/openssl_version_cache/build/openssl-$OPENSSL_VERSION/lib perl Makefile.PL
+    make test
+    cd $DIR
+  - |
+    export PERL5OPT=-M$DIR/net_ssleay_cache/build/p5-net-ssleay-$NET_SSLEAY/blib
+    make
+    make test
