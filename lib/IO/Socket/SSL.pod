@@ -1328,6 +1328,8 @@ the cache will be removed if new ones are added.
 This option does not effect the session cache a server has for it's clients,
 e.g. it does not affect SSL objects with SSL_server set.
 
+Note that session caching with TLS 1.3 needs at least Net::SSLeay 1.87.
+
 =item SSL_session_cache
 
 Specifies session cache object which should be used instead of creating a new.
@@ -1972,7 +1974,7 @@ You may use this to make IO::Socket::SSL automatically re-use a given session
 cache (unless specifically overridden in a call to new()).
 It accepts one argument, which should be an IO::Socket::SSL::Session_Cache
 object or similar (e.g. something which implements get_session, add_session and
-maybe del_session like IO::Socket::SSL::Session_Cache does).
+del_session like IO::Socket::SSL::Session_Cache does).
 See the SSL_session_cache option of new() for more details.
 Note that this sets the default cache globally, so use with caution.
 
