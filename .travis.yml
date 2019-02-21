@@ -69,7 +69,7 @@ script:
     make test
     cd $DIR
   - |
-    export PERL5OPT=-M$DIR/net_ssleay_cache/build/p5-net-ssleay-$NET_SSLEAY/blib
+    export PERL5OPT=-Mblib=$DIR/net_ssleay_cache/build/p5-net-ssleay-$NET_SSLEAY/blib
     perl Makefile.PL
     make
     make test
