@@ -56,7 +56,7 @@ install:
   - if [ ! -f openssl_version_cache/src/openssl-$OPENSSL_VERSION.tar.gz ]; then wget -k -P openssl_version_cache/src https://www.openssl.org/source/openssl-$OPENSSL_VERSION.tar.gz; fi
   - if [ ! -f net_ssleay_cache/src/$NET_SSLEAY.zip ]; then wget -k -P net_ssleay_cache/src https://github.com/noxxi/p5-net-ssleay/archive/$NET_SSLEAY.zip; fi
 
-script:
+before_script:
   - |
     if [ ! -d openssl_version_cache/build/openssl-$OPENSSL_VERSION ]; then
       if [ ! -d openssl_version_cache/src/openssl-$OPENSSL_VERSION ]; then
@@ -79,7 +79,6 @@ script:
       make install_ssldirs > build.log 2>&1 || (cat build.log && exit 1)
       cd ../../..
     fi
-  - grep -H OPENSSL_VERSION_NUMBER $PWD/openssl_version_cache/build/openssl-$OPENSSL_VERSION/include/openssl/opensslv.h # show what version it thinks it is
   - |
     DIR=$PWD
     cd net_ssleay_cache/build/
@@ -89,6 +88,8 @@ script:
     OPENSSL_PREFIX=$DIR/openssl_version_cache/build/openssl-$OPENSSL_VERSION LD_LIBRARY_PATH=$DIR/openssl_version_cache/build/openssl-$OPENSSL_VERSION/lib perl Makefile.PL
     make test
     cd $DIR
+
+script:
   - |
     export PERL5OPT=-Mblib=$DIR/net_ssleay_cache/build/p5-net-ssleay-$NET_SSLEAY/blib
     perl Makefile.PL
