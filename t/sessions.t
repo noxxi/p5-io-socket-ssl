@@ -53,7 +53,7 @@ sub client {
 	# versions of Net::SSLeay with support for SESSION_up_ref have also the
 	# other functionality needed for proper TLS 1.3 session handling
 	defined(&Net::SSLeay::SESSION_up_ref) ? ()
-	    : (SSL_version => 'SSLv23:!TLSv1_3'),
+	    : (SSL_version => 'SSLv23:!TLSv1_3:!SSLv3:!SSLv2'),
     );
 
     my $cache = $ctx->{session_cache} or do {
