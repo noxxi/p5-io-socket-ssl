@@ -57,9 +57,9 @@ my $clctx = IO::Socket::SSL::SSL_Context->new(
     SSL_key => $client_key,
     SSL_ca => [ $cert ],
 
-    # versions of Net::SSLeay with support for SESSION_dup have also the other
-    # functionality needed for proper TLS 1.3 session handling
-    defined(&Net::SSLeay::SESSION_dup) ? ()
+    # versions of Net::SSLeay with support for SESSION_up_ref have also the
+    # other functionality needed for proper TLS 1.3 session handling
+    defined(&Net::SSLeay::SESSION_up_ref) ? ()
 	: (SSL_version => 'SSLv23:!TLSv1_3'),
 );
 
