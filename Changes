@@ -1,3 +1,7 @@
+2.062
+- Enable X509_V_FLAG_PARTIAL_CHAIN if supported by Net::SSLeay (1.83+) and
+  OpenSSL (1.1.0+). This makes leaf certificates or intermediate certificates in
+  the trust store be usable as full trust anchors too.
 2.061
 - Support for TLS 1.3 session reuse. Needs Net::SSLeay 1.86+.
   Note that the previous (and undocumented) API for the session cache has been

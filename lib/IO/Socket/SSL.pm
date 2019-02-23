@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.061';
+our $VERSION = '2.062';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -71,6 +71,7 @@ my $can_tckt_keycb;  # TLS ticket key callback
 my $can_pha;         # do we support PHA
 my $session_upref;   # SSL_SESSION_up_ref is implemented
 my %sess_cb;         # SSL_CTX_sess_set_(new|remove)_cb
+my $check_partial_chain; # use X509_V_FLAG_PARTIAL_CHAIN if available
 
 BEGIN {
     $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x01000000;
@@ -113,6 +114,14 @@ BEGIN {
 	    new => \&Net::SSLeay::CTX_sess_set_new_cb,
 	    remove => \&Net::SSLeay::CTX_sess_set_remove_cb,
 	);
+    }
+
+    if (my $c = eval { Net::SSLeay::X509_V_FLAG_PARTIAL_CHAIN() }) {
+	$check_partial_chain = sub {
+	    my $ctx = shift;
+	    my $param = Net::SSLeay::CTX_get0_param($ctx);
+	    Net::SSLeay::X509_VERIFY_PARAM_set_flags($param, $c);
+	};
     }
 }
 
@@ -2436,6 +2445,9 @@ sub new {
 	}
 
 	Net::SSLeay::CTX_set_options($ctx,$ssl_op);
+
+	# enable X509_V_FLAG_PARTIAL_CHAIN if possible (OpenSSL 1.1.0+)
+	$check_partial_chain && $check_partial_chain->($ctx);
 
 	# if we don't set session_id_context if client certificate is expected
 	# client session caching will fail

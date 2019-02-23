@@ -74,6 +74,24 @@ my @swc = CERT_create(
 save('server-wildcard.pem',PEM_cert2string($swc[0]),PEM_key2string($swc[1]));
 
 
+my @subca = CERT_create(
+    CA => 1,
+    issuer => \@ca,
+    subject => { CN => 'IO::Socket::SSL Demo Sub CA' },
+    %time_valid,
+);
+save('test-subca.pem',PEM_cert2string($subca[0]));
+@server = CERT_create(
+    CA => 0,
+    subject => { CN => 'server.local' },
+    purpose => 'server',
+    issuer => \@subca,
+    %time_valid,
+);
+save('sub-server.pem',PEM_cert2string($server[0]).PEM_key2string($server[1]));
+
+
+
 my @cap = CERT_create(
     CA => 1,
     subject => { CN => 'IO::Socket::SSL::Intercept' },

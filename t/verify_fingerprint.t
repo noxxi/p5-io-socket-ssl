@@ -42,7 +42,10 @@ for my $test (
     [ $saddr2, [$ca2], undef, "accept ca2 for saddr2", 1 ],
     [ $saddr1, [$ca2], undef, "reject ca2 for saddr1", 0 ],
     [ $saddr1, [$ca1,$ca2], undef, "accept ca[12] for saddr1", 1 ],
-    [ $saddr1, [$cert1], undef, "reject non-ca cert1 as ca for saddr1", 0 ],
+    (defined &Net::SSLeay::X509_V_FLAG_PARTIAL_CHAIN ?
+	[ $saddr1, [$cert1], undef, "accept leaf cert1 as trust anchor for saddr1", 1 ] :
+	[ $saddr1, [$cert1], undef, "reject leaf cert1 as trust anchor for saddr1", 0 ]
+    )
 ) {
     my ($saddr,$certs,$fp,$what,$expect) = @$test;
     my $cafile;
