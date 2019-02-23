@@ -59,9 +59,9 @@ install:
     if [ ! -f openssl_version_cache/src/$OPENSSL_VERSION.tar.gz ]; then
       echo $OPENSSL_VERSION | grep -q libressl
       if [ $? -eq 0 ]; then
-	url=https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/$OPENSSL_VERSION.tar.gz
+        url=https://ftp.openbsd.org/pub/OpenBSD/LibreSSL/$OPENSSL_VERSION.tar.gz
       else
-	url=https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz
+        url=https://www.openssl.org/source/$OPENSSL_VERSION.tar.gz
       fi
       wget -k -P openssl_version_cache/src $url
     fi
