@@ -25,7 +25,8 @@ my $server = IO::Socket::SSL->new(
     SSL_ca_file => "certs/test-ca.pem",
     SSL_cert_file => 'certs/server-cert.pem',
     SSL_key_file => 'certs/server-key.pem',
-    SSL_ecdh_curve => 'P-521:P-384'
+    SSL_cipher_list => 'ECDHE',
+    SSL_ecdh_curve => 'P-521:P-384',
 );
 
 warn "\$!=$!, \$\@=$@, S\$SSL_ERROR=$SSL_ERROR" if ! $server;
