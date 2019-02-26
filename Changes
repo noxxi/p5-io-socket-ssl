@@ -1,3 +1,6 @@
+- Refuse to build if Net::SSLeay is compiled with one version of OpenSSL but
+  then linked against another API-incompatible version (ie. more than just the
+  patchlevel differs).
 2.062
 - Enable X509_V_FLAG_PARTIAL_CHAIN if supported by Net::SSLeay (1.83+) and
   OpenSSL (1.1.0+). This makes leaf certificates or intermediate certificates in

@@ -3,7 +3,6 @@
 use 5.008; 
 use ExtUtils::MakeMaker;
 
-
 # Test to make sure that Net::SSLeay can be properly seeded!
 unless (defined $ENV{EGD_PATH}) {
     foreach (qw(/var/run/egd-pool /dev/egd-pool /etc/egd-pool /etc/entropy)) {
@@ -64,6 +63,13 @@ my $yesno = sub {
     die sprintf(
 	"minimal required version for OpenSSL is 0.9.8, but your Net::SSLeay reports 0x%08x",
 	$openssl) if $openssl && $openssl < 0x00908000;
+
+    my $compiled = Net::SSLeay::OPENSSL_VERSION_NUMBER();
+    my $linked = Net::SSLeay::SSLeay();
+    if (($compiled ^ $linked) >= 0x00001000) {
+	die sprintf("API-different OpenSSL versions compiled in (0x%08x) vs linked (0x%08x)",
+	    $compiled,$linked);
+    }
 }
 
 # make sure that we have dualvar from the XS Version of Scalar::Util
