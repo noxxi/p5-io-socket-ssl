@@ -61,6 +61,7 @@ use constant SSL_OCSP_TRY_STAPLE  => 0b10000;
 # capabilities of underlying Net::SSLeay/openssl
 my $can_client_sni;  # do we support SNI on the client side
 my $can_server_sni;  # do we support SNI on the server side
+my $can_multi_cert;  # RSA and ECC certificate in same context
 my $can_npn;         # do we support NPN (obsolete)
 my $can_alpn;        # do we support ALPN
 my $can_ecdh;        # do we support ECDH key exchange
@@ -74,7 +75,7 @@ my %sess_cb;         # SSL_CTX_sess_set_(new|remove)_cb
 my $check_partial_chain; # use X509_V_FLAG_PARTIAL_CHAIN if available
 
 BEGIN {
-    $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x01000000;
+    $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x10000000;
     $can_server_sni = defined &Net::SSLeay::get_servername;
     $can_npn = defined &Net::SSLeay::P_next_proto_negotiated &&
 	! Net::SSLeay::constant("LIBRESSL_VERSION_NUMBER");
@@ -94,14 +95,16 @@ BEGIN {
 	defined &Net::SSLeay::CTX_set1_groups_list ? \&Net::SSLeay::CTX_set1_groups_list :
 	defined &Net::SSLeay::CTX_set1_curves_list ? \&Net::SSLeay::CTX_set1_curves_list :
 	undef;
-    $can_ocsp        = defined &Net::SSLeay::OCSP_cert2ids
+    $can_multi_cert = $can_ecdh
+	&& Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x10002000;
+    $can_ocsp = defined &Net::SSLeay::OCSP_cert2ids
 	# OCSP got broken in 1.75..1.77
 	&& ($Net::SSLeay::VERSION < 1.75 || $Net::SSLeay::VERSION > 1.77);
     $can_ocsp_staple = $can_ocsp
 	&& defined &Net::SSLeay::set_tlsext_status_type;
     $can_tckt_keycb  = defined &Net::SSLeay::CTX_set_tlsext_ticket_getkey_cb
 	&& $Net::SSLeay::VERSION >= 1.80;  
-    $can_pha         = defined &Net::SSLeay::CTX_set_post_handshake_auth;
+    $can_pha = defined &Net::SSLeay::CTX_set_post_handshake_auth;
 
     if (defined &Net::SSLeay::SESSION_up_ref) {
 	$session_upref = 1;
@@ -2051,6 +2054,7 @@ sub error {
 
 sub can_client_sni { return $can_client_sni }
 sub can_server_sni { return $can_server_sni }
+sub can_multi_cert { return $can_multi_cert }
 sub can_npn        { return $can_npn }
 sub can_alpn       { return $can_alpn }
 sub can_ecdh       { return $can_ecdh }
@@ -2423,16 +2427,32 @@ sub new {
 	    }
 	}
 	while (my ($host,$v) = each %sni) {
-	    $ctx{$host} = { %$arg_hash, %$v };
+	    $ctx{$host} = $host =~m{%} ? $v : { %$arg_hash, %$v };
 	}
     }
     $ctx{''} = $arg_hash if ! %ctx;
 
-    while (my ($host,$arg_hash) = each %ctx) {
-	# replace value in %ctx with real context
-	my $ctx = $ctx_new_sub->() or return
+    for my $host (sort keys %ctx) {
+	my $arg_hash = delete $ctx{$host};
+	my $ctx;
+	if ($host =~m{^([^%]*)%}) {
+	    $ctx = $ctx{$1} or return IO::Socket::SSL->error(
+		"SSL Context init for $host failed - no config for $1");
+	    if (my @k = grep { !m{^SSL_(?:cert|key)(?:_file)?$} }
+		keys %$arg_hash) {
+		return IO::Socket::SSL->error(
+		    "invalid keys @k in configuration '$host' of additional certs");
+	    }
+	    $can_multi_cert or return IO::Socket::SSL->error(
+		"no support for both RSA and ECC certificate in same context");
+	    $host = $1;
+	    goto just_configure_certs;
+	}
+
+	$ctx = $ctx_new_sub->() or return
 	    IO::Socket::SSL->error("SSL Context init failed");
 	$CTX_CREATED_IN_THIS_THREAD{$ctx} = 1 if $use_threads;
+	$ctx{$host} = $ctx; # replace value in %ctx with real context
 
 	# SSL_OP_CIPHER_SERVER_PREFERENCE
 	$ssl_op |= 0x00400000 if $arg_hash->{SSL_honor_cipher_order};
@@ -2573,6 +2593,7 @@ sub new {
 	Net::SSLeay::CTX_set_default_passwd_cb($ctx,$arg_hash->{SSL_passwd_cb})
 	    if $arg_hash->{SSL_passwd_cb};
 
+	just_configure_certs:
 	my ($havekey,$havecert);
 	if ( my $x509 = $arg_hash->{SSL_cert} ) {
 	    # binary, e.g. X509*
@@ -2647,9 +2668,6 @@ sub new {
 
         Net::SSLeay::CTX_set_post_handshake_auth($ctx,1)
             if (!$is_server && $can_pha && $havecert && $havekey);
-
-	# replace arg_hash with created context
-	$ctx{$host} = $ctx;
     }
 
     if ($arg_hash->{SSL_server}) {

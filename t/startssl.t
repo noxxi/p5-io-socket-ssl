@@ -5,11 +5,25 @@ use warnings;
 use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
+use IO::Socket::SSL::Utils;
 use IO::Select;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 $|=1;
 print "1..21\n";
+
+my $getfp = do {
+    my (%file2fp);
+    Net::SSLeay::SSLeay_add_ssl_algorithms();
+    my $sha256 = Net::SSLeay::EVP_get_digestbyname('sha256') or die;
+    sub {
+	my $file = shift;
+	return $file2fp{$file} ||= do {
+	    my $cert = PEM_file2cert($file);
+	    'sha256$'.unpack('H*',Net::SSLeay::X509_digest($cert, $sha256));
+	};
+    }
+};
 
 
 my $server = IO::Socket::INET->new(
@@ -50,7 +64,7 @@ if ( $pid == 0 ) {
     $client->sock_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
     ok("client local certificate issuer");
     $client->get_fingerprint('sha256',$client->sock_certificate)
-	eq 'sha256$470b7a305da96d7bebc97d074049ef79c150a5fc93c2abe16aa7e0f713113d4c'
+	eq $getfp->('certs/client-cert.pem')
 	or print "not ";
     ok("client local certificate fingerprint");
 
@@ -59,7 +73,7 @@ if ( $pid == 0 ) {
     $client->peer_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
     ok("client peer certificate issuer");
     $client->get_fingerprint()
-	eq 'sha256$977b1b34dfbdc32aa8046217d4f11eb5f764a92d1ffd556fdf2a3106f43e82d8'
+	eq $getfp->('certs/server-cert.pem')
 	or print "not ";
     ok("client peer certificate fingerprint");
 
@@ -91,7 +105,7 @@ ok("server local certificate subject");
 $csock->sock_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
 ok("server local certificate issuer");
 $csock->get_fingerprint('sha256',$csock->sock_certificate)
-    eq 'sha256$977b1b34dfbdc32aa8046217d4f11eb5f764a92d1ffd556fdf2a3106f43e82d8'
+    eq $getfp->('certs/server-cert.pem')
     or print "not ";
 ok("server local certificate fingerprint");
 
@@ -100,7 +114,7 @@ ok("server peer certificate subject");
 $csock->peer_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
 ok("server peer certificate issuer");
 $csock->get_fingerprint()
-    eq 'sha256$470b7a305da96d7bebc97d074049ef79c150a5fc93c2abe16aa7e0f713113d4c'
+    eq $getfp->('certs/client-cert.pem')
     or print "not ";
 ok("server peer certificate fingerprint");
 

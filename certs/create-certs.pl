@@ -45,6 +45,18 @@ save('server2-cert.pem',PEM_cert2string($server[0]));
 save('server2-key.pem',PEM_key2string($server[1]));
 $printfp->(server2 => $server[0]);
 
+@server = CERT_create(
+    CA => 0,
+    subject => { CN => 'server-ecc.local' },
+    purpose => 'server',
+    issuer => \@ca,
+    key => KEY_create_ec(),
+    %time_valid,
+);
+save('server-ecc-cert.pem',PEM_cert2string($server[0]));
+save('server-ecc-key.pem',PEM_key2string($server[1]));
+$printfp->('server-ecc' => $server[0]);
+
 
 my @client = CERT_create(
     CA => 0,

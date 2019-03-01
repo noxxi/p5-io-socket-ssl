@@ -963,6 +963,13 @@ If your SSL server should be able to use different certificates on the same IP
 address, depending on the name given by SNI, you can use a hash reference
 instead of a file with C<<hostname => cert_file>>.
 
+If your SSL server should be able to use both RSA and ECDSA certificates for the
+same domain/IP a similar hash reference like with SNI is given. The
+domain names used to specify the additional certificates should be
+C<hostname%whatever>, i.e.  C<hostname%ecc> or similar. To let the server pick
+the certificate based on the clients cipher preference also
+C<SSL_honor_cipher_order> should be set to false.
+
 In case certs and keys are needed but not given it might fall back to builtin
 defaults, see "Defaults for Cert, Key and CA".
 
