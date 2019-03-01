@@ -111,4 +111,4 @@ script:
     export PERL5OPT=-Mblib=$DIR/net_ssleay_cache/build/p5-net-ssleay-$NET_SSLEAY/blib
     perl Makefile.PL
     make
-    make test
+    make TEST_VERBOSE=1 test
