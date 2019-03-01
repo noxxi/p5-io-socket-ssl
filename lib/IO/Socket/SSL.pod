@@ -966,9 +966,9 @@ instead of a file with C<<hostname => cert_file>>.
 If your SSL server should be able to use both RSA and ECDSA certificates for the
 same domain/IP a similar hash reference like with SNI is given. The
 domain names used to specify the additional certificates should be
-C<hostname%whatever>, i.e.  C<hostname%ecc> or similar. To let the server pick
-the certificate based on the clients cipher preference also
-C<SSL_honor_cipher_order> should be set to false.
+C<hostname%whatever>, i.e.  C<hostname%ecc> or similar. This needs at least
+OpenSSL 1.0.2. To let the server pick the certificate based on the clients
+cipher preference C<SSL_honor_cipher_order> should be set to false.
 
 In case certs and keys are needed but not given it might fall back to builtin
 defaults, see "Defaults for Cert, Key and CA".
@@ -980,15 +980,19 @@ Examples:
 
  SSL_cert_file => {
     "foo.example.org" => 'foo-cert.pem',
+    "foo.example.org%ecc" => 'foo-ecc-cert.pem',
     "bar.example.org" => 'bar-cert.pem',
     # used when nothing matches or client does not support SNI
     '' => 'default-cert.pem',
- }
+    '%ecc' => 'default-ecc-cert.pem',
+ },
  SSL_key_file => {
     "foo.example.org" => 'foo-key.pem',
+    "foo.example.org%ecc" => 'foo-ecc-key.pem',
     "bar.example.org" => 'bar-key.pem',
     # used when nothing matches or client does not support SNI
     '' => 'default-key.pem',
+    '%ecc' => 'default-ecc-key.pem',
  }
 
 =item SSL_passwd_cb

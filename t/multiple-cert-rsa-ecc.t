@@ -88,6 +88,9 @@ if ( $pid == 0 ) {
 	    SSL_hostname => $host,
 	    SSL_ca_file => 'certs/test-ca.pem',
 	    SSL_cipher_list => $ciphers,
+	    # don't use TLS 1.3 since the ciphers there don't specifify the
+	    # authentication mechanism
+	    SSL_version => 'SSLv23:!TLSv1_3',
 	);
 
 	my $fp = $client ? $fp2k{$client->get_fingerprint('sha256')} : 'FAIL';
