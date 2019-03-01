@@ -1,3 +1,6 @@
+2.063
+- support for both RSA and ECDSA certificate on same domain
+- update PublicSuffix
 - Refuse to build if Net::SSLeay is compiled with one version of OpenSSL but
   then linked against another API-incompatible version (ie. more than just the
   patchlevel differs).
