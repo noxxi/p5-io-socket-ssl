@@ -74,8 +74,13 @@ my $session_upref;   # SSL_SESSION_up_ref is implemented
 my %sess_cb;         # SSL_CTX_sess_set_(new|remove)_cb
 my $check_partial_chain; # use X509_V_FLAG_PARTIAL_CHAIN if available
 
+my $openssl_version;
+my $netssleay_version;
+
 BEGIN {
-    $can_client_sni = Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x10000000;
+    $openssl_version = Net::SSLeay::OPENSSL_VERSION_NUMBER();
+    $netssleay_version = do { no warnings; $Net::SSLeay::VERSION + 0.0; };
+    $can_client_sni = $openssl_version >= 0x10000000;
     $can_server_sni = defined &Net::SSLeay::get_servername;
     $can_npn = defined &Net::SSLeay::P_next_proto_negotiated &&
 	! Net::SSLeay::constant("LIBRESSL_VERSION_NUMBER");
@@ -83,12 +88,12 @@ BEGIN {
 	# available but removed the actual functionality from these functions.
     $can_alpn = defined &Net::SSLeay::CTX_set_alpn_protos;
     $can_ecdh =
-	(Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x1010000f) ? 'auto' :
+	($openssl_version >= 0x1010000f) ? 'auto' :
 	defined(&Net::SSLeay::CTX_set_ecdh_auto) ? 'can_auto' :
 	(defined &Net::SSLeay::CTX_set_tmp_ecdh &&
 	    # There is a regression with elliptic curves on 1.0.1d with 64bit
 	    # http://rt.openssl.org/Ticket/Display.html?id=2975
-	    ( Net::SSLeay::OPENSSL_VERSION_NUMBER() != 0x1000104f
+	    ( $openssl_version != 0x1000104f
 	    || length(pack("P",0)) == 4 )) ? 'tmp_ecdh' :
 	    '';
     $set_groups_list =
@@ -96,14 +101,14 @@ BEGIN {
 	defined &Net::SSLeay::CTX_set1_curves_list ? \&Net::SSLeay::CTX_set1_curves_list :
 	undef;
     $can_multi_cert = $can_ecdh
-	&& Net::SSLeay::OPENSSL_VERSION_NUMBER() >= 0x10002000;
+	&& $openssl_version >= 0x10002000;
     $can_ocsp = defined &Net::SSLeay::OCSP_cert2ids
 	# OCSP got broken in 1.75..1.77
-	&& ($Net::SSLeay::VERSION < 1.75 || $Net::SSLeay::VERSION > 1.77);
+	&& ($netssleay_version < 1.75 || $netssleay_version > 1.77);
     $can_ocsp_staple = $can_ocsp
 	&& defined &Net::SSLeay::set_tlsext_status_type;
     $can_tckt_keycb  = defined &Net::SSLeay::CTX_set_tlsext_ticket_getkey_cb
-	&& $Net::SSLeay::VERSION >= 1.80;  
+	&& $netssleay_version >= 1.80;  
     $can_pha = defined &Net::SSLeay::CTX_set_post_handshake_auth;
 
     if (defined &Net::SSLeay::SESSION_up_ref) {
@@ -1615,7 +1620,7 @@ sub dump_peer_certificate {
 }
 
 if ( defined &Net::SSLeay::get_peer_cert_chain
-    && $Net::SSLeay::VERSION >= 1.58 ) {
+    && $netssleay_version >= 1.58 ) {
     *peer_certificates = sub {
 	my $self = shift;
 	my $ssl = $self->_get_ssl_object || return;
