@@ -54,17 +54,15 @@ my $yesno = sub {
     }
 }
 
-{
+if (my $compiled = eval {
+    require Net::SSLeay;
+    Net::SSLeay::OPENSSL_VERSION_NUMBER()
+}) {
     # don't support too old OpenSSL versions anymore, only causes trouble
-    my $openssl = eval { 
-	require Net::SSLeay; 
-	Net::SSLeay::OPENSSL_VERSION_NUMBER()
-    };
     die sprintf(
 	"minimal required version for OpenSSL is 0.9.8, but your Net::SSLeay reports 0x%08x",
-	$openssl) if $openssl && $openssl < 0x00908000;
+	$compiled) if $compiled < 0x00908000;
 
-    my $compiled = Net::SSLeay::OPENSSL_VERSION_NUMBER();
     my $linked = Net::SSLeay::SSLeay();
     if (($compiled ^ $linked) >= 0x00001000) {
 	die sprintf("API-different OpenSSL versions compiled in (0x%08x) vs linked (0x%08x)",
@@ -154,6 +152,12 @@ WriteMakefile(
 		homepage    => 'https://github.com/noxxi/p5-io-socket-ssl',
 		bugtracker  => 'https://rt.cpan.org/Dist/Display.html?Queue=IO-Socket-SSL',
 	    },
+	},
+    ):(),
+    $ExtUtils::MakeMaker::VERSION >= 6.52 ? (
+	'CONFIGURE_REQUIRES' => {
+	    "ExtUtils::MakeMaker" => 0,
+	    'Net::SSLeay' => 1.46,
 	},
     ):(),
 );
