@@ -77,6 +77,8 @@ my $check_partial_chain; # use X509_V_FLAG_PARTIAL_CHAIN if available
 my $auto_retry;      # (clear|set)_mode SSL_MODE_AUTO_RETRY with OpenSSL 1.1.1+ with non-blocking
 my $ssl_mode_release_buffers = 0; # SSL_MODE_RELEASE_BUFFERS if available
 my $can_ciphersuites; # support for SSL_CTX_set_ciphersuites (TLS 1.3)
+my $can_client_psk; # work as PSK client
+my $can_server_psk; # work as PSK server
 
 my $openssl_version;
 my $netssleay_version;
@@ -115,6 +117,8 @@ BEGIN {
 	&& $netssleay_version >= 1.80;
     $can_pha = defined &Net::SSLeay::CTX_set_post_handshake_auth;
     $can_ciphersuites = defined &Net::SSLeay::CTX_set_ciphersuites;
+    $can_client_psk = defined &Net::SSLeay::CTX_set_psk_client_callback;
+    $can_server_psk = defined &Net::SSLeay::CTX_set_psk_server_callback;
 
     if (defined &Net::SSLeay::SESSION_up_ref) {
 	$session_upref = 1;
@@ -2123,6 +2127,12 @@ sub can_ticket_keycb { return $can_tckt_keycb }
 sub can_pha        { return $can_pha }
 sub can_partial_chain { return $check_partial_chain && 1 }
 sub can_ciphersuites { return $can_ciphersuites }
+sub can_psk {
+    my %can;
+    $can{client}=1 if $can_client_psk;
+    $can{server}=1 if $can_server_psk;
+    return %can ? \%can : undef
+}
 
 sub DESTROY {
     my $self = shift or return;
@@ -2574,6 +2584,44 @@ sub new {
 	    my $cb = $arg_hash->{SSL_ticket_keycb};
 	    ($cb,my $arg) = ref($cb) eq 'CODE' ? ($cb):@$cb;
 	    Net::SSLeay::CTX_set_tlsext_ticket_getkey_cb($ctx,$cb,$arg);
+	}
+
+	if ($arg_hash->{SSL_psk}) {
+	    my $psk = $arg_hash->{SSL_psk};
+	    if ($arg_hash->{SSL_server}) {
+		$can_server_psk or return IO::Socket::SSL->_internal_error(
+		    "no support for server side PSK");
+		Net::SSLeay::CTX_set_psk_server_callback($ctx, sub {
+		    my ($ssl,$identity,$psklen) = @_;
+		    if (ref($psk) eq 'HASH') {
+			return $psk->{$identity} || $psk->{''} or return
+			    IO::Socket::SSL->_internal_error(
+			    "no PSK for given identity '$identity' and no default");
+		    } else {
+			return $psk;
+		    }
+		});
+	    } else {
+		$can_client_psk or return IO::Socket::SSL->_internal_error(
+		    "no support for client side PSK");
+		Net::SSLeay::CTX_set_psk_client_callback($ctx, sub {
+		    my $hint = shift;
+		    my ($i,$p);
+		    if (ref($psk) eq 'HASH') {
+			$hint //= '';
+			$p = $psk->{$hint} or return IO::Socket::SSL->_internal_error(
+			    "no PSK for given hint '$hint'");
+			$i = $hint;
+		    } elsif (ref($psk)) { # [identity,psk]
+			($i,$p) = @$psk;
+		    } else {
+			($i,$p) = ('io_socket_ssl', $psk)
+		    }
+		    # for some reason this expects the PSK in hex whereas the server
+		    # side function expects the PSK in binary
+		    return ($i, unpack("H*",$p));
+		});
+	    }
 	}
 
 	# Try to apply SSL_ca even if SSL_verify_mode is 0, so that they can be

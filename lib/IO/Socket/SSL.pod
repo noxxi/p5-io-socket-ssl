@@ -1333,6 +1333,36 @@ C<\%entry>) where entry is the hash representation of the OCSP response with
 fields like C<nextUpdate>. The default implementation of the cache will consider
 responses valid as long as C<nextUpdate> is less then the current time.
 
+=item SSL_psk
+
+PSK to use instead of certificate. Requires the peer to use the same PSK.
+
+On the client side the identity and psk need to be provided as array-ref with
+C<<[identity,psk]>>. Alternatively only the psk might be provided, in which case
+C<io_socket_ssl> is used as identity.
+On the server side a single psk might be given which will then be use no matter
+which identity hint was given by the client. Alternatively a hash-ref can be
+provided with identity as key and psk as value to serve clients with different
+psk based on the identity hint. The special identity C<''> is used to set a
+default psk.
+
+To use PSK make sure to have the relevant ciphers enabled. With TLS 1.3 this
+is implicit, but with TLS 1.2 and lower explicitly add PSK to C<SSL_cipher_list>
+since it is not enabled by default.
+
+Note that the given psk is expected to be binary and not hexadecimal as some
+other tools do. To convert hex to binary use C<pack("H*",hexstring)>.
+Also note that the error messages one gets if either identity or psk don't match
+the configuration in the peer can be useless ("handshake failure") or misleading
+("bad mac").
+
+PSK support needs respective API functionality in Net::SSLeay, which was
+only fully included in 1.94. C<<IO::Socket::SSL->can_psk()>> returns undef if
+functionality is not available and a hash-ref with details otherwise: key
+C<client> in the hash signals support for using PSK in a SSL client (available
+since Net::SSLeay 1.82) while key server for support of PSK in SSL server (since
+Net::SSLeay 1.94).
+
 =item SSL_reuse_ctx
 
 If you have already set the above options for a previous instance of
