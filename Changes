@@ -1,3 +1,9 @@
+2.064
+- make algorithm for fingerprint optional, i.e. detect based on length of
+  fingerprint - https://rt.cpan.org/Ticket/Display.html?id=127773
+- fix t/sessions.t and improve stability of t/verify_hostname.t on windows
+- use CTX_set_ecdh_auto when needed (OpenSSL 1.0.2) if explicit curves are set
+- update fingerprints for live tests
 2.063
 - support for both RSA and ECDSA certificate on same domain
 - update PublicSuffix

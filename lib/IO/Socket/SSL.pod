@@ -920,11 +920,17 @@ unknown CA and you really want to accept it, but don't want to disable
 verification at all. In this case you can specify the fingerprint of the
 certificate as C<'algo$hex_fingerprint'>. C<algo> is a fingerprint algorithm
 supported by OpenSSL, e.g. 'sha1','sha256'... and C<hex_fingerprint> is the
-hexadecimal representation of the binary fingerprint.
+hexadecimal representation of the binary fingerprint. Any colons inside the
+hex string will be ignored.
+
 If you want to use the fingerprint of the pubkey inside the certificate instead
 of the certificate use the syntax C<'algo$pub$hex_fingerprint'> instead.
 To get the fingerprint of an established connection you can use
 C<get_fingerprint>.
+
+It is also possible to skip C<algo$>, i.e. only specifiy the fingerprint. In
+this case the likely algorithms will be automatically detected based on the
+length of the digest string.
 
 You can specify a list of fingerprints in case you have several acceptable
 certificates.

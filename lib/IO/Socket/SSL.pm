@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.063';
+our $VERSION = '2.064';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -2720,6 +2720,8 @@ sub new {
 	    } elsif ($set_groups_list) {
 		$set_groups_list->($_,$curve) or return IO::Socket::SSL->error(
 		    "failed to set ECDH groups/curves on context");
+		# needed for OpenSSL 1.0.2 if ($can_ecdh eq 'can_auto') {
+		Net::SSLeay::CTX_set_ecdh_auto($_,1) if $can_ecdh eq 'can_auto';
 	    } elsif ($curve =~m{:}) {
 		return IO::Socket::SSL->error(
 		    "SSL_CTX_groups_list or SSL_CTX_curves_list not implemented");
