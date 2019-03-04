@@ -17,14 +17,10 @@ print "1..$numtests\n";
 
 my $what = 'server';
 my @servers = map {
-    IO::Socket::SSL->new(
+    IO::Socket::INET->new(
 	LocalAddr => '127.0.0.1',
 	LocalPort => 0,
 	Listen => 2,
-	Timeout => 30,
-	SSL_cert_file => "certs/server-cert.pem",
-	SSL_key_file => "certs/server-key.pem",
-	SSL_ca_file => "certs/test-ca.pem",
     )
 } (1..3);
 
@@ -64,12 +60,11 @@ sub client {
     my $dump_cache = $DEBUG ? sub { diag($cache->_dump) } : sub {};
 
     IO::Socket::SSL::set_default_context($ctx);
+    my @clients;
+    push @clients, IO::Socket::SSL->new(PeerAddr => $saddr[0], Domain => AF_INET);
+    push @clients, IO::Socket::SSL->new(PeerAddr => $saddr[1], Domain => AF_INET);
     my $sock3 = IO::Socket::INET->new($saddr[2]);
-    my @clients = (
-	IO::Socket::SSL->new(PeerAddr => $saddr[0], Domain => AF_INET),
-	IO::Socket::SSL->new(PeerAddr => $saddr[1], Domain => AF_INET),
-	IO::Socket::SSL->start_SSL($sock3),
-    );
+    push @clients, IO::Socket::SSL->start_SSL($sock3);
 
     if ( grep { !$_ } @clients >0 ) {
 	print "not ok \# Client init $SSL_ERROR\n";
@@ -114,11 +109,32 @@ sub client {
 }
 
 sub server {
-    my @clients = map { scalar $_->accept } @servers;
+    my @ctx = map {
+	IO::Socket::SSL::SSL_Context->new(
+	    SSL_server => 1,
+	    SSL_cert_file => "certs/server-cert.pem",
+	    SSL_key_file => "certs/server-key.pem",
+	    SSL_ca_file => "certs/test-ca.pem",
+	);
+    } @servers;
+    my @clients;
+    my $accept_all = sub {
+	@clients = map { undef } @servers;
+	for(my $i=0; $i<@servers; $i++) {
+	    my $cl = $servers[$i]->accept or next;
+	    IO::Socket::SSL->start_SSL($cl,
+		SSL_server => 1,
+		SSL_reuse_ctx => $ctx[$i]
+	    ) or next;
+	    $clients[$i] = $cl;
+	}
+    };
+    &$accept_all;
     if ( grep { !$_ } @clients > 0 ) {
 	print "not ok \# Client init\n";
 	exit;
     }
+
     ok("Client init");
     for(@clients) {
 	print $_ "ping!\n";
@@ -127,7 +143,7 @@ sub server {
     ok("Server send pong, received ping");
     close($_) for @clients;
 
-    @clients = map { scalar $_->accept } @servers;
+    &$accept_all;
     for(@clients) {
 	print $_ "ping!\n";
 	<$_>; # read pong

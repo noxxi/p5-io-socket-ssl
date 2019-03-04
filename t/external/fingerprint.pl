@@ -36,37 +36,37 @@ my $fingerprints= [
     port => 443
   },
   {
-    fingerprint => 'sha1$pub$92447765c3dde2634366d661b86810f301961c9b',
+    fingerprint => 'sha1$pub$56f745d484d13c95ad58142ef4d1cc2f11c073f6',
     host => 'www.yahoo.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$83ac9a7311a410d3d819a45ec1f7460c7adfe4c0',
+    fingerprint => 'sha1$pub$52509cfecdc8264c21da6279360e89c1be1bc30a',
     host => 'www.comdirect.de',
     port => 443,
     subject_hash_ca => '02265526'
   },
   {
-    fingerprint => 'sha1$pub$458e905cd62b9ce9f8c5eb7298f62871de89c81f',
+    fingerprint => 'sha1$pub$c2ee1cc0963c55286bcd549f1d782c5557602f4c',
     host => 'meine.deutsche-bank.de',
     port => 443,
     subject_hash_ca => 'c01cdfa2'
   },
   {
-    fingerprint => 'sha1$pub$9f627bb2880eee1b79e06924e5ba3f47a60b02f0',
+    fingerprint => 'sha1$pub$5414c379b16298b2352812d7f5c7f4b576da9efa',
     host => 'www.twitter.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$c0fd74f57dcbc627f103d362a245d7841c152108',
+    fingerprint => 'sha1$pub$7b89d1ee6a48e3abc504ee1642dbc7d0fc74965b',
     host => 'www.facebook.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$0a2a638d8484c2be34fd9534cf111d48b91885b0',
+    fingerprint => 'sha1$pub$9c070a464b2eb1ee315120bcd0a0ba82e711be9c',
     host => 'www.live.com',
     port => 443,
     subject_hash_ca => '653b494a'

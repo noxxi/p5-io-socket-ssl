@@ -19,14 +19,11 @@ my $max = 42;
 $max+=3 if $can_idn;
 print "1..$max\n";
 
-my $server = IO::Socket::SSL->new(
+my $server = IO::Socket::INET->new(
     LocalAddr => '127.0.0.1',
     LocalPort => 0,
     Listen => 2,
     ReuseAddr => 1,
-    SSL_ca_file => "certs/test-ca.pem",
-    SSL_cert_file => "certs/server-wildcard.pem",
-    SSL_key_file => "certs/server-wildcard.pem",
 );
 warn "\$!=$!, \$\@=$@, S\$SSL_ERROR=$SSL_ERROR" if ! $server;
 print "not ok\n", exit if !$server;
@@ -35,7 +32,6 @@ my $saddr = $server->sockhost.':'.$server->sockport;
 
 defined( my $pid = fork() ) || die $!;
 if ( $pid == 0 ) {
-
     close($server);
     my $client = IO::Socket::SSL->new(
 	PeerAddr => $saddr,
@@ -101,13 +97,24 @@ if ( $pid == 0 ) {
     exit;
 }
 
-my $csock = $server->accept;
+my $accept = sub {
+    my $csock = $server->accept;
+    IO::Socket::SSL->start_SSL($csock,
+	SSL_server => 1,
+	SSL_ca_file => "certs/test-ca.pem",
+	SSL_cert_file => "certs/server-wildcard.pem",
+	SSL_key_file => "certs/server-wildcard.pem",
+    );
+};
+
+my $csock = &$accept;
 wait;
 
 # try with implicit checking
 # Should succeed
 defined( $pid = fork() ) || die $!;
 if ( $pid == 0 ) {
+    close($server);
     IO::Socket::SSL->new(
 	PeerAddr => $saddr,
 	Domain => AF_INET,
@@ -119,12 +126,13 @@ if ( $pid == 0 ) {
     ok("implicit hostname check www.server.local");
     exit;
 }
-$csock = $server->accept;
+$csock = &$accept;
 wait;
 
 # Should fail
 defined( $pid = fork() ) || die $!;
 if ( $pid == 0 ) {
+    close($server);
     if (IO::Socket::SSL->new(
 	PeerAddr => $saddr,
 	Domain => AF_INET,
@@ -141,7 +149,7 @@ if ( $pid == 0 ) {
     ok("implicit hostname check does.not.match.server.local");
     exit;
 }
-$csock = $server->accept;
+$csock = &$accept;
 wait;
 
 
