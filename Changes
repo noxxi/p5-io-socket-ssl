@@ -1,3 +1,10 @@
+2.065
+- make sure that Net::SSLeay::CTX_get0_param is defined before using
+  X509_V_FLAG_PARTIAL_CHAIN. Net::SSLeay 1.85 defined only the second with
+  LibreSSL 2.7.4 but not the first
+  https://rt.cpan.org/Ticket/Display.html?id=128716
+- prefer AES for server side cipher default since it is usually
+  hardware-accelerated
 2.064
 - make algorithm for fingerprint optional, i.e. detect based on length of
   fingerprint - https://rt.cpan.org/Ticket/Display.html?id=127773
