@@ -6,7 +6,7 @@ use Net::SSLeay;
 use Socket;
 use IO::Socket::SSL;
 
-if (!eval { Net::SSLeay::X509_V_FLAG_PARTIAL_CHAIN() }) {
+if (!IO::Socket::SSL->can_partial_chain) {
     print "1..0 # no support for X509_V_FLAG_PARTIAL_CHAIN\n";
     exit(0);
 }

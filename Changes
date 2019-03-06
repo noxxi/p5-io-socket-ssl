@@ -1,3 +1,7 @@
+2.066
+- fix test t/verify_partial_chain.t by using the newly exposed function
+  can_partial_chain instead of guessing (wrongly) if the functionality is
+  available
 2.065
 - make sure that Net::SSLeay::CTX_get0_param is defined before using
   X509_V_FLAG_PARTIAL_CHAIN. Net::SSLeay 1.85 defined only the second with

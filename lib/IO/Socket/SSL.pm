@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.065';
+our $VERSION = '2.066';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -2069,6 +2069,7 @@ sub can_ipv6       { return CAN_IPV6 }
 sub can_ocsp       { return $can_ocsp }
 sub can_ticket_keycb { return $can_tckt_keycb }
 sub can_pha        { return $can_pha }
+sub can_partial_chain { return $check_partial_chain && 1 }
 
 sub DESTROY {
     my $self = shift or return;
