@@ -73,6 +73,7 @@ my $can_pha;         # do we support PHA
 my $session_upref;   # SSL_SESSION_up_ref is implemented
 my %sess_cb;         # SSL_CTX_sess_set_(new|remove)_cb
 my $check_partial_chain; # use X509_V_FLAG_PARTIAL_CHAIN if available
+my $auto_retry;      # (clear|set)_mode SSL_MODE_AUTO_RETRY with OpenSSL 1.1.1+ with non-blocking
 
 my $openssl_version;
 my $netssleay_version;
@@ -131,6 +132,30 @@ BEGIN {
 	    my $param = Net::SSLeay::CTX_get0_param($ctx);
 	    Net::SSLeay::X509_VERIFY_PARAM_set_flags($param, $c);
 	};
+    }
+
+    if (!defined &Net::SSLeay::clear_mode) {
+	# assume SSL_CTRL_CLEAR_MODE being 78 since it was always this way
+	*Net::SSLeay::clear_mode = sub {
+	    my ($ctx,$opt) = @_;
+	    Net::SSLeay::ctrl($ctx,78,$opt,0);
+	};
+    }
+
+    if ($openssl_version >= 0x10101000) {
+	# openssl 1.1.1 enabled SSL_MODE_AUTO_RETRY by default, which is bad for
+	# non-blocking sockets
+	my $mode_auto_retry =
+	    # was always 0x00000004
+	    eval { Net::SSLeay::MODE_AUTO_RETRY() } || 0x00000004;
+	$auto_retry = sub {
+	    my ($ssl,$on) = @_;
+	    if ($on) {
+		Net::SSLeay::set_mode($ssl, $mode_auto_retry);
+	    } else {
+		Net::SSLeay::clear_mode($ssl, $mode_auto_retry);
+	    }
+	}
     }
 }
 
@@ -854,6 +879,7 @@ sub connect_SSL {
     } else {
 	# timeout does not apply because invalid or socket non-blocking
 	$timeout = undef;
+	$auto_retry && $auto_retry->($ssl,$self->blocking);
     }
 
     my $start = defined($timeout) && time();
@@ -1066,6 +1092,7 @@ sub accept_SSL {
     } else {
 	# timeout does not apply because invalid or socket non-blocking
 	$timeout = undef;
+	$auto_retry && $auto_retry->($ssl,$socket->blocking);
     }
 
     my $start = defined($timeout) && time();
@@ -1138,6 +1165,14 @@ sub accept_SSL {
 
 
 ####### I/O subroutines ########################
+
+if ($auto_retry) {
+    *blocking = sub {
+	my $self = shift;
+	{ @_ && $auto_retry->($self->_get_ssl_object || last, @_); }
+	return $self->SUPER::blocking(@_);
+    };
+}
 
 sub _generic_read {
     my ($self, $read_func, undef, $length, $offset) = @_;
