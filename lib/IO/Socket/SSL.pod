@@ -426,6 +426,21 @@ Another way might be if you try to sysread at least 16kByte all the time.
 from only a single SSL frame you can guarantee that there are no pending
 data.
 
+Additionally, contrary to plain sockets the  data delivered on the socket are
+not necessarily application payload.
+It might be a TLS handshake, it might just be the beginning of a TLS record or
+it might be TLS session tickets which are send after the TLS handshake in TLS
+1.3.
+In such situations select will return that data are available for read since it
+only looks at the plain socket.
+A sysread on the IO::Socket::SSL socket will not return any data though since it
+is an abstraction which only returns application data.
+This causes the sysread to hang in case the socket was blocking or to return
+an error with EAGAIN on non-blocking sockets.
+Applications using select or similar should therefore set the socket to
+non-blocking and also expect that the sysread might temporarily fail with
+EAGAIN.
+
 See also L</"Using Non-Blocking Sockets">.
 
 =item *
