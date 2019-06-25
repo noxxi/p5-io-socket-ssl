@@ -22,6 +22,7 @@ use Exporter ();
 use Errno qw( EWOULDBLOCK EAGAIN ETIMEDOUT EINTR EPIPE );
 use Carp;
 use strict;
+use version 0.77;
 
 my $use_threads;
 BEGIN {
@@ -80,7 +81,7 @@ my $netssleay_version;
 
 BEGIN {
     $openssl_version = Net::SSLeay::OPENSSL_VERSION_NUMBER();
-    $netssleay_version = do { no warnings; $Net::SSLeay::VERSION + 0.0; };
+    $netssleay_version = do { no warnings; version->parse($Net::SSLeay::VERSION + 0.0); };
     $can_client_sni = $openssl_version >= 0x10000000;
     $can_server_sni = defined &Net::SSLeay::get_servername;
     $can_npn = defined &Net::SSLeay::P_next_proto_negotiated &&
