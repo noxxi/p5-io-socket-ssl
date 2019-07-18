@@ -455,7 +455,7 @@ socket will result in writing and reading data to the TCP socket too.
 
 Especially the hidden writes might result in a connection reset if the
 underlying TCP socket is already closed by the peer. Unless signal PIPE is
-explicitly handled by the application this will ususally result in the
+explicitly handled by the application this will usually result in the
 application crashing. It is thus recommended to explicitly IGNORE signal PIPE so
 that the errors get propagated as EPIPE instead of causing a crash of the
 application.
@@ -943,7 +943,7 @@ of the certificate use the syntax C<'algo$pub$hex_fingerprint'> instead.
 To get the fingerprint of an established connection you can use
 C<get_fingerprint>.
 
-It is also possible to skip C<algo$>, i.e. only specifiy the fingerprint. In
+It is also possible to skip C<algo$>, i.e. only specify the fingerprint. In
 this case the likely algorithms will be automatically detected based on the
 length of the digest string.
 
