@@ -1931,7 +1931,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 		if ( $identity eq $commonName ) {
 		    return 1 if
 			$scheme->{ip_in_cn} == 4 ? length($ipn) == 4 :
-			$scheme->{ip_in_cn} == 6 ? length($ipn) == 8 :
+			$scheme->{ip_in_cn} == 6 ? length($ipn) == 16 :
 			1;
 		}
 	    }
