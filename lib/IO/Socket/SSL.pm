@@ -2687,7 +2687,7 @@ sub new {
 		# did not duplicate the certificates
 	    }
 	    $havecert or return IO::Socket::SSL->error(
-		"Failed to load certificate from file (no PEM, DER or PKCS12)");
+		"Failed to load certificate from file (either no PEM, DER or PKCS12 or corrupt or too insecure)");
 	}
 
 	if (!$havecert || $havekey) {
