@@ -22,18 +22,6 @@ my $numtests = 40;
 $numtests+=5 if $CAN_NONBLOCK;
 $numtests+=3 if $CAN_PEEK;
 
-my $expected_peer = do {
-    my $us = IO::Socket::INET->new( LocalAddr => '127.0.0.1', Proto => 'udp' );
-    my $uc = IO::Socket::INET->new( 
-	PeerAddr => $us->sockhost,
-	PeerPort => $us->sockport,
-	Proto => 'udp'
-    ) or do {
-	plan skip_all => "Skipped: cannot determine default peer IP";
-    };
-    $uc->sockhost,
-};
-
 plan tests => $numtests;
 
 # We need to detect the best TLS version supported by the server since we can
@@ -50,8 +38,9 @@ for(qw(TLSv1_2 TLSv1_1 TLSv1)) {
 die "no TLS support" if ! $tls_version;
 
 my $error_trapped = 0;
+my $localip = '127.0.0.1';
 my $server = IO::Socket::SSL->new(
-    LocalAddr => '127.0.0.1',
+    LocalAddr => $localip,
     LocalPort => 0,
     Listen => 2,
     Timeout => 30,
@@ -75,18 +64,22 @@ $server or exit;
 
 ok( fileno( $server), "Server Fileno Check");
 
-my $saddr = $server->sockhost.':'.$server->sockport;
+my $saddr = $localip.':'.$server->sockport;
 
 
 unless (fork) {
     close $server;
-    my $client = IO::Socket::INET->new($saddr);
+    my $client = IO::Socket::INET->new(
+	PeerAddr => $saddr,
+	LocalAddr => $localip,
+    );
     print $client "Test\n";
     is( <$client>, "This server is SSL only", "Client non-SSL connection");
     close $client;
 
     $client = IO::Socket::SSL->new(
 	PeerAddr => $saddr,
+	LocalAddr => $localip,
 	Domain => AF_INET,
 	SSL_verify_mode => 0x01,
 	SSL_ca_file => "certs/test-ca.pem",
@@ -172,7 +165,10 @@ unless (fork) {
 
     $client->close(SSL_no_shutdown => 1);
 
-    my $client_2 = IO::Socket::INET->new($saddr);
+    my $client_2 = IO::Socket::INET->new(
+	PeerAddr => $saddr,
+	LocalAddr => $localip
+    );
     ok( $client_2, "Second Client Initialization");
 
     $client_2 = IO::Socket::SSL->new_from_fd($client_2->fileno, '+<>',
@@ -186,6 +182,7 @@ unless (fork) {
     if ($CAN_NONBLOCK) {
 	my $client_3 = IO::Socket::SSL->new(
 	    PeerAddr => $saddr,
+	    LocalAddr => $localip,
 	    Domain => AF_INET,
 	    SSL_verify_mode => 0x01,
 	    SSL_ca_file => "certs/test-ca.pem",
@@ -201,6 +198,7 @@ unless (fork) {
 
 	my $client_4 = IO::Socket::SSL->new(
 	    PeerAddr => $saddr,
+	    LocalAddr => $localip,
 	    Domain => AF_INET,
 	    SSL_reuse_ctx => $client_3,
 	    Blocking => 0
@@ -270,7 +268,7 @@ close $client;
     fail("client creation failed");
     exit;
 };
-is( inet_ntoa((unpack_sockaddr_in($peer))[1]), $expected_peer, "Peer address check");
+is( inet_ntoa((unpack_sockaddr_in($peer))[1]), $localip, "Peer address check");
 
 if ($CAN_NONBLOCK) {
     $client->blocking(0);
