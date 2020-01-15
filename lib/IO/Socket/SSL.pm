@@ -74,6 +74,7 @@ my $session_upref;   # SSL_SESSION_up_ref is implemented
 my %sess_cb;         # SSL_CTX_sess_set_(new|remove)_cb
 my $check_partial_chain; # use X509_V_FLAG_PARTIAL_CHAIN if available
 my $auto_retry;      # (clear|set)_mode SSL_MODE_AUTO_RETRY with OpenSSL 1.1.1+ with non-blocking
+my $ssl_mode_release_buffers = 0; # SSL_MODE_RELEASE_BUFFERS if available
 
 my $openssl_version;
 my $netssleay_version;
@@ -109,7 +110,7 @@ BEGIN {
     $can_ocsp_staple = $can_ocsp
 	&& defined &Net::SSLeay::set_tlsext_status_type;
     $can_tckt_keycb  = defined &Net::SSLeay::CTX_set_tlsext_ticket_getkey_cb
-	&& $netssleay_version >= 1.80;  
+	&& $netssleay_version >= 1.80;
     $can_pha = defined &Net::SSLeay::CTX_set_post_handshake_auth;
 
     if (defined &Net::SSLeay::SESSION_up_ref) {
@@ -156,6 +157,10 @@ BEGIN {
 		Net::SSLeay::clear_mode($ssl, $mode_auto_retry);
 	    }
 	}
+    }
+    if ($openssl_version >= 0x10000000) {
+	# ssl/ssl.h:#define SSL_MODE_RELEASE_BUFFERS 0x00000010L
+	$ssl_mode_release_buffers = 0x00000010;
     }
 }
 
@@ -223,7 +228,7 @@ my %DEFAULT_SSL_CLIENT_ARGS = (
 
     SSL_cipher_list => join(" ",
 
-	# SSLabs report for Chrome 48/OSX. 
+	# SSLabs report for Chrome 48/OSX.
 	# This also includes the fewer ciphers Firefox uses.
 	'ECDHE-ECDSA-AES128-GCM-SHA256',
 	'ECDHE-RSA-AES128-GCM-SHA256',
@@ -281,7 +286,7 @@ my %DEFAULT_SSL_SERVER_ARGS;
 	# library_init returns false if the library was already initialized.
 	# This way we can find out if the library needs to be re-initialized
 	# inside code compiled with perlcc
-	Net::SSLeay::library_init() or return; 
+	Net::SSLeay::library_init() or return;
 
 	Net::SSLeay::load_error_strings();
 	Net::SSLeay::OpenSSL_add_all_digests();
@@ -348,7 +353,7 @@ BEGIN{
 # every time we setup a connection
 my %SSL_OP_NO;
 for(qw( SSLv2 SSLv3 TLSv1 TLSv1_1 TLSv11:TLSv1_1 TLSv1_2 TLSv12:TLSv1_2
-        TLSv1_3 TLSv13:TLSv1_3 )) {
+	TLSv1_3 TLSv13:TLSv1_3 )) {
     my ($k,$op) = m{:} ? split(m{:},$_,2) : ($_,$_);
     my $sub = "Net::SSLeay::OP_NO_$op";
     local $SIG{__DIE__};
@@ -410,8 +415,8 @@ BEGIN {
 	Socket::inet_pton( AF_INET6(),'::1') && AF_INET6() or die;
 	Socket->import( qw/inet_pton NI_NUMERICHOST NI_NUMERICSERV/ );
 	# behavior different to Socket6::getnameinfo - wrap
-	*_getnameinfo = sub { 
-	    my ($err,$host,$port) = Socket::getnameinfo(@_) or return; 
+	*_getnameinfo = sub {
+	    my ($err,$host,$port) = Socket::getnameinfo(@_) or return;
 	    return if $err;
 	    return ($host,$port);
 	};
@@ -430,8 +435,8 @@ BEGIN {
     if ($ip6) {
 	# if we have IO::Socket::IP >= 0.31 we will use this in preference
 	# because it can handle both IPv4 and IPv6
-	if ( eval { 
-	    require IO::Socket::IP; 
+	if ( eval {
+	    require IO::Socket::IP;
 	    IO::Socket::IP->VERSION(0.31)
 	}) {
 	    @ISA = qw(IO::Socket::IP);
@@ -1856,7 +1861,7 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
 	    $ipn = inet_pton(AF_INET6,$identity) or return; # invalid name
 	} elsif ( my @ip = $identity =~m{^(\d+)(?:\.(\d+)\.(\d+)\.(\d+)|[\d\.]*)$} ) {
 	    # check for invalid IP/hostname
-	    return if 4 != @ip or 4 != grep { defined($_) && $_<256 } @ip; 
+	    return if 4 != @ip or 4 != grep { defined($_) && $_<256 } @ip;
 	    $ipn = pack("CCCC",@ip);
 	} else {
 	    # assume hostname, check for umlauts etc
@@ -1960,7 +1965,7 @@ sub get_servername {
 sub get_fingerprint_bin {
     my ($self,$algo,$cert,$key_only) = @_;
     $cert ||= $self->peer_certificate;
-    return $key_only 
+    return $key_only
 	? Net::SSLeay::X509_pubkey_digest($cert, $algo2digest->($algo || 'sha256'))
 	: Net::SSLeay::X509_digest($cert, $algo2digest->($algo || 'sha256'));
 }
@@ -2300,7 +2305,7 @@ sub new {
 
     my $is_server = $arg_hash->{SSL_server};
     my %defaults = $is_server
-	? (%DEFAULT_SSL_SERVER_ARGS, %$GLOBAL_SSL_ARGS, %$GLOBAL_SSL_SERVER_ARGS) 
+	? (%DEFAULT_SSL_SERVER_ARGS, %$GLOBAL_SSL_ARGS, %$GLOBAL_SSL_SERVER_ARGS)
 	: (%DEFAULT_SSL_CLIENT_ARGS, %$GLOBAL_SSL_ARGS, %$GLOBAL_SSL_CLIENT_ARGS);
     if ( $defaults{SSL_reuse_ctx} ) {
 	# ignore default context if there are args to override it
@@ -2516,8 +2521,8 @@ sub new {
 	# client session caching will fail
 	# if user does not provide explicit id just use the stringification
 	# of the context
-	if($arg_hash->{SSL_server} and my $id = 
-	    $arg_hash->{SSL_session_id_context} || 
+	if($arg_hash->{SSL_server} and my $id =
+	    $arg_hash->{SSL_session_id_context} ||
 	    ( $arg_hash->{SSL_verify_mode} & 0x01 ) && "$ctx" ) {
 	    Net::SSLeay::CTX_set_session_id_context($ctx,$id,length($id));
 	}
@@ -2527,7 +2532,10 @@ sub new {
 	# SSL_MODE_ENABLE_PARTIAL_WRITE can be necessary for non-blocking because we
 	# cannot guarantee, that the location of the buffer stays constant
 	Net::SSLeay::CTX_set_mode( $ctx,
-	    SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER|SSL_MODE_ENABLE_PARTIAL_WRITE);
+	    SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER |
+	    SSL_MODE_ENABLE_PARTIAL_WRITE |
+	    ($arg_hash->{SSL_mode_release_buffers} ? $ssl_mode_release_buffers : 0)
+	);
 
 	if ( my $proto_list = $arg_hash->{SSL_npn_protocols} ) {
 	    return IO::Socket::SSL->_internal_error("NPN not supported in Net::SSLeay",9)
@@ -2709,8 +2717,8 @@ sub new {
 		"Failed to load key from file (no PEM or DER)");
 	}
 
-        Net::SSLeay::CTX_set_post_handshake_auth($ctx,1)
-            if (!$is_server && $can_pha && $havecert && $havekey);
+	Net::SSLeay::CTX_set_post_handshake_auth($ctx,1)
+	    if (!$is_server && $can_pha && $havecert && $havekey);
     }
 
     if ($arg_hash->{SSL_server}) {
@@ -2731,7 +2739,7 @@ sub new {
 	    # binary, e.g. DH*
 
 	    for( values %ctx ) {
-		Net::SSLeay::CTX_set_tmp_dh( $_,$dh ) || return 
+		Net::SSLeay::CTX_set_tmp_dh( $_,$dh ) || return
 		    IO::Socket::SSL->error( "Failed to set DH from SSL_dh" );
 	    }
 	}
@@ -2939,8 +2947,8 @@ sub new {
 
     if ( my $cl = $arg_hash->{SSL_cipher_list} ) {
 	for (keys %ctx) {
-	    Net::SSLeay::CTX_set_cipher_list($ctx{$_}, ref($cl) 
-		? $cl->{$_} || $cl->{''} || $DEFAULT_SSL_ARGS{SSL_cipher_list} || next 
+	    Net::SSLeay::CTX_set_cipher_list($ctx{$_}, ref($cl)
+		? $cl->{$_} || $cl->{''} || $DEFAULT_SSL_ARGS{SSL_cipher_list} || next
 		: $cl
 	    ) || return IO::Socket::SSL->error("Failed to set SSL cipher list");
 	}

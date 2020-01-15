@@ -1495,6 +1495,13 @@ Example:
 
     my $srv = IO::Socket::SSL->new(..., SSL_ticket_keycb => $keycb);
 
+=item SSL_mode_release_buffers 1|0
+
+This enables or disables the SSL_MODE_RELEASE_BUFFERS option on the SSL object.
+With this option the read buffer will be released after each SSL_read but will
+need to be reallocated for each new SSL_read. If memory usage is a concern this
+might save lots of memory in the mean time though, about 34k per idle SSL
+connection according to the documentation in SSL_CTX_set_mode(3ssl).
 
 =back
 
