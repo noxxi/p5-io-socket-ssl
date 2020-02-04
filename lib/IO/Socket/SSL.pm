@@ -2804,7 +2804,7 @@ sub new {
 		length($digest) == 40 ? 'sha1' :
 		length($digest) == 64 ? 'sha256' :
 		return IO::Socket::SSL->_internal_error(
-		    "cannot detect hash algorithem from fingerprint '$_'",9);
+		    "cannot detect hash algorithm from fingerprint '$_'",9);
 	    $algo = lc($algo);
 	    push @accept_fp,[ $algo, $pubkey || '', pack('H*',$digest) ]
 	}
