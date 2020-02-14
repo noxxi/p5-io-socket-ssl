@@ -1,3 +1,4 @@
+2.067 2020/02/14
 - fix memory leak on incomplete handshake
   https://github.com/noxxi/p5-io-socket-ssl/issues/92
   Thanks to olegwtf
