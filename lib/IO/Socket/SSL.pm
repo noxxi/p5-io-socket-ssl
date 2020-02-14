@@ -1461,7 +1461,9 @@ sub stop_SSL {
     $stop_args->{SSL_no_shutdown} = 1 if ! ${*$self}{_SSL_opened};
 
     if (my $ssl = ${*$self}{'_SSL_object'}) {
-	if ( ! $stop_args->{SSL_no_shutdown} ) {
+	if (delete ${*$self}{'_SSL_opening'}) {
+	    # just destroy the object further below
+	} elsif ( ! $stop_args->{SSL_no_shutdown} ) {
 	    my $status = Net::SSLeay::get_shutdown($ssl);
 
 	    my $timeout =
@@ -2116,8 +2118,7 @@ sub DESTROY {
     if (my $ssl = ${*$self}{_SSL_object}) {
 	delete $SSL_OBJECT{$ssl};
 	if (!$use_threads or delete $CREATED_IN_THIS_THREAD{$ssl}) {
-	    $self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1)
-		if ${*$self}{'_SSL_opened'};
+	    $self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1);
 	}
     }
     delete @{*$self}{@all_my_keys};
