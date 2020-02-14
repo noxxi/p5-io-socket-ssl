@@ -1093,7 +1093,7 @@ parameters or (better, because faster) the ECDH curve. This setting cares
 about DH parameters.
 
 To support non-elliptic Diffie-Hellman key exchange a suitable file needs to
-be given here or the SSL_dh should be used with a appropriate value.
+be given here or the SSL_dh should be used with an appropriate value.
 See dhparam command in openssl for more information.
 
 If neither C<SSL_dh_file> nor C<SSL_dh> are set a builtin DH parameter with a
