@@ -25,10 +25,11 @@ env:
     - RELEASE_TESTING=0
     - NET_SSLEAY=1.88
   matrix:
-    - OPENSSL_VERSION=openssl-1.1.1b
+    - OPENSSL_VERSION=openssl-1.1.1d
     - OPENSSL_VERSION=libressl-2.9.2
-    - OPENSSL_VERSION=openssl-1.1.0j
-    - OPENSSL_VERSION=openssl-1.0.2r
+    - OPENSSL_VERSION=libressl-3.0.2
+    - OPENSSL_VERSION=openssl-1.1.0l
+    - OPENSSL_VERSION=openssl-1.0.2u
     - OPENSSL_VERSION=openssl-1.0.1u
     - OPENSSL_VERSION=openssl-1.0.0s
     - OPENSSL_VERSION=openssl-0.9.8zh
@@ -36,9 +37,9 @@ env:
 matrix:
   exclude:
   - perl: "5.8"
-    env: OPENSSL_VERSION=openssl-1.1.0j
+    env: OPENSSL_VERSION=openssl-1.1.0l
   - perl: "5.8"
-    env: OPENSSL_VERSION=openssl-1.1.1b
+    env: OPENSSL_VERSION=openssl-1.1.1d
 
 cache:
   directories:

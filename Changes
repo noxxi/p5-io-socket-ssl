@@ -1,3 +1,22 @@
+- fix memory leak on incomplete handshake
+  https://github.com/noxxi/p5-io-socket-ssl/issues/92
+  Thanks to olegwtf
+- add support for SSL_MODE_RELEASE_BUFFERS via SSL_mode_release_buffers
+  This can decrease memory usage at the costs of more allocations
+  https://rt.cpan.org/Ticket/Display.html?id=129463
+- more detailed error messages when loading of certificate file failed
+  https://github.com/noxxi/p5-io-socket-ssl/issues/89
+- fix for ip_in_cn == 6 in verify_hostname scheme
+  https://rt.cpan.org/Ticket/Display.html?id=131384
+- deal with new MODE_AUTO_RETRY default in OpenSSL 1.1.1
+- fix warning when no ecdh support is available
+- documentation update regarding use of select and TLS 1.3
+- various fixes in documentation
+  https://github.com/noxxi/p5-io-socket-ssl/issues/91
+  https://github.com/noxxi/p5-io-socket-ssl/issues/90
+  https://github.com/noxxi/p5-io-socket-ssl/issues/87
+  https://github.com/noxxi/p5-io-socket-ssl/issues/81
+- stability fix t/core.t
 2.066 2019/03/06
 - fix test t/verify_partial_chain.t by using the newly exposed function
   can_partial_chain instead of guessing (wrongly) if the functionality is
