@@ -2101,6 +2101,14 @@ sub error {
     return;
 }
 
+sub _errstack {
+    my @err;
+    while (my $err = Net::SSLeay::ERR_get_error()) {
+	push @err, Net::SSLeay::ERR_error_string($err);
+    }
+    return @err;
+}
+
 sub can_client_sni { return $can_client_sni }
 sub can_server_sni { return $can_server_sni }
 sub can_multi_cert { return $can_multi_cert }
@@ -2285,6 +2293,7 @@ use strict;
 
 my %CTX_CREATED_IN_THIS_THREAD;
 *DEBUG = *IO::Socket::SSL::DEBUG;
+*_errstack = \&IO::Socket::SSL::_errstack;
 
 use constant SSL_MODE_ENABLE_PARTIAL_WRITE => 1;
 use constant SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER => 2;
@@ -2662,11 +2671,16 @@ sub new {
 	    $havecert = 'OBJ';
 	} elsif ( my $f = $arg_hash->{SSL_cert_file} ) {
 	    # try to load chain from PEM or certificate from ASN1
+	    my @err;
 	    if (Net::SSLeay::CTX_use_certificate_chain_file($ctx,$f)) {
 		$havecert = 'PEM';
-	    } elsif (Net::SSLeay::CTX_use_certificate_file($ctx,$f,FILETYPE_ASN1)) {
+	    } elsif (do {
+		push @err, [ PEM => _errstack() ];
+		Net::SSLeay::CTX_use_certificate_file($ctx,$f,FILETYPE_ASN1)
+	    }) {
 		$havecert = 'DER';
 	    } else {
+		push @err, [ DER => _errstack() ];
 		# try to load certificate, key and chain from PKCS12 file
 		my ($key,$cert,@chain) = Net::SSLeay::P_PKCS12_load_file($f,1);
 		if (!$cert and $arg_hash->{SSL_passwd_cb}
@@ -2695,8 +2709,15 @@ sub new {
 		# don't free @chain, because CTX_add_extra_chain_cert
 		# did not duplicate the certificates
 	    }
-	    $havecert or return IO::Socket::SSL->error(
-		"Failed to load certificate from file (either no PEM, DER or PKCS12 or corrupt or too insecure)");
+	    if (!$havecert) {
+		push @err, [ PKCS12 => _errstack() ];
+		my $err = "Failed to load certificate from file $f:";
+		for(@err) {
+		    my ($type,@e) = @$_;
+		    $err .= " [format:$type] @e **" if @e;
+		}
+		return IO::Socket::SSL->error($err);
+	    }
 	}
 
 	if (!$havecert || $havekey) {
