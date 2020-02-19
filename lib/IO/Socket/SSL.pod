@@ -688,7 +688,7 @@ TCP socket in a non-blocking way with C<start_SSL> and C<accept_SSL>.
 	# next frame.
 	my $n = sysread( $cl,my $buf,1);
 	if ( ! defined $n ) {
-	    die $! if not ${EWOULDBLOCK};
+	    die $! if not $!{EWOULDBLOCK};
 	    next if $SSL_ERROR == SSL_WANT_READ;
 	    if ( $SSL_ERROR == SSL_WANT_WRITE ) {
 		# need to write data on renegotiation
