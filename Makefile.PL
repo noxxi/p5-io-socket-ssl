@@ -68,6 +68,12 @@ if (my $compiled = eval {
 	die sprintf("API-different OpenSSL versions compiled in (0x%08x) vs linked (0x%08x)",
 	    $compiled,$linked);
     }
+
+    # OpenSSL 1.1.1e introduced behavior changes breaking various code
+    # will likely be reverted  in 1.1.1f - enforce to not use this version
+    if ($linked == 0x1010105f) {
+	die "detected OpenSSL 1.1.1e - please use a different version\n";
+    }
 }
 
 # make sure that we have dualvar from the XS Version of Scalar::Util

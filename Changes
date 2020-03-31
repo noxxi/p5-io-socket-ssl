@@ -1,3 +1,10 @@
+2.068 2020/03/31
+- treat OpenSSL 1.1.1e as broken and refuse to build with it in order to
+  prevent follow-up problems in tests and user code
+  https://github.com/noxxi/p5-io-socket-ssl/issues/93
+  https://github.com/openssl/openssl/issues/11388
+  https://github.com/openssl/openssl/issues/11378
+- update PublicSuffix with latest data from publicsuffix.org
 2.067 2020/02/14
 - fix memory leak on incomplete handshake
   https://github.com/noxxi/p5-io-socket-ssl/issues/92
