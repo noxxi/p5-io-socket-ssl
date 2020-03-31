@@ -25,6 +25,7 @@ env:
     - RELEASE_TESTING=0
     - NET_SSLEAY=1.88
   matrix:
+    - OPENSSL_VERSION=openssl-1.1.1f
     - OPENSSL_VERSION=openssl-1.1.1d
     - OPENSSL_VERSION=libressl-2.9.2
     - OPENSSL_VERSION=libressl-3.0.2
