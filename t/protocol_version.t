@@ -12,7 +12,7 @@ plan skip_all => "Test::More has no done_testing"
 
 $|=1;
 
-my $XDEBUG = 0;
+my $XDEBUG = 1;
 my @versions = qw(SSLv3 TLSv1 TLSv1_1 TLSv1_2 TLSv1_3);
 
 my $server = IO::Socket::SSL->new(

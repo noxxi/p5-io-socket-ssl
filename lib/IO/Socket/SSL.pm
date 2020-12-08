@@ -176,6 +176,8 @@ my $algo2digest = do {
     }
 };
 
+*Net::SSLeay::TLS1_3_VERSION = sub { 0x0304 };
+*Net::SSLeay::OP_NO_TLSv1_3 = sub { 0x20000000 };
 my $CTX_tlsv1_3_new;
 if ( defined &Net::SSLeay::CTX_set_min_proto_version
     and defined &Net::SSLeay::CTX_set_max_proto_version
