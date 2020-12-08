@@ -51,13 +51,23 @@ for my $test (
     my $cafile;
     my $cl = IO::Socket::INET->new( $saddr ) or die $!;
     syswrite($cl,"X",1);
-    my $ok = IO::Socket::SSL->start_SSL($cl,
-	SSL_verify_mode => 1,
+
+    my $ctx = IO::Socket::SSL::SSL_Context->new(
 	SSL_fingerprint => $fp,
+	SSL_verify_mode => 1,
 	SSL_ca => $certs,
 	SSL_ca_file => undef,
 	SSL_ca_path => undef,
     );
+    if ($fp) {
+	# LibreSSL: only the legacy verifier properly calls verify_callback
+	# But only new verifier supports partial chain
+	Net::SSLeay::X509_VERIFY_PARAM_set_flags(
+	    Net::SSLeay::CTX_get0_param($ctx->{context}),
+	    0x400000 # X509_V_FLAG_LEGACY_VERIFY
+	);
+    }
+    my $ok = IO::Socket::SSL->start_SSL($cl, SSL_reuse_ctx => $ctx);
     ok( ($ok?1:0) == ($expect?1:0),$what);
 }
 
@@ -96,7 +106,7 @@ sub _server {
     my $ctx = IO::Socket::SSL::SSL_Context->new(
 	SSL_server => 1,
 	SSL_cert  => $certs,
-	SSL_key   => $key
+	SSL_key   => $key,
     );
     while (1) {
 	#local $IO::Socket::SSL::DEBUG=10;

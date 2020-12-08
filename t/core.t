@@ -77,10 +77,7 @@ unless (fork) {
     is( <$client>, "This server is SSL only", "Client non-SSL connection");
     close $client;
 
-    $client = IO::Socket::SSL->new(
-	PeerAddr => $saddr,
-	LocalAddr => $localip,
-	Domain => AF_INET,
+    my $ctx = IO::Socket::SSL::SSL_Context->new(
 	SSL_verify_mode => 0x01,
 	SSL_ca_file => "certs/test-ca.pem",
 	SSL_use_cert => 1,
@@ -89,12 +86,21 @@ unless (fork) {
 	SSL_passwd_cb => sub { return "opossum" },
 	SSL_verify_callback => \&verify_sub,
     );
-
+    Net::SSLeay::X509_VERIFY_PARAM_set_flags(
+	Net::SSLeay::CTX_get0_param($ctx->{context}),
+	0x400000 # X509_V_FLAG_LEGACY_VERIFY
+    );
+    $client = IO::Socket::SSL->new(
+	PeerAddr => $saddr,
+	LocalAddr => $localip,
+	Domain => AF_INET,
+	SSL_reuse_ctx => $ctx,
+    );
 
     sub verify_sub {
 	my ($ok, $ctx_store, $cert, $error) = @_;
 	$ok && $ctx_store && $cert && !$error or do {
-	    fail("client failure in verify_sub");
+	    fail("client failure in verify_sub ok=$ok err=$error");
 	    exit;
 	};
 	like( $cert, qr/IO::Socket::SSL Demo CA/, "Client Verify-sub Check");
