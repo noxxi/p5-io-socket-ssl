@@ -9,14 +9,14 @@ use Test::More;
 
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
-plan tests => 1 + 7 + 4 + 7*2 + 4;
+plan tests => 1 + 7 + 5 + 7*2 + 5;
 my @tests = qw(
     example.com      www FAIL
     server.local     ldap OK
     server.local     www FAIL
     bla.server.local www OK
     www7.other.local www OK
-    www7.other.local ldap FAIL
+    www7.other.local ldap OK
     bla.server.local ldap OK
 );
 

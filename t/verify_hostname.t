@@ -52,7 +52,7 @@ if ( $pid == 0 ) {
     my @want = (
 	GEN_DNS() => '*.server.local',
 	GEN_IPADD() => '127.0.0.1',
-	GEN_DNS() => 'www*.other.local',
+	GEN_DNS() => '*.other.local',
 	GEN_DNS() => 'smtp.mydomain.local',
 	GEN_DNS() => 'xn--lwe-sna.idntest.local',
     );
@@ -71,8 +71,8 @@ if ( $pid == 0 ) {
 	'server.local' => [qw(smtp ldap)],
 	'blafasel.server.local' => [qw(smtp ldap www)],
 	'lala.blafasel.server.local' => [],
-	'www.other.local' => [qw()],
-	'www-13.other.local' => [qw(www)],
+	'www.other.local' => [qw(smtp ldap www)],
+	'www-13.other.local' => [qw(smtp ldap www)],
 	'www-13.lala.other.local' => [],
 	'smtp.mydomain.local' => [qw(smtp ldap www)],
 	'xn--lwe-sna.idntest.local' => [qw(smtp ldap www)],

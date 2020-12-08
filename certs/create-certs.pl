@@ -77,7 +77,7 @@ my @swc = CERT_create(
     subjectAltNames => [ 
 	[ DNS => '*.server.local' ],
 	[ IP => '127.0.0.1' ],
-	[ DNS => 'www*.other.local' ],
+	[ DNS => '*.other.local' ],
 	[ DNS => 'smtp.mydomain.local' ],
 	[ DNS => 'xn--lwe-sna.idntest.local' ]
     ],
