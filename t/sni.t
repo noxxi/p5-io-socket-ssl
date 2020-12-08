@@ -63,20 +63,29 @@ if ( $pid == 0 ) {
 	    SSL_verify_mode => 1,
 	    SSL_hostname => $host,
 	    SSL_ca_file => 'certs/test-ca.pem',
-	) || print "not ";
-	print "ok # client ssl connect $host\n";
-
-	$client->verify_hostname($host,'http') or print "not ";
-	print "ok # client verify hostname in cert $host\n";
+	);
+	if ($client) {
+	    print "ok # client ssl connect $host\n";
+	    $client->verify_hostname($host,'http') or print "not ";
+	    print "ok # client verify hostname in cert $host\n";
+	} else {
+	    print "not ok # client ssl connect $host - $SSL_ERROR\n";
+	    print "ok # skip connect failed\n";
+	}
     }
     exit;
 }
 
 for my $host (@tests) {
-    my $csock = $server->accept or print "not ";
-    print "ok # server accept\n";
-    my $name = $csock->get_servername;
-    print "not " if ! $name or $name ne $host;
-    print "ok # server got SNI name $host\n";
+    my $csock = $server->accept;
+    if ($csock) {
+	print "ok # server accept\n";
+	my $name = $csock->get_servername;
+	print "not " if ! $name or $name ne $host;
+	print "ok # server got SNI name $host\n";
+    } else {
+	print "not ok # server accept - $SSL_ERROR\n";
+	print "ok # skip accept failed\n";
+    }
 }
 wait;
