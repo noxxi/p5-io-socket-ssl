@@ -1,3 +1,8 @@
+2.069 2021/01/22
+- IO::Socket::Utils CERT_asHash and CERT_create now support subject and issuer
+  with multiple same parts (like multiple OU). In this case an array ref instead
+  of a scalar is used as hash value.
+  https://github.com/noxxi/p5-io-socket-ssl/issues/95
 2.068 2020/03/31
 - treat OpenSSL 1.1.1e as broken and refuse to build with it in order to
   prevent follow-up problems in tests and user code
