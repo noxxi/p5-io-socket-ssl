@@ -1,3 +1,5 @@
+2.070 2021/02/26
+- changed bugtracker in Makefile.PL to github, away from obsolete rt.cpan.org
 2.069 2021/01/22
 - IO::Socket::Utils CERT_asHash and CERT_create now support subject and issuer
   with multiple same parts (like multiple OU). In this case an array ref instead

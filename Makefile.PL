@@ -156,7 +156,7 @@ WriteMakefile(
 		license     => 'http://dev.perl.org/licenses/',
 		repository  => 'https://github.com/noxxi/p5-io-socket-ssl',
 		homepage    => 'https://github.com/noxxi/p5-io-socket-ssl',
-		bugtracker  => 'https://rt.cpan.org/Dist/Display.html?Queue=IO-Socket-SSL',
+		bugtracker    => 'https://github.com/noxxi/p5-io-socket-ssl/issues',
 	    },
 	},
     ):(),
