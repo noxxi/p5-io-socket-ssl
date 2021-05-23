@@ -20,6 +20,8 @@ if ( ! eval "use 5.006; use IO::Select; return 1" ) {
 $|=1;
 print "1..27\n";
 
+my $START = time();
+
 # first create simple non-blocking tcp-server
 my $ID = 'server';
 my $server = IO::Socket::INET->new(
@@ -186,12 +188,18 @@ if ( $pid == 0 ) {
 	WRITE:
 	for( my $i=0;$i<50000;$i++ ) {
 	    my $offset = 0;
+	    my $sel_server = IO::Select->new($to_server);
 	    while (1) {
-		if ( $can && ! IO::Select->new($to_server)->$can(30)) {
-		    diag("fail $can");
-		    print "not ";
+		if ($can && !$sel_server->$can(15)) {
+		    if ( $bytes_send > 30000 ) {
+			diag("fail $can, but limit reached. Assume connection closed");
+		    } else {
+			diag("fail $can");
+			print "not ";
+		    }
 		    last WRITE;
-		};
+		}
+
 		my $n = syswrite( $to_server,$msg,length($msg)-$offset,$offset );
 		if ( !defined($n) ) {
 		    diag( "\$!=$! \$SSL_ERROR=$SSL_ERROR send=$bytes_send" );
@@ -256,7 +264,8 @@ if ( $pid == 0 ) {
     foreach my $test ( 'slow','fast' ) {
 
 	# accept a connection
-	IO::Select->new( $server )->can_read(30);
+	my $can_read = IO::Select->new( $server )->can_read(30);
+	diag("tcp server socket is ".($can_read? "ready" : "NOT ready"));
 	my $from_client = $server->accept or print "not ";
 	ok( "tcp accept" );
 	$from_client || do {
@@ -388,5 +397,14 @@ exit;
 
 
 
-sub ok { print "ok # [$ID] @_\n"; }
-sub diag { print "# @_\n" }
+sub ok   { unshift @_, "ok # "; goto &_out }
+sub diag { unshift @_, "#    "; goto &_out }
+sub _out {
+    my $prefix = shift;
+    printf "%s [%04d.%s:%03d] %s\n",
+	$prefix,
+	time() - $START,
+	$ID,
+	(caller())[2],
+	"@_";
+}

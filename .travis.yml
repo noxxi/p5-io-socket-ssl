@@ -5,6 +5,9 @@ sudo: false
 language: perl
 
 perl:
+  - "5.34"
+  - "5.32"
+  - "5.30"
   - "5.28"
   - "5.26"
   - "5.24"
@@ -23,17 +26,20 @@ env:
     - PERL_MM_USE_DEFAULT=1
     - AUTOMATED_TESTING=1
     - RELEASE_TESTING=0
-    - NET_SSLEAY=1.88
+    - NET_SSLEAY=1.90
   matrix:
-    - OPENSSL_VERSION=openssl-1.1.1f
+    - OPENSSL_VERSION=openssl-1.1.1k
+    - OPENSSL_VERSION=libressl-3.3.3
     - OPENSSL_VERSION=openssl-1.1.1d
-    - OPENSSL_VERSION=libressl-2.9.2
-    - OPENSSL_VERSION=libressl-3.0.2
     - OPENSSL_VERSION=openssl-1.1.0l
     - OPENSSL_VERSION=openssl-1.0.2u
     - OPENSSL_VERSION=openssl-1.0.1u
     - OPENSSL_VERSION=openssl-1.0.0s
     - OPENSSL_VERSION=openssl-0.9.8zh
+    - OPENSSL_VERSION=libressl-3.2.2
+    - OPENSSL_VERSION=libressl-3.1.2
+    - OPENSSL_VERSION=libressl-3.0.2
+    - OPENSSL_VERSION=libressl-2.9.2
 
 matrix:
   exclude:
