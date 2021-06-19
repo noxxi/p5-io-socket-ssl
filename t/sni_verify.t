@@ -69,6 +69,7 @@ if ( $pid == 0 ) {
 	) || print "not ";
 	print "ok # client ssl connect $host\n";
 
+	sleep 1 if $^O eq 'MSWin32';
 	$client->verify_hostname($host,'http') or print "not ";
 	print "ok # client verify hostname in cert $host\n";
     }
