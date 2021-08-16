@@ -85,9 +85,9 @@ The function accepts a string or an array-ref (e.g. host split by C<.>). In the
 first case it will return string(s), in the latter case array-ref(s).
 
 International hostnames or labels can be in ASCII (IDNA form starting with
-C<xn-->) or unicode. In the latter case an IDNA handling library like
-L<Net::IDN:::Encode>, L<Net::LibIDN> or recent versions of L<URI> need to be
-installed.
+C<xn-->) or unicode. In the latter case an IDNA handling library needs to be
+available.  L<URI> is preferred, but L<Net::IDN:::Encode>, L<Net::LibIDN> are
+still supported.
 
 =item ($self|class)->can_idn
 

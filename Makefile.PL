@@ -90,7 +90,8 @@ WARNING
 No library for handling international domain names found.
 It will work but croak if you try to verify an international name against
 a certificate.
-It's recommended to install either Net::IDN::Encode, Net::LibIDN or URI version>=1.50
+It's recommended to install URI version>=1.50.
+Net::IDN::Encode and Net::LibIDN are also still supported.
 
 EOM
 }
