@@ -124,6 +124,6 @@ openssl x509 -in server-cert.pem -out server-cert.der -outform der
 openssl rsa -in server-key.pem -out server-key.der -outform der
 openssl rsa -in server-key.pem -out server-key.enc -passout pass:bluebell
 openssl rsa -in client-key.pem -out client-key.enc -passout pass:opossum
-openssl pkcs12 -export -in server-cert.pem -inkey server-key.pem -out server.p12 -passout pass:
-openssl pkcs12 -export -in server-cert.pem -inkey server-key.pem -out server_enc.p12 -passout pass:bluebell
+openssl pkcs12 -export -in server-cert.pem -inkey server-key.pem -out server.p12 -descert -passout pass:
+openssl pkcs12 -export -in server-cert.pem -inkey server-key.pem -out server_enc.p12 -descert -passout pass:bluebell
 CMD
