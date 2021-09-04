@@ -1,5 +1,8 @@
+2.072
 - add PEM_certs2file and PEM_file2certs in IO::Socket::SSL::Utils based
   on idea by rovo89 in #101
+- certs/*.p12 used for testing should now work with OpenSSL 3.0 too #108
+- update public suffix database
 2.071 2021/05/23
 - fix t/nonblock.t race on some systems. Fixes issue #102, maybe #98 too.
 2.070 2021/02/26
