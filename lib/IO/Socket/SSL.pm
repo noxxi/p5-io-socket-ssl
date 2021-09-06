@@ -1174,7 +1174,7 @@ sub accept_SSL {
 if ($auto_retry) {
     *blocking = sub {
 	my $self = shift;
-	{ @_ && $auto_retry->($self->_get_ssl_object || last, @_); }
+	{ @_ && $auto_retry->(${*$self}{_SSL_object} || last, @_); }
 	return $self->SUPER::blocking(@_);
     };
 }
