@@ -1,5 +1,5 @@
 # to update fingerprints in this file:
-# perl -e 'do q[t/external/fingerprint.pl]; update_fingerprints()'
+# perl -e 'do q[./t/external/fingerprint.pl]; update_fingerprints()'
 
 use strict;
 use warnings;
@@ -18,17 +18,17 @@ my $fingerprints= [
   },
   {
     _ => 'no OCSP stapling',
-    fingerprint => 'sha1$pub$f8c51d37c070c423ccc5f6065e080b94ce03494c',
+    fingerprint => 'sha1$pub$c8ba0806b887fc15e9d98e73107a17150f847bbf',
     host => 'www.bild.de',
     ocsp => {
               staple => 0
             },
     port => 443,
-    subject_hash_ca => 'e2799e36'
+    subject_hash_ca => '3513523f'
   },
   {
     _ => 'this is revoked',
-    fingerprint => 'sha1$pub$75f8bfe5feac656c894c06011422b6455854b4e5',
+    fingerprint => 'sha1$pub$f0f0c49b8a04a2dd2110e10f7806c97d87d0b26f',
     host => 'revoked.grc.com',
     ocsp => {
               revoked => 1
@@ -36,40 +36,40 @@ my $fingerprints= [
     port => 443
   },
   {
-    fingerprint => 'sha1$pub$56f745d484d13c95ad58142ef4d1cc2f11c073f6',
+    fingerprint => 'sha1$pub$06d0540a8a17d0b794793830811985d821833ce0',
     host => 'www.yahoo.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$52509cfecdc8264c21da6279360e89c1be1bc30a',
+    fingerprint => 'sha1$pub$c40d9bc2496fa2db198b27b6c1f94d1c703e7039',
     host => 'www.comdirect.de',
     port => 443,
-    subject_hash_ca => '02265526'
+    subject_hash_ca => '062cdee6'
   },
   {
-    fingerprint => 'sha1$pub$c2ee1cc0963c55286bcd549f1d782c5557602f4c',
+    fingerprint => 'sha1$pub$c78493da803e190c202f103049c74b02ef0a68be',
     host => 'meine.deutsche-bank.de',
     port => 443,
-    subject_hash_ca => 'c01cdfa2'
+    subject_hash_ca => '607986c7'
   },
   {
-    fingerprint => 'sha1$pub$5414c379b16298b2352812d7f5c7f4b576da9efa',
+    fingerprint => 'sha1$pub$5ae9284e67d6e91db39f1f7e10cfab2e987ef1f2',
     host => 'www.twitter.com',
     port => 443,
-    subject_hash_ca => '244b5494'
+    subject_hash_ca => '3513523f'
   },
   {
-    fingerprint => 'sha1$pub$7b89d1ee6a48e3abc504ee1642dbc7d0fc74965b',
+    fingerprint => 'sha1$pub$2003390d568988d918b40a10e2d32cf297d22117',
     host => 'www.facebook.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$9c070a464b2eb1ee315120bcd0a0ba82e711be9c',
+    fingerprint => 'sha1$pub$0a9d53f5c6f85aa0b759c7430c83ce4afb88caf6',
     host => 'www.live.com',
     port => 443,
-    subject_hash_ca => '653b494a'
+    subject_hash_ca => '3513523f'
   }
 ]
 ;
