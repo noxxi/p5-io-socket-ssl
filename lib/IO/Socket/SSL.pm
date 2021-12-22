@@ -39,6 +39,7 @@ BEGIN {
 my $Net_SSLeay_ERROR_WANT_READ   = Net::SSLeay::ERROR_WANT_READ();
 my $Net_SSLeay_ERROR_WANT_WRITE  = Net::SSLeay::ERROR_WANT_WRITE();
 my $Net_SSLeay_ERROR_SYSCALL     = Net::SSLeay::ERROR_SYSCALL();
+my $Net_SSLeay_ERROR_SSL         = Net::SSLeay::ERROR_SSL();
 my $Net_SSLeay_VERIFY_NONE       = Net::SSLeay::VERIFY_NONE();
 my $Net_SSLeay_VERIFY_PEER       = Net::SSLeay::VERIFY_PEER();
 
@@ -1188,13 +1189,12 @@ sub _generic_read {
     my ($data,$rwerr) = $read_func->($ssl, $length);
     while ( ! defined($data)) {
 	if ( my $err = $self->_skip_rw_error( $ssl, defined($rwerr) ? $rwerr:-1 )) {
-	    if ($err == $Net_SSLeay_ERROR_SYSCALL) {
-		# OpenSSL 1.1.0c+ : EOF can now result in SSL_read returning -1
-		if (not $!) {
-		    # SSL_ERROR_SYSCALL but not errno -> treat as EOF
-		    $data = '';
-		    last;
-		}
+	    # OpenSSL 1.1.0c+ : EOF can now result in SSL_read returning -1 and SSL_ERROR_SYSCALL
+	    # OpenSSL 3.0 : EOF can now result in SSL_read returning -1 and SSL_ERROR_SSL
+	    if (not $! and $err == $Net_SSLeay_ERROR_SSL || $err == $Net_SSLeay_ERROR_SYSCALL) {
+		# treat as EOF
+		$data = '';
+		last;
 	    }
 	    $self->error("SSL read error");
 	}
