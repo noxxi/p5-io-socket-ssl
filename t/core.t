@@ -130,7 +130,6 @@ unless (fork) {
 		    4.0,
 		    ord("y"),
 		    "Test\nBeaver\nBeaver\n");
-    shutdown($client, 1);
 
     my $buffer="\0\0aaaaaaaaaaaaaaaaaaaa";
     $client->sysread($buffer, 7, 2);
@@ -247,7 +246,7 @@ is( $array[0], "Test\n", "Server Getline Check");
 
 is( getc($client), "\$", "Server Getc Check");
 
-@array = <$client>;
+@array = map { scalar <$client> } (0..5);
 is( scalar @array, 6, "Server Getlines Check 1");
 
 is( $array[0], "1.04\n", "Server Getlines Check 2");

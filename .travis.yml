@@ -26,8 +26,9 @@ env:
     - PERL_MM_USE_DEFAULT=1
     - AUTOMATED_TESTING=1
     - RELEASE_TESTING=0
-    - NET_SSLEAY=1.90
+    - NET_SSLEAY=1.91
   matrix:
+    - OPENSSL_VERSION=openssl-3.0.1
     - OPENSSL_VERSION=openssl-1.1.1k
     - OPENSSL_VERSION=libressl-3.3.3
     - OPENSSL_VERSION=openssl-1.1.1d
