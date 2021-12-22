@@ -1,3 +1,6 @@
+2.073
+- fix behavior and tests for openssl 3.0.1
+- fix #110 - prevent internal error warning in some cases
 2.072
 - add PEM_certs2file and PEM_file2certs in IO::Socket::SSL::Utils based
   on idea by rovo89 in #101
