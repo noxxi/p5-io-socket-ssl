@@ -1064,17 +1064,31 @@ request. In this case setting the version to
 =item SSL_cipher_list
 
 If this option is set the cipher list for the connection will be set to the
-given value, e.g. something like 'ALL:!LOW:!EXP:!aNULL'. Look into the OpenSSL
-documentation (L<https://www.openssl.org/docs/manmaster/man1/openssl-ciphers.html#CIPHER-STRINGS>)
+given value, e.g. something like 'ALL:!LOW:!EXP:!aNULL'. This will only affect
+ciphers for TLS 1.2 and lower. See the OpenSSL documentation
+(L<https://www.openssl.org/docs/manmaster/man1/openssl-ciphers.html#CIPHER-STRINGS>)
 for more details.
 
 Unless you fail to contact your peer because of no shared ciphers it is
-recommended to leave this option at the default setting. The default setting
-prefers ciphers with forward secrecy, disables anonymous authentication and
-disables known insecure ciphers like MD5, DES etc. This gives a grade A result
-at the tests of SSL Labs.
-To use the less secure OpenSSL builtin default (whatever this is) set
-SSL_cipher_list to ''.
+recommended to leave this option at the default setting, which uses the system
+default but disables some insecure ciphers which might still be enabled on older
+systems.
+
+In case different cipher lists are needed for different SNI hosts a hash can be
+given with the host as key and the cipher suite as value, similar to
+B<SSL_cert*>.
+
+=item SSL_ciphersuites
+
+If this option is set the TLS 1.3 ciphersuites for the connection will be
+set to the given value. This is similar to SSL_cipher_list, but only for TLS 1.3
+ciphers. See argument C<-ciphersuits> in the OpenSSL documentation
+(L<https://www.openssl.org/docs/manmaster/man1/openssl-ciphers.html>) for
+details.
+
+Unless you fail to contact your peer because of no shared ciphers it is
+recommended to leave this option at the default setting, which uses the system
+default.
 
 In case different cipher lists are needed for different SNI hosts a hash can be
 given with the host as key and the cipher suite as value, similar to
