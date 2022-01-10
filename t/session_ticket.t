@@ -57,6 +57,10 @@ my $clctx = IO::Socket::SSL::SSL_Context->new(
     SSL_key => $client_key,
     SSL_ca => [ $cert ],
 
+    # LibreSSL has currently no support for TLS 1.3 session handling
+    # therefore enforce TLS 1.2
+    Net::SSLeay::constant("LIBRESSL_VERSION_NUMBER") ?
+	(SSL_version => 'TLSv1_2') :
     # versions of Net::SSLeay with support for SESSION_up_ref have also the
     # other functionality needed for proper TLS 1.3 session handling
     defined(&Net::SSLeay::SESSION_up_ref) ? ()

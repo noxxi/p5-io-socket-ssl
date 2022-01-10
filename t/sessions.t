@@ -43,13 +43,17 @@ sub client {
     $what = 'client';
     @servers = ();
     my $ctx = IO::Socket::SSL::SSL_Context->new(
-	 SSL_ca_file => "certs/test-ca.pem",
-	 # make cache large enough since we get multiple tickets with TLS 1.3
-	 SSL_session_cache_size => 100,
+	SSL_ca_file => "certs/test-ca.pem",
+	# make cache large enough since we get multiple tickets with TLS 1.3
+	SSL_session_cache_size => 100,
+	# LibreSSL has currently no support for TLS 1.3 session handling
+	# therefore enforce TLS 1.2
+	Net::SSLeay::constant("LIBRESSL_VERSION_NUMBER") ?
+	    (SSL_version => 'TLSv1_2') :
 	# versions of Net::SSLeay with support for SESSION_up_ref have also the
 	# other functionality needed for proper TLS 1.3 session handling
-	defined(&Net::SSLeay::SESSION_up_ref) ? ()
-	    : (SSL_version => 'SSLv23:!TLSv1_3:!SSLv3:!SSLv2'),
+	defined(&Net::SSLeay::SESSION_up_ref) ? () :
+	    (SSL_version => 'SSLv23:!TLSv1_3:!SSLv3:!SSLv2'),
     );
 
     my $cache = $ctx->{session_cache} or do {
