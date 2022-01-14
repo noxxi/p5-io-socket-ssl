@@ -80,8 +80,10 @@ sub _server {
     defined( my $pid = fork()) or die $!;
     if ( $pid ) {
 	push @child,$pid;
+	my $saddr = '127.0.0.1:'.$sock->sockport;
+	close($sock);
 	return (
-	    '127.0.0.1:'.$sock->sockport,
+	    $saddr,
 	    map { [ 
 		'sha1$'.Net::SSLeay::X509_get_fingerprint($_,'sha1'),
 		'sha1$pub$'.unpack("H*",Net::SSLeay::X509_pubkey_digest($_,
