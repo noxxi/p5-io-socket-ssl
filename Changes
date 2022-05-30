@@ -1,3 +1,9 @@
+2.075
+- treat SSL_write returning 0 same as previously -1, as suggested by both
+  OpenSSL and LibreSSL documentation
+- propagate error from SSL_shutdown, but if the shutdown is caused by an outer
+  SSL error keep the original error
+- small tests fixes
 2.074
 - add SSL_ciphersuites option for TLS 1.3 ciphers
 - no longer use own default for ciphers, instead use system default but disable
