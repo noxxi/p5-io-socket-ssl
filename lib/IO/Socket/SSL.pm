@@ -1211,7 +1211,7 @@ sub _generic_write {
     } else {
 	$written = Net::SSLeay::write_partial( $ssl,$offset,$length,$$buffer );
 	# write_partial does SSL_write which returns -1 on error
-	$written = undef if $written < 0;
+	$written = undef if $written <= 0;
     }
     if ( !defined($written) ) {
 	if ( my $err = $self->_skip_rw_error( $ssl,-1 )) {
