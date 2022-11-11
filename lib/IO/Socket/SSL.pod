@@ -545,8 +545,8 @@ The following debugs levels are defined, but used not in any consistent way:
 
 =item *
 
-2 - Print also information about call flow from L<IO::Socket::SSL> and progress
-information from L<Net::SSLeay>.
+2 - Print also information about call flow from L<IO::Socket::SSL>, progress
+information from L<Net::SSLeay> and state information from OpenSSL.
 
 =item *
 

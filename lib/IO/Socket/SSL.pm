@@ -193,6 +193,8 @@ if ( defined &Net::SSLeay::CTX_set_min_proto_version
     };
 }
 
+my $set_msg_callback = defined &Net::SSLeay::CTX_set_msg_callback
+    && \&Net::SSLeay::CTX_set_msg_callback;
 
 # global defaults
 my %DEFAULT_SSL_ARGS = (
@@ -2471,7 +2473,8 @@ sub new {
 	}
 
 	Net::SSLeay::CTX_set_options($ctx,$ssl_op);
-	eval { Net::SSLeay::CTX_set_msg_callback($ctx, \&IO::Socket::SSL::Trace::ossl_trace) };
+	$DEBUG>=2 && $set_msg_callback
+	    && $set_msg_callback->($ctx, \&IO::Socket::SSL::Trace::ossl_trace);
 
 	# enable X509_V_FLAG_PARTIAL_CHAIN if possible (OpenSSL 1.1.0+)
 	$check_partial_chain && $check_partial_chain->($ctx);
@@ -3476,8 +3479,7 @@ package IO::Socket::SSL::Trace;
 *DEBUG = *IO::Socket::SSL::DEBUG;
 
 # Exhaustive list of constants we need for tracing
-my %trace_constants = map { $_ => eval { Net::SSLeay->$_ } || -1 }
-qw/
+my %trace_constants = map { $_ => eval { Net::SSLeay->$_ } || -1 } qw(
     SSL2_VERSION
     SSL3_VERSION
     TLS1_VERSION
@@ -3520,7 +3522,8 @@ qw/
     SSL3_MT_KEY_UPDATE
     SSL3_MT_NEXT_PROTO
     SSL3_MT_MESSAGE_HASH
-/;
+);
+
 #
 # Major versions
 #
@@ -3528,23 +3531,85 @@ $trace_constants{SSL2_VERSION_MAJOR} = $trace_constants{SSL2_VERSION} >> 8;
 $trace_constants{SSL3_VERSION_MAJOR} = $trace_constants{SSL3_VERSION} >> 8;
 
 #
+# Mapping between trace constant and version string
+#
+my %tc_ver2s;
+for (
+    [ SSL2_VERSION    => "SSLv2" ],
+    [ SSL2_VERSION    => "SSLv2" ],
+    [ SSL3_VERSION    => "SSLv3" ],
+    [ TLS1_VERSION    => "TLSv1.0" ],
+    [ TLS1_1_VERSION  => "TLSv1.1" ],
+    [ TLS1_2_VERSION  => "TLSv1.2" ],
+    [ TLS1_3_VERSION  => "TLSv1.3" ],
+    [ DTLS1_VERSION   => "DTLSv1.0" ],
+    [ DTLS1_2_VERSION => "DTLSv1.2" ],
+    [ DTLS1_BAD_VER   => "DTLSv1.0 (bad)" ]
+) {
+    next if $trace_constants{$_->[0]} == -1;
+    $tc_ver2s{$trace_constants{$_->[0]}} = $_->[1];
+}
+
+my %tc_type2s;
+for (
+    [ SSL3_RT_HEADER             => "TLS header" ],
+    [ SSL3_RT_CHANGE_CIPHER_SPEC => "TLS change cipher" ],
+    [ SSL3_RT_ALERT              => "TLS alert" ],
+    [ SSL3_RT_HANDSHAKE          => "TLS handshake" ],
+    [ SSL3_RT_APPLICATION_DATA   => "TLS app data" ]
+) {
+    next if $trace_constants{$_->[0]} == -1;
+    $tc_type2s{$trace_constants{$_->[0]}} = $_->[1];
+}
+
+my %tc_msgtype2s;
+for(
+    [ SSL2_MT_ERROR               => "Error" ],
+    [ SSL2_MT_CLIENT_HELLO        => "Client hello" ],
+    [ SSL2_MT_CLIENT_MASTER_KEY   => "Client key" ],
+    [ SSL2_MT_CLIENT_FINISHED     => "Client finished" ],
+    [ SSL2_MT_SERVER_HELLO        => "Server hello" ],
+    [ SSL2_MT_SERVER_VERIFY       => "Server verify" ],
+    [ SSL2_MT_SERVER_FINISHED     => "Server finished" ],
+    [ SSL2_MT_REQUEST_CERTIFICATE => "Request CERT" ],
+    [ SSL2_MT_REQUEST_CERTIFICATE => "Client CERT" ]
+) {
+    next if $trace_constants{$_->[0]} == -1;
+    $tc_msgtype2s{$trace_constants{SSL2_VERSION_MAJOR}, $trace_constants{$_->[0]}} = $_->[1];
+}
+for(
+    [ SSL3_MT_HELLO_REQUEST        => "Hello request" ],
+    [ SSL3_MT_CLIENT_HELLO         => "Client hello" ],
+    [ SSL3_MT_SERVER_HELLO         => "Server hello" ],
+    [ SSL3_MT_NEWSESSION_TICKET    => "Newsession Ticket" ],
+    [ SSL3_MT_CERTIFICATE          => "Certificate" ],
+    [ SSL3_MT_SERVER_KEY_EXCHANGE  => "Server key exchange" ],
+    [ SSL3_MT_CLIENT_KEY_EXCHANGE  => "Client key exchange" ],
+    [ SSL3_MT_CERTIFICATE_REQUEST  => "Request CERT" ],
+    [ SSL3_MT_SERVER_DONE          => "Server finished" ],
+    [ SSL3_MT_CERTIFICATE_VERIFY   => "CERT verify" ],
+    [ SSL3_MT_FINISHED             => "Finished" ],
+    [ SSL3_MT_CERTIFICATE_STATUS   => "Certificate Status" ],
+    [ SSL3_MT_ENCRYPTED_EXTENSIONS => "Encrypted Extensions" ],
+    [ SSL3_MT_SUPPLEMENTAL_DATA    => "Supplemental data" ],
+    [ SSL3_MT_END_OF_EARLY_DATA    => "End of early data" ],
+    [ SSL3_MT_KEY_UPDATE           => "Key update" ],
+    [ SSL3_MT_NEXT_PROTO           => "Next protocol" ],
+    [ SSL3_MT_MESSAGE_HASH         => "Message hash" ]
+) {
+    next if $trace_constants{$_->[0]} == -1;
+    $tc_msgtype2s{$trace_constants{SSL3_VERSION_MAJOR}, $trace_constants{$_->[0]}} = $_->[1];
+}
+
+#
 # Translation of curl ossl_trace
 #
 
 sub ossl_trace {
+    $DEBUG>=2 or return;
     my ($direction, $ssl_ver, $content_type, $buf, $len, $ssl, $userp) = @_;
 
-    my $verstr;
-    if    ($ssl_ver == $trace_constants{SSL2_VERSION})    { $verstr = "SSLv2";          }
-    elsif ($ssl_ver == $trace_constants{SSL3_VERSION})    { $verstr = "SSLv3";          }
-    elsif ($ssl_ver == $trace_constants{TLS1_VERSION})    { $verstr = "TLSv1.1";        }
-    elsif ($ssl_ver == $trace_constants{TLS1_1_VERSION})  { $verstr = "TLSv1.1";        }
-    elsif ($ssl_ver == $trace_constants{TLS1_2_VERSION})  { $verstr = "TLSv1.2";        }
-    elsif ($ssl_ver == $trace_constants{TLS1_3_VERSION})  { $verstr = "TLSv1.3";        }
-    elsif ($ssl_ver == $trace_constants{DTLS1_VERSION})   { $verstr = "DTLSv1.0";       }
-    elsif ($ssl_ver == $trace_constants{DTLS1_2_VERSION}) { $verstr = "DTLSv1.2";       }
-    elsif ($ssl_ver == $trace_constants{DTLS1_BAD_VER})   { $verstr = "DTLSv1.0 (bad)"; }
-    else                                                  { $verstr = "$ssl_ver";       }
+    my $verstr = $tc_ver2s{$ssl_ver} || "(version=$ssl_ver)";
 
     # Log progress for interesting records only (like Handshake or Alert), skip
     # all raw record headers (content_type == SSL3_RT_HEADER or ssl_ver == 0).
@@ -3559,12 +3624,9 @@ sub ossl_trace {
         # always pass-up content-type as 0. But the interesting message-type
         # is at 'buf[0]'.
 
-        my $tls_rt_name;
-        if ($ssl_ver == $trace_constants{SSL3_VERSION_MAJOR} && $content_type) {
-            $tls_rt_name = tls_rt_type($content_type);
-        } else {
-            $tls_rt_name = "";
-        }
+	my $tls_rt_name = ($ssl_ver == $trace_constants{SSL3_VERSION_MAJOR} && $content_type)
+	    ? $tc_type2s{$content_type} || "TLS Unknown (type=$content_type)"
+	    : "";
 
         my $msg_type;
         my $msg_name;
@@ -3577,69 +3639,18 @@ sub ossl_trace {
             $msg_name = eval { Net::SSLeay::SSL_alert_desc_string_long($msg_type) } || "Unknown alert";
         } else {
             $msg_type = unpack('c1', $buf);
-            $msg_name = ssl_msg_type($ssl_ver, $msg_type);
+	    $msg_name = $tc_msgtype2s{$ssl_ver, $msg_type} || "Unknown (ssl_ver=$ssl_ver, msg=$msg_type)";
         }
-        $DEBUG>=3 && DEBUG(sprintf("* %s (%s), %s, %s (%d)", $verstr, $direction ? "OUT" : "IN", $tls_rt_name, $msg_name, $msg_type));
+	DEBUG(sprintf("* %s (%s), %s, %s (%d)",
+	    $verstr, $direction ? "OUT" : "IN", $tls_rt_name, $msg_name, $msg_type));
     }
 
     #
     # Here one might want to hexdump $buf (?)
     #
     # $DEBUG>=4 && printf STDERR "%s", hexdump($buf);
-
-    return $ssl;
 }
 
-sub tls_rt_type {
-    my ($type) = @_;
-
-    if    ($type == $trace_constants{SSL3_RT_HEADER})             { return "TLS header";        }
-    elsif ($type == $trace_constants{SSL3_RT_CHANGE_CIPHER_SPEC}) { return "TLS change cipher"; }
-    elsif ($type == $trace_constants{SSL3_RT_ALERT})              { return "TLS alert";         }
-    elsif ($type == $trace_constants{SSL3_RT_HANDSHAKE})          { return "TLS handshake";     }
-    elsif ($type == $trace_constants{SSL3_RT_APPLICATION_DATA})   { return "TLS app data";      }
-
-    return "TLS Unknown (type=$type)";
-}
-
-sub ssl_msg_type {
-    my ($ssl_ver, $msg) = @_;
-
-    if ($ssl_ver == $trace_constants{SSL2_VERSION_MAJOR}) {
-        if ($msg == $trace_constants{SSL2_MT_ERROR})               { return "Error";           }
-        if ($msg == $trace_constants{SSL2_MT_CLIENT_HELLO})        { return "Client hello";    }
-        if ($msg == $trace_constants{SSL2_MT_CLIENT_MASTER_KEY})   { return "Client key";      }
-        if ($msg == $trace_constants{SSL2_MT_CLIENT_FINISHED})     { return "Client finished"; }
-        if ($msg == $trace_constants{SSL2_MT_SERVER_HELLO})        { return "Server hello";    }
-        if ($msg == $trace_constants{SSL2_MT_SERVER_VERIFY})       { return "Server verify";   }
-        if ($msg == $trace_constants{SSL2_MT_SERVER_FINISHED})     { return "Server finished"; }
-        if ($msg == $trace_constants{SSL2_MT_REQUEST_CERTIFICATE}) { return "Request CERT";    }
-        if ($msg == $trace_constants{SSL2_MT_REQUEST_CERTIFICATE}) { return "Client CERT";     }
-    }
-
-    if ($ssl_ver == $trace_constants{SSL3_VERSION_MAJOR}) {
-        if ($msg == $trace_constants{SSL3_MT_HELLO_REQUEST})        { return "Hello request";        }
-        if ($msg == $trace_constants{SSL3_MT_CLIENT_HELLO})         { return "Client hello";         }
-        if ($msg == $trace_constants{SSL3_MT_SERVER_HELLO})         { return "Server hello";         }
-        if ($msg == $trace_constants{SSL3_MT_NEWSESSION_TICKET})    { return "Newsession Ticket";    }
-        if ($msg == $trace_constants{SSL3_MT_CERTIFICATE})          { return "Certificate";          }
-        if ($msg == $trace_constants{SSL3_MT_SERVER_KEY_EXCHANGE})  { return "Server key exchange";  }
-        if ($msg == $trace_constants{SSL3_MT_CLIENT_KEY_EXCHANGE})  { return "Client key exchange";  }
-        if ($msg == $trace_constants{SSL3_MT_CERTIFICATE_REQUEST})  { return "Request CERT";         }
-        if ($msg == $trace_constants{SSL3_MT_SERVER_DONE})          { return "Server finished";      }
-        if ($msg == $trace_constants{SSL3_MT_CERTIFICATE_VERIFY})   { return "CERT verify";          }
-        if ($msg == $trace_constants{SSL3_MT_FINISHED})             { return "Finished";             }
-        if ($msg == $trace_constants{SSL3_MT_CERTIFICATE_STATUS})   { return "Certificate Status";   }
-        if ($msg == $trace_constants{SSL3_MT_ENCRYPTED_EXTENSIONS}) { return "Encrypted Extensions"; }
-        if ($msg == $trace_constants{SSL3_MT_SUPPLEMENTAL_DATA})    { return "Supplemental data";    }
-        if ($msg == $trace_constants{SSL3_MT_END_OF_EARLY_DATA})    { return "End of early data";    }
-        if ($msg == $trace_constants{SSL3_MT_KEY_UPDATE})           { return "Key update";           }
-        if ($msg == $trace_constants{SSL3_MT_NEXT_PROTO})           { return "Next protocol";        }
-        if ($msg == $trace_constants{SSL3_MT_MESSAGE_HASH})         { return "Message hash";         }
-    }
-
-    return "Unknown (ssl_ver=$ssl_ver, msg=$msg)";
-}
 
 1;
 
