@@ -36,7 +36,7 @@ my $fingerprints= [
     port => 443
   },
   {
-    fingerprint => 'sha1$pub$151e1d9f65439c2612900df11c6e59b70a4bd135',
+    fingerprint => 'sha1$pub$7397f9dea15c007ad1eabe7a0c895ccac60389b1',
     host => 'www.yahoo.com',
     port => 443,
     subject_hash_ca => '244b5494'
@@ -48,7 +48,7 @@ my $fingerprints= [
     subject_hash_ca => '062cdee6'
   },
   {
-    fingerprint => 'sha1$pub$c78493da803e190c202f103049c74b02ef0a68be',
+    fingerprint => 'sha1$pub$26907a3f3088cf57264f7a0f083767e400ea871e',
     host => 'meine.deutsche-bank.de',
     port => 443,
     subject_hash_ca => '607986c7'
@@ -60,13 +60,13 @@ my $fingerprints= [
     subject_hash_ca => '3513523f'
   },
   {
-    fingerprint => 'sha1$pub$e984dd7aa13ee2856e2e0162a385715b35b7ca99',
+    fingerprint => 'sha1$pub$12b35a6d540bcba5f9ff055fdcc5af0dac67fc73',
     host => 'www.facebook.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$0a9d53f5c6f85aa0b759c7430c83ce4afb88caf6',
+    fingerprint => 'sha1$pub$6ad05c9dd77463152389f755cb6a81c41c33c987',
     host => 'www.live.com',
     port => 443,
     subject_hash_ca => '3513523f'
