@@ -3097,6 +3097,7 @@ sub del_session {
     for (@del) {
 	_del_entry($self,$_);
 	Net::SSLeay::SESSION_free($_->[SESSION]) if $_->[SESSION];
+	@$_ = ();
     }
     return ~~@del;
 }
@@ -3148,6 +3149,7 @@ sub _add_entry {
 	my $l = $self->{ghead}[GPREV];
 	_del_entry($self,$l);
 	Net::SSLeay::SESSION_free($l->[SESSION]) if $l->[SESSION];
+	@$l = ();
     }
 }
 
