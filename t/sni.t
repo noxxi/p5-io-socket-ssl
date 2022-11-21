@@ -68,6 +68,8 @@ if ( $pid == 0 ) {
 	    print "ok # client ssl connect $host\n";
 	    $client->verify_hostname($host,'http') or print "not ";
 	    print "ok # client verify hostname in cert $host\n";
+	    # wait for server to send something to make sure finished accept
+	    <$client>;
 	} else {
 	    print "not ok # client ssl connect $host - $SSL_ERROR\n";
 	    print "ok # skip connect failed\n";
@@ -83,6 +85,7 @@ for my $host (@tests) {
 	my $name = $csock->get_servername;
 	print "not " if ! $name or $name ne $host;
 	print "ok # server got SNI name $host\n";
+	print $csock "hi\n";
     } else {
 	print "not ok # server accept - $SSL_ERROR\n";
 	print "ok # skip accept failed\n";

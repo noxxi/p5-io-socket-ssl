@@ -1,3 +1,8 @@
+2.077 2022/11/21
+- fix memory leak in session cache, thanks to genuaboro
+  https://github.com/noxxi/p5-io-socket-ssl/pull/118
+- more race conditions in tests fixed thanks to jddurand
+  https://github.com/noxxi/p5-io-socket-ssl/issues/97
 2.076 2022/11/12
 - added curl like tracing based on contribution from jddurand
   https://github.com/noxxi/p5-io-socket-ssl/pull/117

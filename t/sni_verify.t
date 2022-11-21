@@ -71,12 +71,12 @@ if ( $pid == 0 ) {
 	    print "ok # client ssl connect $host\n";
 	    $client->verify_hostname($host,'http') or print "not ";
 	    print "ok # client verify hostname in cert $host\n";
+	    # wait for server to send something to make sure finished accept
+	    <$client>;
 	} else {
 	    print "not ok # client ssl connect $host - $SSL_ERROR\n";
 	    print "ok # skip connect failed\n";
 	}
-	# wait for server to send something to make sure finished accept
-	<$client>;
     }
     exit;
 }
