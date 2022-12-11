@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.077';
+our $VERSION = '2.078';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -2365,9 +2365,6 @@ sub new {
 		warn "Cannot determine hostname of peer for verification. ".
 		    "Disabling default hostname verification for now. ".
 		    "Please specify hostname with SSL_verifycn_name and better set SSL_verifycn_scheme too.\n";
-		return $ok;
-	    } elsif ( ! $vcn_scheme && $host =~m{^[\d.]+$|:} ) {
-		# don't try to verify IP by default
 		return $ok;
 	    }
 

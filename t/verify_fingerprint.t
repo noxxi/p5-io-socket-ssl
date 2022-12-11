@@ -11,6 +11,7 @@ plan tests => 13;
 my ($ca1,$cakey1) = CERT_create( CA => 1, subject => { CN => 'ca1' });
 my ($cert1,$key1) = CERT_create( 
     subject => { CN => 'cert1' },
+    subjectAltNames => [ [ DNS => 'cert1' ], [ IP => '127.0.0.1' ] ],
     issuer => [ $ca1,$cakey1 ]
 );
 my ($ca2,$cakey2) = CERT_create( CA => 1, subject => { CN => 'ca2' });
@@ -21,6 +22,7 @@ my ($ica2,$icakey2) = CERT_create(
 );
 my ($cert2,$key2) = CERT_create( 
     subject => { CN => 'cert2' },
+    subjectAltNames => [ [ DNS => 'cert2' ], [ IP => '127.0.0.1' ] ],
     issuer => [ $ica2,$icakey2 ]
 );
 

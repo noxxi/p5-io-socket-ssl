@@ -12,21 +12,6 @@ plan skip_all => 'no support for session ticket key callback'
 
 plan tests => 6;
 
-# create some self signed certificate
-my ($cert,$key) = CERT_create(CA => 1,
-    subject => { CN => 'ca' },
-);
-my ($client_cert,$client_key) = CERT_create(
-    issuer => [ $cert,$key],
-    subject => { CN => 'client' },
-    purpose => { client => 1 }
-);
-my ($server_cert,$server_key) = CERT_create(
-    issuer => [ $cert,$key],
-    subject => { CN => 'server' },
-    purpose => { server => 1 }
-);
-
 # create two servers with the same session ticket callback
 my (@server,@saddr);
 for (1,2) {
@@ -39,6 +24,27 @@ for (1,2) {
     push @saddr, $server->sockhost.':'.$server->sockport;
     diag("listen at $saddr[-1]");
 }
+
+# create some self signed certificate
+my ($cert,$key) = CERT_create(CA => 1,
+    subject => { CN => 'ca' },
+);
+my ($client_cert,$client_key) = CERT_create(
+    issuer => [ $cert,$key],
+    subject => { CN => 'client' },
+    purpose => { client => 1 }
+);
+my ($server_cert,$server_key) = CERT_create(
+    issuer => [ $cert,$key],
+    subject => { CN => 'server' },
+    subjectAltNames => [
+	[ DNS => 'server' ],
+	[ IP => $saddr[0]=~m{^(.*):} && $1 ],
+	[ IP => $saddr[1]=~m{^(.*):} && $1 ],
+    ],
+    purpose => { server => 1 }
+);
+
 
 defined( my $pid = fork() ) || die $!;
 exit(_server()) if ! $pid;

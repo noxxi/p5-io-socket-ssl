@@ -26,6 +26,7 @@ save('test-ca.pem',PEM_cert2string($ca[0]));
 my @server = CERT_create(
     CA => 0,
     subject => { CN => 'server.local' },
+    subjectAltNames => [ [ DNS => 'server.local' ], [ IP => '127.0.0.1' ] ],
     purpose => 'server',
     issuer => \@ca,
     %time_valid,
@@ -37,6 +38,7 @@ $printfp->(server => $server[0]);
 @server = CERT_create(
     CA => 0,
     subject => { CN => 'server2.local' },
+    subjectAltNames => [ [ DNS => 'server2.local' ], [ IP => '127.0.0.1' ] ],
     purpose => 'server',
     issuer => \@ca,
     %time_valid,
@@ -48,6 +50,7 @@ $printfp->(server2 => $server[0]);
 @server = CERT_create(
     CA => 0,
     subject => { CN => 'server-ecc.local' },
+    subjectAltNames => [ [ DNS => 'server-ecc.local' ], [ IP => '127.0.0.1' ] ],
     purpose => 'server',
     issuer => \@ca,
     key => KEY_create_ec(),
@@ -96,6 +99,7 @@ save('test-subca.pem',PEM_cert2string($subca[0]));
 @server = CERT_create(
     CA => 0,
     subject => { CN => 'server.local' },
+    subjectAltNames => [ [ DNS => 'server.local' ], [ IP => '127.0.0.1' ] ],
     purpose => 'server',
     issuer => \@subca,
     %time_valid,
