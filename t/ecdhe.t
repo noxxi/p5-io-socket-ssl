@@ -25,8 +25,8 @@ my $server = IO::Socket::SSL->new(
     LocalAddr => $addr,
     Listen => 2,
     ReuseAddr => 1,
-    SSL_cert_file => "certs/server-cert.pem",
-    SSL_key_file  => "certs/server-key.pem",
+    SSL_cert_file => "t/certs/server-cert.pem",
+    SSL_key_file  => "t/certs/server-key.pem",
     (defined &Net::SSLeay::CTX_set1_groups_list || defined &Net::SSLeay::CTX_set1_curves_list)
 	? (SSL_ecdh_curve => 'prime256v1' ) : (),
 ) || do {

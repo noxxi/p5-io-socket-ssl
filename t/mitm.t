@@ -16,8 +16,8 @@ END { kill 9,@pid }
 my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',
     LocalPort => 0,
-    SSL_cert_file => 'certs/server-cert.pem',
-    SSL_key_file => 'certs/server-key.pem',
+    SSL_cert_file => 't/certs/server-cert.pem',
+    SSL_key_file => 't/certs/server-key.pem',
     Listen => 10,
 );
 ok($server,"server ssl socket");
@@ -45,7 +45,7 @@ my $cl = IO::Socket::SSL->new(
     PeerAddr => $saddr,
     Domain => AF_INET,
     SSL_verify_mode => 1,
-    SSL_ca_file => 'certs/test-ca.pem',
+    SSL_ca_file => 't/certs/test-ca.pem',
 );
 ssl_ok($cl,"ssl connected to server");
 ok( $cl->peer_certificate('subject') =~ m{server\.local}, "subject w/o mitm");
@@ -57,7 +57,7 @@ $cl = IO::Socket::SSL->new(
     PeerAddr => $paddr,
     Domain => AF_INET,
     SSL_verify_mode => 1,
-    SSL_ca_file => 'certs/proxyca.pem',
+    SSL_ca_file => 't/certs/proxyca.pem',
 );
 ssl_ok($cl,"ssl connected to proxy");
 ok( $cl->peer_certificate('subject') =~ m{server\.local}, "subject w/ mitm");
@@ -74,8 +74,8 @@ sub server {
 
 sub proxy {
     my $mitm = IO::Socket::SSL::Intercept->new(
-	proxy_cert_file => 'certs/proxyca.pem',
-	proxy_key_file => 'certs/proxyca.pem',
+	proxy_cert_file => 't/certs/proxyca.pem',
+	proxy_key_file => 't/certs/proxyca.pem',
     );
     while (1) {
 	my $toc = $proxy->accept or next;
@@ -83,7 +83,7 @@ sub proxy {
 	    PeerAddr => $saddr,
 	    Domain => AF_INET,
 	    SSL_verify_mode => 1,
-	    SSL_ca_file => 'certs/test-ca.pem',
+	    SSL_ca_file => 't/certs/test-ca.pem',
 	) or die "failed connect to server: $!, $SSL_ERROR";
 	my ($cert,$key) = $mitm->clone_cert($tos->peer_certificate);
 	$toc = IO::Socket::SSL->start_SSL( $toc,

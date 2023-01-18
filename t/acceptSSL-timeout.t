@@ -43,8 +43,8 @@ sub server {
     if ( IO::Socket::SSL->start_SSL( $client,
 	SSL_server => 1,
 	Timeout => 5,
-	SSL_cert_file => 'certs/server-cert.pem',
-	SSL_key_file => 'certs/server-key.pem',
+	SSL_cert_file => 't/certs/server-cert.pem',
+	SSL_key_file => 't/certs/server-key.pem',
     )) {
 	print "SSL Handshake OK\n";
 	print $client "Hi!\n";

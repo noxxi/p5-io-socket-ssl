@@ -23,14 +23,14 @@ print "1..12\n";
 
 my %certs = (
     SSL_cert_file => {
-	'' => 'certs/server-cert.pem',
-	'%ecc' => "certs/server-ecc-cert.pem",
-	'server2.local' => 'certs/server2-cert.pem',
+	'' => 't/certs/server-cert.pem',
+	'%ecc' => "t/certs/server-ecc-cert.pem",
+	'server2.local' => 't/certs/server2-cert.pem',
     },
     SSL_key_file => {
-	'' => 'certs/server-key.pem',
-	'%ecc' => 'certs/server-ecc-key.pem',
-	'server2.local' => 'certs/server2-key.pem',
+	'' => 't/certs/server-key.pem',
+	'%ecc' => 't/certs/server-ecc-key.pem',
+	'server2.local' => 't/certs/server2-key.pem',
     }
 );
 
@@ -49,7 +49,7 @@ my $server = IO::Socket::SSL->new(
     Listen => 2,
     ReuseAddr => 1,
     SSL_server => 1,
-    SSL_ca_file => "certs/test-ca.pem",
+    SSL_ca_file => "t/certs/test-ca.pem",
     SSL_honor_cipher_order => 0,
     SSL_cipher_list => 'ECDHE-ECDSA-AES128-SHA:ECDHE-RSA-AES128-SHA',
     %certs,
@@ -86,7 +86,7 @@ if ( $pid == 0 ) {
 	    Domain => AF_INET,
 	    SSL_verify_mode => 0,
 	    SSL_hostname => $host,
-	    SSL_ca_file => 'certs/test-ca.pem',
+	    SSL_ca_file => 't/certs/test-ca.pem',
 	    SSL_cipher_list => $ciphers,
 	    # don't use TLS 1.3 since the ciphers there don't specifify the
 	    # authentication mechanism

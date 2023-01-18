@@ -45,8 +45,8 @@ sub server {
 	if ( IO::Socket::SSL->start_SSL( $client,
 	    SSL_server => 1,
 	    Timeout => 30,
-	    SSL_cert_file => 'certs/server-cert.pem',
-	    SSL_key_file => 'certs/server-key.pem',
+	    SSL_cert_file => 't/certs/server-cert.pem',
+	    SSL_key_file => 't/certs/server-key.pem',
 	)) {
 	    print "Server SSL Handshake OK\n";
 	    print $client "Hi!\n";
@@ -62,7 +62,7 @@ sub client {
     print "Connected\n";
     if ( IO::Socket::SSL->start_SSL( $c,
 	Timeout => 5,
-	SSL_ca_file => 'certs/test-ca.pem',
+	SSL_ca_file => 't/certs/test-ca.pem',
     )) {
 	print "Client SSL Handshake OK\n";
 	print <$c>

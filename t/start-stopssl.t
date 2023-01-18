@@ -84,8 +84,8 @@ sub server {
 	    #print STDERR ">>$$ start\n";
 	    IO::Socket::SSL->start_SSL( $client,
 		SSL_server => 1,
-		SSL_cert_file => "certs/client-cert.pem",
-		SSL_key_file => "certs/client-key.pem"
+		SSL_cert_file => "t/certs/client-cert.pem",
+		SSL_key_file => "t/certs/client-key.pem"
 	    ) || die "not ok #server::start_SSL: $SSL_ERROR\n";
 	    #print STDERR "<<$$ start\n";
 

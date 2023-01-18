@@ -12,7 +12,7 @@ my $numtests = 11;
 print "1..$numtests\n";
 
 my $ctx = IO::Socket::SSL::SSL_Context->new(
-     SSL_ca_file => "certs/test-ca.pem",
+     SSL_ca_file => "t/certs/test-ca.pem",
      SSL_session_cache_size => 3,
 );
 

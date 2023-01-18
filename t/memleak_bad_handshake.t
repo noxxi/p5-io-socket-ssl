@@ -46,8 +46,8 @@ my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',
     LocalPort => 0,
     Listen => 200,
-    SSL_cert_file => 'certs/server-cert.pem',
-    SSL_key_file => 'certs/server-key.pem',
+    SSL_cert_file => 't/certs/server-cert.pem',
+    SSL_key_file => 't/certs/server-key.pem',
 );
 
 my $saddr = $server->sockhost.':'.$server->sockport;

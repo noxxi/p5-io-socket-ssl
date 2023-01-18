@@ -27,8 +27,8 @@ my $server = IO::Socket::SSL->new(
     Listen => 2,
     SSL_version => 'SSLv23:!TLSv1_3', # NPN does not exist in TLSv1.3
                                 # https://github.com/openssl/openssl/issues/3665
-    SSL_cert_file => 'certs/server-cert.pem',
-    SSL_key_file => 'certs/server-key.pem',
+    SSL_cert_file => 't/certs/server-cert.pem',
+    SSL_key_file => 't/certs/server-key.pem',
     SSL_npn_protocols => [qw(one two)],
 ) || do {
     ok(0,$!);

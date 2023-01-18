@@ -43,7 +43,7 @@ sub client {
     $what = 'client';
     @servers = ();
     my $ctx = IO::Socket::SSL::SSL_Context->new(
-	SSL_ca_file => "certs/test-ca.pem",
+	SSL_ca_file => "t/certs/test-ca.pem",
 	# make cache large enough since we get multiple tickets with TLS 1.3
 	SSL_session_cache_size => 100,
 	# LibreSSL has currently no support for TLS 1.3 session handling
@@ -116,9 +116,9 @@ sub server {
     my @ctx = map {
 	IO::Socket::SSL::SSL_Context->new(
 	    SSL_server => 1,
-	    SSL_cert_file => "certs/server-cert.pem",
-	    SSL_key_file => "certs/server-key.pem",
-	    SSL_ca_file => "certs/test-ca.pem",
+	    SSL_cert_file => "t/certs/server-cert.pem",
+	    SSL_key_file => "t/certs/server-key.pem",
+	    SSL_ca_file => "t/certs/test-ca.pem",
 	);
     } @servers;
     my @clients;

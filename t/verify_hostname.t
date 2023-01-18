@@ -101,9 +101,9 @@ my $accept = sub {
     my $csock = $server->accept;
     IO::Socket::SSL->start_SSL($csock,
 	SSL_server => 1,
-	SSL_ca_file => "certs/test-ca.pem",
-	SSL_cert_file => "certs/server-wildcard.pem",
-	SSL_key_file => "certs/server-wildcard.pem",
+	SSL_ca_file => "t/certs/test-ca.pem",
+	SSL_cert_file => "t/certs/server-wildcard.pem",
+	SSL_key_file => "t/certs/server-wildcard.pem",
     );
 };
 
@@ -118,7 +118,7 @@ if ( $pid == 0 ) {
     IO::Socket::SSL->new(
 	PeerAddr => $saddr,
 	Domain => AF_INET,
-	SSL_ca_file => "certs/test-ca.pem",
+	SSL_ca_file => "t/certs/test-ca.pem",
 	SSL_verify_mode => 1,
 	SSL_verifycn_scheme => 'www',
 	SSL_verifycn_name => 'www.server.local'
@@ -136,7 +136,7 @@ if ( $pid == 0 ) {
     if (IO::Socket::SSL->new(
 	PeerAddr => $saddr,
 	Domain => AF_INET,
-	SSL_ca_file => "certs/test-ca.pem",
+	SSL_ca_file => "t/certs/test-ca.pem",
 	SSL_verify_mode => 1,
 	SSL_verifycn_scheme => 'www',
 	SSL_verifycn_name => 'does.not.match.server.local'

@@ -7,13 +7,13 @@ use Test::More;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 # create listener
-IO::Socket::SSL::default_ca('certs/test-ca.pem');
+IO::Socket::SSL::default_ca('t/certs/test-ca.pem');
 my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',
     LocalPort => 0,
     Listen => 2,
-    SSL_cert_file => 'certs/server-cert.pem',
-    SSL_key_file => 'certs/server-key.pem',
+    SSL_cert_file => 't/certs/server-cert.pem',
+    SSL_key_file => 't/certs/server-key.pem',
     # start as plain and upgrade later
     SSL_startHandshake => 0,
 ) || die "not ok #tcp listen failed: $!\n";

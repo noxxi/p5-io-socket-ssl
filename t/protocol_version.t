@@ -22,8 +22,8 @@ my $server = IO::Socket::SSL->new(
     SSL_server => 1,
     SSL_startHandshake => 0,
     SSL_version => 'SSLv23', # allow SSLv3 too
-    SSL_cert_file => 'certs/server-cert.pem',
-    SSL_key_file  => 'certs/server-key.pem',
+    SSL_cert_file => 't/certs/server-cert.pem',
+    SSL_key_file  => 't/certs/server-key.pem',
 ) or BAIL_OUT("cannot listen on localhost: $!");
 print "not ok\n", exit if !$server;
 my $saddr = $server->sockhost().':'.$server->sockport();

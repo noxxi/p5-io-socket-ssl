@@ -30,8 +30,8 @@ my %server_args = (
     Listen => 2,
     SSL_server => 1,
     SSL_verify_mode => 0x00,
-    SSL_ca_file => "certs/test-ca.pem",
-    SSL_key_file => "certs/client-key.pem",
+    SSL_ca_file => "t/certs/test-ca.pem",
+    SSL_key_file => "t/certs/client-key.pem",
 );
 
 my ($x509,@server);
@@ -40,7 +40,7 @@ foreach my $test ( 1,2,3 ) {
     my $spec;
     if ( $test == 1 ) {
 	# 1st test:  create server with SSL_cert_file
-	$args{SSL_cert_file} = "certs/client-cert.pem";
+	$args{SSL_cert_file} = "t/certs/client-cert.pem";
 	$spec = 'Using SSL_cert_file';
     } elsif ( $test == 2 ) {
 	# 2nd test:  use x509 from previous server

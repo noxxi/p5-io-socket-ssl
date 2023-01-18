@@ -53,8 +53,8 @@ my $contact = $server->accept;
 my $socket_to_ssl = IO::Socket::SSL::socketToSSL($contact, {
     SSL_server => 1,
     SSL_verify_mode => 0,
-    SSL_cert_file => 'certs/server-cert.pem',
-    SSL_key_file => 'certs/server-key.pem',
+    SSL_cert_file => 't/certs/server-cert.pem',
+    SSL_key_file => 't/certs/server-key.pem',
 });
 ok( $socket_to_ssl, "socketToSSL");
 <$contact>;

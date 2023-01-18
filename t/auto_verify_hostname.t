@@ -28,8 +28,8 @@ my $server = IO::Socket::SSL->new(
     Listen => 2,
     ReuseAddr => 1,
     SSL_server => 1,
-    SSL_cert_file => "certs/server-wildcard.pem",
-    SSL_key_file => "certs/server-wildcard.pem",
+    SSL_cert_file => "t/certs/server-wildcard.pem",
+    SSL_key_file => "t/certs/server-wildcard.pem",
 );
 warn "\$!=$!, \$\@=$@, S\$SSL_ERROR=$SSL_ERROR" if ! $server;
 ok( $server, "Server Initialization");
@@ -45,7 +45,7 @@ if ( $pid == 0 ) {
 }
 
 close($server);
-IO::Socket::SSL::default_ca('certs/test-ca.pem');
+IO::Socket::SSL::default_ca('t/certs/test-ca.pem');
 for( my $i=0;$i<@tests;$i+=3 ) {
     my ($name,$scheme,$result) = @tests[$i,$i+1,$i+2];
     my $cl = IO::Socket::SSL->new(

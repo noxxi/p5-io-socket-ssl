@@ -21,8 +21,8 @@ my $server = IO::Socket::SSL->new(
     LocalAddr => $addr,
     Listen => 2,
     ReuseAddr => 1,
-    SSL_cert_file => "certs/server-cert.pem",
-    SSL_key_file  => "certs/server-key.pem",
+    SSL_cert_file => "t/certs/server-cert.pem",
+    SSL_key_file  => "t/certs/server-key.pem",
     SSL_cipher_list => 'DH:!aNULL',  # allow only DH ciphers
 ) || do {
     notok($!);

@@ -15,7 +15,7 @@ my $saddr = $srv->sockhost.':'.$srv->sockport;
 my ($fh,$pemfile) = tempfile();
 my $master = $$;
 END { unlink($pemfile) if $$ == $master };
-for ('certs/server-cert.pem','certs/server-key.pem') {
+for ('t/certs/server-cert.pem','t/certs/server-key.pem') {
     open( my $pf,'<',$_ ) or die "open $_: $!";
     print $fh do { local $/; <$pf> };
 }
@@ -23,26 +23,26 @@ close($fh);
 
 my @tests = (
     'PEM' => {
-	SSL_cert_file => 'certs/server-cert.pem',
-	SSL_key_file => 'certs/server-key.pem',
+	SSL_cert_file => 't/certs/server-cert.pem',
+	SSL_key_file => 't/certs/server-key.pem',
     },
     'PEM_one_file' => {
 	SSL_cert_file => $pemfile,
     },
     'PEM_keyenc' => {
-	SSL_cert_file => 'certs/server-cert.pem',
-	SSL_key_file => 'certs/server-key.enc',
+	SSL_cert_file => 't/certs/server-cert.pem',
+	SSL_key_file => 't/certs/server-key.enc',
 	SSL_passwd_cb => sub { "bluebell" },
     },
     'DER' => {
-	SSL_cert_file => 'certs/server-cert.der',
-	SSL_key_file => 'certs/server-key.der',
+	SSL_cert_file => 't/certs/server-cert.der',
+	SSL_key_file => 't/certs/server-key.der',
     },
     'PKCS12' => {
-	SSL_cert_file => 'certs/server.p12',
+	SSL_cert_file => 't/certs/server.p12',
     },
     'PKCS12_enc' => {
-	SSL_cert_file => 'certs/server_enc.p12',
+	SSL_cert_file => 't/certs/server_enc.p12',
 	SSL_passwd_cb => sub { "bluebell" },
     },
 );

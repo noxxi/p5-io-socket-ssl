@@ -25,8 +25,8 @@ my $addr = '127.0.0.1';
 my $server = IO::Socket::SSL->new(
     LocalAddr => $addr,
     Listen => 2,
-    SSL_cert_file => 'certs/server-cert.pem',
-    SSL_key_file => 'certs/server-key.pem',
+    SSL_cert_file => 't/certs/server-cert.pem',
+    SSL_key_file => 't/certs/server-key.pem',
     SSL_alpn_protocols => [qw(one two)],
 ) || do {
     ok(0,"server creation failed: $!");

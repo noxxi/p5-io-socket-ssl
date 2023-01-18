@@ -19,9 +19,9 @@ my $server = IO::Socket::SSL->new(
     LocalPort => 0,
     Listen => 2,
     SSL_server => 1,
-    SSL_ca_file => "certs/test-ca.pem",
-    SSL_cert_file => "certs/server-wildcard.pem",
-    SSL_key_file => "certs/server-wildcard.pem",
+    SSL_ca_file => "t/certs/test-ca.pem",
+    SSL_cert_file => "t/certs/server-wildcard.pem",
+    SSL_key_file => "t/certs/server-wildcard.pem",
 );
 warn "\$!=$!, \$\@=$@, S\$SSL_ERROR=$SSL_ERROR" if ! $server;
 print "not ok\n", exit if !$server;

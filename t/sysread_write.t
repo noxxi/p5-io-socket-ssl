@@ -27,8 +27,8 @@ my $server = IO::Socket::SSL->new(
     LocalAddr => '127.0.0.1',
     LocalPort => 0,
     Listen => 2,
-    SSL_cert_file => "certs/server-cert.pem",
-    SSL_key_file => "certs/server-key.pem",
+    SSL_cert_file => "t/certs/server-cert.pem",
+    SSL_key_file => "t/certs/server-key.pem",
 );
 print "not ok: $!\n", exit if !$server;
 ok("Server Initialization");
@@ -48,7 +48,7 @@ if ( $pid == 0 ) {
     my $to_server = IO::Socket::SSL->new(
 	PeerAddr => $saddr,
 	Domain => AF_INET,
-	SSL_ca_file => "certs/test-ca.pem",
+	SSL_ca_file => "t/certs/test-ca.pem",
     ) || do {
 	print "not ok: connect failed: $!\n";
 	exit

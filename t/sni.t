@@ -23,18 +23,18 @@ my $server = IO::Socket::SSL->new(
     Listen => 2,
     ReuseAddr => 1,
     SSL_server => 1,
-    SSL_ca_file => "certs/test-ca.pem",
+    SSL_ca_file => "t/certs/test-ca.pem",
     SSL_cert_file => {
-	'server.local' => 'certs/server-cert.pem',
-	'server2.local' => 'certs/server2-cert.pem',
-	'smtp.mydomain.local' => "certs/server-wildcard.pem",
-	'' => "certs/server-wildcard.pem",
+	'server.local' => 't/certs/server-cert.pem',
+	'server2.local' => 't/certs/server2-cert.pem',
+	'smtp.mydomain.local' => "t/certs/server-wildcard.pem",
+	'' => "t/certs/server-wildcard.pem",
     },
     SSL_key_file => {
-	'server.local' => 'certs/server-key.pem',
-	'server2.local' => 'certs/server2-key.pem',
-	'smtp.mydomain.local' => "certs/server-wildcard.pem",
-	'' => "certs/server-wildcard.pem",
+	'server.local' => 't/certs/server-key.pem',
+	'server2.local' => 't/certs/server2-key.pem',
+	'smtp.mydomain.local' => "t/certs/server-wildcard.pem",
+	'' => "t/certs/server-wildcard.pem",
     },
 );
 
@@ -62,7 +62,7 @@ if ( $pid == 0 ) {
 	    Domain => AF_INET,
 	    SSL_verify_mode => 1,
 	    SSL_hostname => $host,
-	    SSL_ca_file => 'certs/test-ca.pem',
+	    SSL_ca_file => 't/certs/test-ca.pem',
 	);
 	if ($client) {
 	    print "ok # client ssl connect $host\n";

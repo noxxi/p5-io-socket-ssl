@@ -1,3 +1,6 @@
+2.080 2023/01/18
+- move certs into t/ so that distributions like CentOS don't install the
+  test certificates as part of the documentation any longer.
 2.079 2023/01/16
 - properly extract IPv6 address for verification from PeerAddr if not explicitly
   given as SSL_verifycn_name.

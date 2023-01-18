@@ -47,8 +47,8 @@ if ( $pid == 0 ) {
 
     unless ( IO::Socket::SSL->start_SSL( $client,
 	SSL_verify_mode => 0,
-	SSL_cert_file => "certs/client-cert.pem",
-	SSL_key_file => "certs/client-key.enc",
+	SSL_cert_file => "t/certs/client-cert.pem",
+	SSL_key_file => "t/certs/client-key.enc",
 	SSL_passwd_cb => sub { return "opossum" }
     )) {
 	#DEBUG( $SSL_ERROR );
@@ -64,7 +64,7 @@ if ( $pid == 0 ) {
     $client->sock_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
     ok("client local certificate issuer");
     $client->get_fingerprint('sha256',$client->sock_certificate)
-	eq $getfp->('certs/client-cert.pem')
+	eq $getfp->('t/certs/client-cert.pem')
 	or print "not ";
     ok("client local certificate fingerprint");
 
@@ -73,7 +73,7 @@ if ( $pid == 0 ) {
     $client->peer_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
     ok("client peer certificate issuer");
     $client->get_fingerprint()
-	eq $getfp->('certs/server-cert.pem')
+	eq $getfp->('t/certs/server-cert.pem')
 	or print "not ";
     ok("client peer certificate fingerprint");
 
@@ -89,9 +89,9 @@ ok( "tcp accept" );
 IO::Socket::SSL->start_SSL( $csock,
     SSL_server => 1,
     SSL_verify_mode => SSL_VERIFY_PEER|SSL_VERIFY_FAIL_IF_NO_PEER_CERT,
-    SSL_ca_file => "certs/test-ca.pem",
-    SSL_cert_file => "certs/server-cert.pem",
-    SSL_key_file => "certs/server-key.enc",
+    SSL_ca_file => "t/certs/test-ca.pem",
+    SSL_cert_file => "t/certs/server-cert.pem",
+    SSL_key_file => "t/certs/server-key.enc",
     SSL_passwd_cb => sub { return "bluebell" },
 ) || print "not ";
 #DEBUG( $IO::Socket::SSL::ERROR );
@@ -105,7 +105,7 @@ ok("server local certificate subject");
 $csock->sock_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
 ok("server local certificate issuer");
 $csock->get_fingerprint('sha256',$csock->sock_certificate)
-    eq $getfp->('certs/server-cert.pem')
+    eq $getfp->('t/certs/server-cert.pem')
     or print "not ";
 ok("server local certificate fingerprint");
 
@@ -114,7 +114,7 @@ ok("server peer certificate subject");
 $csock->peer_certificate('issuer') =~ /IO::Socket::SSL Demo CA/ or print "not ";
 ok("server peer certificate issuer");
 $csock->get_fingerprint()
-    eq $getfp->('certs/client-cert.pem')
+    eq $getfp->('t/certs/client-cert.pem')
     or print "not ";
 ok("server peer certificate fingerprint");
 

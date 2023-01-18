@@ -21,8 +21,8 @@ my $server = IO::Socket::SSL->new(
     LocalPort => 0,
     Listen => 2,
     ReuseAddr => 1,
-    SSL_cert_file => "certs/sub-server.pem",
-    SSL_key_file => "certs/sub-server.pem",
+    SSL_cert_file => "t/certs/sub-server.pem",
+    SSL_key_file => "t/certs/sub-server.pem",
 );
 warn "\$!=$!, \$\@=$@, S\$SSL_ERROR=$SSL_ERROR" if ! $server;
 print "not ok\n", exit if !$server;
@@ -35,7 +35,7 @@ if ( $pid == 0 ) {
     my $client = IO::Socket::SSL->new(
 	PeerAddr => $saddr,
 	Domain => AF_INET,
-	SSL_ca_file => "certs/test-subca.pem",
+	SSL_ca_file => "t/certs/test-subca.pem",
     ) or print "not ";
     ok( "client ssl connect" );
     if ($client) {
