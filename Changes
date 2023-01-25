@@ -1,3 +1,8 @@
+2.081 2023/01/25
+- new function set_msg_callback for user defined callback on each SSL message
+- showcase function in example/ssl_client.pl and example/ssl_server.pl for
+  computing JA3S/JA3 fingerprints
+- fix tracing added in 2.076 to no longer include SSL3_RT_HEADER (noise)
 2.080 2023/01/18
 - move certs into t/ so that distributions like CentOS don't install the
   test certificates as part of the documentation any longer.

@@ -5,6 +5,7 @@ use strict;
 use warnings;
 use IO::Socket::SSL;
 use Getopt::Long qw(:config posix_default bundling);
+use Digest::MD5 'md5_hex';
 
 my ($cert_file,$key_file,$key_pass,$ca,$name,$no_verify);
 GetOptions(
@@ -49,9 +50,48 @@ my $cl = IO::Socket::SSL->new(
 	SSL_cert_file => $cert_file,
 	SSL_key_file  => $key_file,
 	defined($key_pass) ? ( SSL_passwd_cb => sub { $key_pass } ):(),
-    ):()
+    ):(),
+    SSL_startHandshake => 0,
 ) or die "failed to connect to $addr: $!,$SSL_ERROR";
+
+my $ja3s;
+$cl->set_msg_callback(\&msgcb, \$ja3s);
+$cl->connect_SSL() or die "failed SSL handshake: $SSL_ERROR";
 
 warn "new SSL connection with cipher=".$cl->get_cipher." version=".$cl->get_sslversion." certificate:\n".
     "\tsubject=".$cl->peer_certificate('subject')."\n".
-    "\tissuer=".$cl->peer_certificate('issuer')."\n"
+    "\tissuer=".$cl->peer_certificate('issuer')."\n".
+    "\tja3s=".md5_hex($ja3s)." $ja3s\n";
+
+
+sub msgcb {
+    my ($self, $direction, $ssl_ver, $content_type, $buf, $len, $ssl, $ja3s_r) = @_;
+    $content_type == 22 or return;  # TLS handshake
+    #  1 byte: msg type
+    #  3 byte: length
+    (my $msg_type, $buf) = unpack('c x3 a*', $buf);
+    if ($msg_type == 2) {  # Server Hello
+	$self->set_msg_callback(undef);  # no need to look further
+
+	#  2 byte: protocol version
+	# 32 byte: random
+	# 1/...  : session id
+	#  2 byte: cipher suite
+	#  1 byte: compression method
+	# 2/...  : extensions
+	my ($ver, $cipher, $ext) = unpack("n x32 c/x n x n/a", $buf);
+
+	my @ext;
+	while (length($ext)>2) {
+	    # 2 byte: extension type
+	    # 2|... : extension data
+	    (my $ext_type, $ext) = unpack("n n/x a*", $ext);
+	    push @ext, $ext_type;
+	}
+	$$ja3s_r = join(",",
+	    $ver,
+	    $cipher,
+	    join("-", @ext)
+	);
+    }
+}

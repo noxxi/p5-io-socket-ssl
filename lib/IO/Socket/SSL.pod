@@ -1901,6 +1901,34 @@ As long as the function returns undef and $! is set to EWOULDBLOCK one could
 retry the call after the socket got readable (SSL_WANT_READ) or writeable
 (SSL_WANT_WRITE).
 
+=item B<set_msg_callback>
+
+This will add/remove a user defined callback for each message, internally using
+openssl SSL_set_msg_callback API. To make sure that the callback is active
+before the handshake starts, combine it with C<< SSL_startHandshake => 0 >> in
+the preceding setup of the SSL object. To remove callback explicitly call it
+with an empty callback function.
+
+Example:
+
+    $sock = IO::Socket::SSL->new( .... , SSL_startHandshake => 0);
+    # set callback
+    $sock->set_msg_callback(\&cb, $cbarg1, $cbarg2);
+    $sock->connect_SSL();
+
+    sub cb {
+	my ($sock,
+	    # see SSL_set_msg_callback for the following args
+	    $direction, $ssl_ver, $content_type, $buf, $len, $ssl,
+	    $cbarg1, $cbarg2)
+	    = @_;
+	...
+	if (no_longer_need_cb) {
+	    # disable callback
+	    $sock->set_msg_callback(undef);
+	}
+    }
+
 =item B<ocsp_resolver>
 
 This will create an OCSP resolver object, which can be used to create OCSP
