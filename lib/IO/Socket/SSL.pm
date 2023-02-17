@@ -789,6 +789,8 @@ sub connect_SSL {
 		|| $arg_hash->{SSL_hostname};
 	    if ( ! defined $host ) {
 		if ( $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} ) {
+		    # some tools like to enforce -w for all code, stop them here
+		    no warnings 'uninitialized'; 
 		    $host =~s{^
 			(?:
 			    ([^:\[]+) |    # ipv4|host

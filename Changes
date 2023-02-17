@@ -1,3 +1,5 @@
+- disable warnings in substitution section where unitialized is expected in
+  order to work around tools globally enforcing warnings with -w #126
 2.081 2023/01/25
 - new function set_msg_callback for user defined callback on each SSL message
 - showcase function in example/ssl_client.pl and example/ssl_server.pl for
