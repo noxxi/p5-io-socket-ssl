@@ -1,3 +1,5 @@
+- Utils::CERT_create - die if unexpected arguments are given instead of ignoring
+  these
 - disable warnings in substitution section where unitialized is expected in
   order to work around tools globally enforcing warnings with -w #126
 2.081 2023/01/25
