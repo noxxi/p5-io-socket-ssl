@@ -2116,6 +2116,7 @@ sub can_ocsp       { return $can_ocsp }
 sub can_ticket_keycb { return $can_tckt_keycb }
 sub can_pha        { return $can_pha }
 sub can_partial_chain { return $check_partial_chain && 1 }
+sub can_ciphersuites { return $can_ciphersuites }
 
 sub DESTROY {
     my $self = shift or return;
