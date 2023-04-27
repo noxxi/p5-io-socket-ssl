@@ -789,15 +789,13 @@ sub connect_SSL {
 		|| $arg_hash->{SSL_hostname};
 	    if ( ! defined $host ) {
 		if ( $host = $arg_hash->{PeerAddr} || $arg_hash->{PeerHost} ) {
-		    # some tools like to enforce -w for all code, stop them here
-		    no warnings 'uninitialized'; 
 		    $host =~s{^
-			(?:
-			    ([^:\[]+) |    # ipv4|host
-			    (\[(.*)\])     # [ipv6|host]
+			(
+			    (?:[^:\[]+) |    # ipv4|host
+			    (?:\[(.*)\])     # [ipv6|host]
 			)
 			(:[\w\-]+)?        # optional :port
-		    $}{$1$2}x;             # ipv4|host|ipv6
+		    $}{$1}x;             # ipv4|host|ipv6
 		}
 	    }
 	    ${$ctx->{verify_name_ref}} = $host;
