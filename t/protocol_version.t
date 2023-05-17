@@ -24,6 +24,7 @@ my $server = IO::Socket::SSL->new(
     SSL_version => 'SSLv23', # allow SSLv3 too
     SSL_cert_file => 't/certs/server-cert.pem',
     SSL_key_file  => 't/certs/server-key.pem',
+    SSL_cipher_list => 'DEFAULT:@SECLEVEL=0',
 ) or BAIL_OUT("cannot listen on localhost: $!");
 print "not ok\n", exit if !$server;
 my $saddr = $server->sockhost().':'.$server->sockport();
@@ -46,6 +47,7 @@ if ($pid == 0) {
 	    SSL_startHandshake => 0,
 	    SSL_verify_mode => 0,
 	    SSL_version => $ver,
+	    SSL_cipher_list => 'DEFAULT:@SECLEVEL=0',
 	) or do {
 	    # Might bail out before the starttls if we provide a known-unsupported
 	    # version, for example SSLv3 on openssl 1.0.2+
