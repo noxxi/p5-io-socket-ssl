@@ -792,10 +792,10 @@ sub connect_SSL {
 		    $host =~s{^
 			(
 			    (?:[^:\[]+) |    # ipv4|host
-			    (?:\[(.*)\])     # [ipv6|host]
+			    (?:\[(?:.*)\])   # [ipv6|host]
 			)
-			(:[\w\-]+)?        # optional :port
-		    $}{$1}x;             # ipv4|host|ipv6
+			(:[\w\-]+)?          # optional :port
+		    $}{$1}x;                 # ipv4|host|ipv6
 		}
 	    }
 	    ${$ctx->{verify_name_ref}} = $host;
