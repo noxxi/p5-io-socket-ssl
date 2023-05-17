@@ -1,7 +1,10 @@
+2.082 2023/05/17
+- SSL_version default now TLS 1.2+ since TLS 1.1 and lower deprecated #122
+- fix output of alert string when debugging #132
+- improve regex for hostname validation #130, #126
+- add can_ciphersuites subroutine for feature checking #127
 - Utils::CERT_create - die if unexpected arguments are given instead of ignoring
   these
-- disable warnings in substitution section where unitialized is expected in
-  order to work around tools globally enforcing warnings with -w #126
 2.081 2023/01/25
 - new function set_msg_callback for user defined callback on each SSL message
 - showcase function in example/ssl_client.pl and example/ssl_server.pl for
