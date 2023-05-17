@@ -18,7 +18,7 @@ my $fingerprints= [
   },
   {
     _ => 'no OCSP stapling',
-    fingerprint => 'sha1$pub$c8ba0806b887fc15e9d98e73107a17150f847bbf',
+    fingerprint => 'sha1$pub$7bb3ccee47202aaa3ff54385d1e16041607c2717',
     host => 'www.bild.de',
     ocsp => {
               staple => 0
@@ -36,13 +36,13 @@ my $fingerprints= [
     port => 443
   },
   {
-    fingerprint => 'sha1$pub$7397f9dea15c007ad1eabe7a0c895ccac60389b1',
+    fingerprint => 'sha1$pub$8420580d25d48cbe657b44d44ffb3208c809d853',
     host => 'www.yahoo.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$c40d9bc2496fa2db198b27b6c1f94d1c703e7039',
+    fingerprint => 'sha1$pub$ca8114a3303ff688f63c70ae2e605d39f6f654cb',
     host => 'www.comdirect.de',
     port => 443,
     subject_hash_ca => '062cdee6'
@@ -54,13 +54,13 @@ my $fingerprints= [
     subject_hash_ca => '607986c7'
   },
   {
-    fingerprint => 'sha1$pub$232e02961a493a2e528460d0d3c0720a8f533428',
+    fingerprint => 'sha1$pub$916746dac08bb07342b3e5b76a80d108b6c3205b',
     host => 'www.twitter.com',
     port => 443,
     subject_hash_ca => '3513523f'
   },
   {
-    fingerprint => 'sha1$pub$12b35a6d540bcba5f9ff055fdcc5af0dac67fc73',
+    fingerprint => 'sha1$pub$dd05d516982dc8d869fcb3269f323232eeaf2204',
     host => 'www.facebook.com',
     port => 443,
     subject_hash_ca => '244b5494'
