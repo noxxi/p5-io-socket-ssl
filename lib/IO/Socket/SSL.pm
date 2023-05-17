@@ -3682,7 +3682,7 @@ sub ossl_trace {
         } elsif ($content_type == $trace_constants{SSL3_RT_ALERT}) {
             my @c = unpack('c2', $buf);
             $msg_type = ($c[0] << 8) + $c[1];
-            $msg_name = eval { Net::SSLeay::SSL_alert_desc_string_long($msg_type) } || "Unknown alert";
+            $msg_name = eval { Net::SSLeay::alert_desc_string_long($msg_type) } || "Unknown alert";
         } else {
             $msg_type = unpack('c1', $buf);
 	    $msg_name = $tc_msgtype2s{$ssl_ver, $msg_type} || "Unknown (ssl_ver=$ssl_ver, msg=$msg_type)";
