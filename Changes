@@ -1,3 +1,6 @@
+2.083 2023/05/18
+- fix t/protocol_version.t for OpenSSL versions which don't support SECLEVEL
+  (regression from #122)
 2.082 2023/05/17
 - SSL_version default now TLS 1.2+ since TLS 1.1 and lower deprecated #122
 - fix output of alert string when debugging #132
