@@ -1959,7 +1959,7 @@ sub get_servername {
 
 sub get_fingerprint_bin {
     my ($self,$algo,$cert,$key_only) = @_;
-    $cert ||= $self->peer_certificate;
+    $cert ||= $self->peer_certificate or return;
     return $key_only
 	? Net::SSLeay::X509_pubkey_digest($cert, $algo2digest->($algo || 'sha256'))
 	: Net::SSLeay::X509_digest($cert, $algo2digest->($algo || 'sha256'));
