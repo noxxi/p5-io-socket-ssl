@@ -1040,25 +1040,26 @@ Sets the version of the SSL protocol used to transmit data.
 'SSLv2', 'SSLv3', 'TLSv1', 'TLSv1_1', 'TLSv1_2', or 'TLSv1_3' restrict
 handshake and protocol to the specified version.
 All values are case-insensitive.  Instead of 'TLSv1_1', 'TLSv1_2', and
-'TLSv1_3' one can also use 'TLSv11', 'TLSv12', and 'TLSv13'.  Support for
-'TLSv1_1', 'TLSv1_2', and 'TLSv1_3' requires recent versions of Net::SSLeay
-and openssl.
+'TLSv1_3' one can also use 'TLSv11', 'TLSv12', and 'TLSv13'.  Which protocol
+versions are actually supported depend on the versions of OpenSSL and
+Net::SSLeay installed, but modern protocols like TLS 1.3 are supported by these
+for many years now.
 
 Independent from the handshake format you can limit to set of accepted SSL
 versions by adding !version separated by ':'.
 
-The default SSL_version is 'SSLv23:!SSLv3:!SSLv2' which means, that the
-handshake format is compatible to SSL2.0 and higher, but that the successful
-handshake is limited to TLS1.0 and higher, that is no SSL2.0 or SSL3.0 because
-both of these versions have serious security issues and should not be used
-anymore.
+The default SSL_version is 'SSLv23:!TLSv1:!TLSv1_1:!SSLv3:!SSLv2'. This means,
+that the handshake format is compatible to SSL2.0 and higher, but that the
+successful handshake is limited to TLS1.2 and higher, that is no SSL2.0, SSL3.0,
+TLS 1.0 or TLS 1.1 because these versions have serious security issues and
+should not be used anymore.
+
 You can also use !TLSv1_1 and !TLSv1_2 to disable TLS versions 1.1 and 1.2 while
 still allowing TLS version 1.0.
-
-Setting the version instead to 'TLSv1' might break interaction with older
-clients, which need and SSL2.0 compatible handshake. On the other
-side some clients just close the connection when they receive a TLS version 1.1
-request. In this case setting the version to
+Setting the version instead to 'TLSv1' might break interaction with very old or
+broken clients, which expect a SSL2.0 compatible handshake. On the other
+side some broken clients just close the connection when they receive a TLS
+version 1.1 request. In this case setting the version to
 'SSLv23:!SSLv2:!SSLv3:!TLSv1_1:!TLSv1_2' might help.
 
 =item SSL_cipher_list
