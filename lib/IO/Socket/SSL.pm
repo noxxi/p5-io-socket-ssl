@@ -1182,6 +1182,8 @@ sub _generic_read {
 	    if (not $! and $err == $Net_SSLeay_ERROR_SSL || $err == $Net_SSLeay_ERROR_SYSCALL) {
 		# treat as EOF
 		$data = '';
+		# clear the "unexpected eof while reading" error (OpenSSL 3.0+)
+		Net::SSLeay::ERR_clear_error();
 		last;
 	    }
 	    $self->error("SSL read error");
