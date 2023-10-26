@@ -1501,7 +1501,7 @@ sub stop_SSL {
 		    my $err = Net::SSLeay::get_error($ssl,$rv);
 		    if ( $err == $Net_SSLeay_ERROR_WANT_READ) {
 			select($vec,undef,undef,$wait)
-		    } elsif ( $err == $Net_SSLeay_ERROR_WANT_READ) {
+		    } elsif ( $err == $Net_SSLeay_ERROR_WANT_WRITE) {
 			select(undef,$vec,undef,$wait)
 		    } else {
 			last;
