@@ -75,15 +75,15 @@ if (my $compiled = eval {
     # declares that from 3.0 on x.y versions are for all y ABI-compatible.
     # https://www.openssl.org/policies/releasestrat.html
     if ($linked <  0x30000000) {
-      if (($compiled ^ $linked) >= 0x00001000) {
-	  die sprintf("API-different OpenSSL versions compiled in (0x%08x) vs linked (0x%08x)",
-	      $compiled,$linked);
-      }
+	if (($compiled ^ $linked) >= 0x00001000) {
+	    die sprintf("API-different OpenSSL versions compiled in (0x%08x) vs linked (0x%08x)",
+		$compiled,$linked);
+	}
     } else {
-      if (($compiled ^ $linked) >= 0x10000000) {
-	  die sprintf("API-different OpenSSL versions compiled in (0x%08x) vs linked (0x%08x)",
-	      $compiled,$linked);
-      }
+	if (($compiled ^ $linked) >= 0x10000000) {
+	    die sprintf("API-different OpenSSL versions compiled in (0x%08x) vs linked (0x%08x)",
+		$compiled,$linked);
+	}
     }
 }
 
