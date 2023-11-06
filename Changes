@@ -1,3 +1,5 @@
+2.084 2023/11/06
+- various fixes for edge cases and build: #136, #141, #142, #143, #145
 - update documentation to reflect default SSL_version
 2.083 2023/05/18
 - fix t/protocol_version.t for OpenSSL versions which don't support SECLEVEL
