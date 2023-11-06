@@ -1182,6 +1182,8 @@ sub _generic_read {
 	    if (not $! and $err == $Net_SSLeay_ERROR_SSL || $err == $Net_SSLeay_ERROR_SYSCALL) {
 		# treat as EOF
 		$data = '';
+		# clear the "unexpected eof while reading" error (OpenSSL 3.0+)
+		Net::SSLeay::ERR_clear_error();
 		last;
 	    }
 	    $self->error("SSL read error");
@@ -1501,9 +1503,14 @@ sub stop_SSL {
 		    my $err = Net::SSLeay::get_error($ssl,$rv);
 		    if ( $err == $Net_SSLeay_ERROR_WANT_READ) {
 			select($vec,undef,undef,$wait)
-		    } elsif ( $err == $Net_SSLeay_ERROR_WANT_READ) {
+		    } elsif ( $err == $Net_SSLeay_ERROR_WANT_WRITE) {
 			select(undef,$vec,undef,$wait)
 		    } else {
+			if ($err) {
+				# if $! is not set with ERROR_SYSCALL then report as EPIPE
+				$! ||= EPIPE if $err == $Net_SSLeay_ERROR_SYSCALL;
+				$self->error("SSL shutdown error ($err)");
+			}
 			last;
 		    }
 		}
@@ -3652,49 +3659,54 @@ sub ossl_trace {
     $DEBUG>=2 or return;
     my ($direction, $ssl_ver, $content_type, $buf, $len, $ssl) = @_;
 
-    my $verstr = $tc_ver2s{$ssl_ver} || "(version=$ssl_ver)";
+    {
+        # Preserve original $! value
+        local $!;
 
-    # Log progress for interesting records only (like Handshake or Alert), skip
-    # all raw record headers (content_type == SSL3_RT_HEADER or ssl_ver == 0).
-    # For TLS 1.3, skip notification of the decrypted inner Content-Type.
+        my $verstr = $tc_ver2s{$ssl_ver} || "(version=$ssl_ver)";
 
-    if ($ssl_ver
-	&& ($content_type != $trace_constants{SSL3_RT_HEADER})
-	&& ($content_type != $trace_constants{SSL3_RT_INNER_CONTENT_TYPE})
-    ) {
+        # Log progress for interesting records only (like Handshake or Alert), skip
+        # all raw record headers (content_type == SSL3_RT_HEADER or ssl_ver == 0).
+        # For TLS 1.3, skip notification of the decrypted inner Content-Type.
 
-        # the info given when the version is zero is not that useful for us
-        $ssl_ver >>= 8;  # check the upper 8 bits only below */
+        if ($ssl_ver
+    	&& ($content_type != $trace_constants{SSL3_RT_HEADER})
+    	&& ($content_type != $trace_constants{SSL3_RT_INNER_CONTENT_TYPE})
+        ) {
 
-        # SSLv2 doesn't seem to have TLS record-type headers, so OpenSSL
-        # always pass-up content-type as 0. But the interesting message-type
-        # is at 'buf[0]'.
+            # the info given when the version is zero is not that useful for us
+            $ssl_ver >>= 8;  # check the upper 8 bits only below */
 
-	my $tls_rt_name = ($ssl_ver == $trace_constants{SSL3_VERSION_MAJOR} && $content_type)
-	    ? $tc_type2s{$content_type} || "TLS Unknown (type=$content_type)"
-	    : "";
+            # SSLv2 doesn't seem to have TLS record-type headers, so OpenSSL
+            # always pass-up content-type as 0. But the interesting message-type
+            # is at 'buf[0]'.
 
-        my $msg_type;
-        my $msg_name;
-        if ($content_type == $trace_constants{SSL3_RT_CHANGE_CIPHER_SPEC}) {
-            $msg_type = unpack('c1', $buf);
-            $msg_name = "Change cipher spec";
-        } elsif ($content_type == $trace_constants{SSL3_RT_ALERT}) {
-            my @c = unpack('c2', $buf);
-            $msg_type = ($c[0] << 8) + $c[1];
-            $msg_name = eval { Net::SSLeay::alert_desc_string_long($msg_type) } || "Unknown alert";
-        } else {
-            $msg_type = unpack('c1', $buf);
-	    $msg_name = $tc_msgtype2s{$ssl_ver, $msg_type} || "Unknown (ssl_ver=$ssl_ver, msg=$msg_type)";
+    	my $tls_rt_name = ($ssl_ver == $trace_constants{SSL3_VERSION_MAJOR} && $content_type)
+    	    ? $tc_type2s{$content_type} || "TLS Unknown (type=$content_type)"
+    	    : "";
+
+            my $msg_type;
+            my $msg_name;
+            if ($content_type == $trace_constants{SSL3_RT_CHANGE_CIPHER_SPEC}) {
+                $msg_type = unpack('c1', $buf);
+                $msg_name = "Change cipher spec";
+            } elsif ($content_type == $trace_constants{SSL3_RT_ALERT}) {
+                my @c = unpack('c2', $buf);
+                $msg_type = ($c[0] << 8) + $c[1];
+                $msg_name = eval { Net::SSLeay::alert_desc_string_long($msg_type) } || "Unknown alert";
+            } else {
+                $msg_type = unpack('c1', $buf);
+    	    $msg_name = $tc_msgtype2s{$ssl_ver, $msg_type} || "Unknown (ssl_ver=$ssl_ver, msg=$msg_type)";
+            }
+    	DEBUG(sprintf("* %s (%s), %s, %s (%d)",
+    	    $verstr, $direction ? "OUT" : "IN", $tls_rt_name, $msg_name, $msg_type));
         }
-	DEBUG(sprintf("* %s (%s), %s, %s (%d)",
-	    $verstr, $direction ? "OUT" : "IN", $tls_rt_name, $msg_name, $msg_type));
-    }
 
-    #
-    # Here one might want to hexdump $buf (?)
-    #
-    # $DEBUG>=4 && printf STDERR "%s", hexdump($buf);
+        #
+        # Here one might want to hexdump $buf (?)
+        #
+        # $DEBUG>=4 && printf STDERR "%s", hexdump($buf);
+    }
 }
 
 
