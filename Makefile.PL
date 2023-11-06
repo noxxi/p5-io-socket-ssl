@@ -64,15 +64,26 @@ if (my $compiled = eval {
 	$compiled) if $compiled < 0x00908000;
 
     my $linked = Net::SSLeay::SSLeay();
-    if (($compiled ^ $linked) >= 0x00001000) {
-	die sprintf("API-different OpenSSL versions compiled in (0x%08x) vs linked (0x%08x)",
-	    $compiled,$linked);
-    }
 
     # OpenSSL 1.1.1e introduced behavior changes breaking various code
     # will likely be reverted  in 1.1.1f - enforce to not use this version
     if ($linked == 0x1010105f) {
 	die "detected OpenSSL 1.1.1e - please use a different version\n";
+    }
+
+    # For old versions we need to be rather strict, however OpenSSL explicitly
+    # declares that from 3.0 on x.y versions are for all y ABI-compatible.
+    # https://www.openssl.org/policies/releasestrat.html
+    if ($linked <  0x30000000) {
+      if (($compiled ^ $linked) >= 0x00001000) {
+	  die sprintf("API-different OpenSSL versions compiled in (0x%08x) vs linked (0x%08x)",
+	      $compiled,$linked);
+      }
+    } else {
+      if (($compiled ^ $linked) >= 0x10000000) {
+	  die sprintf("API-different OpenSSL versions compiled in (0x%08x) vs linked (0x%08x)",
+	      $compiled,$linked);
+      }
     }
 }
 
