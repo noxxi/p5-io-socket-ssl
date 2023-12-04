@@ -1,3 +1,6 @@
+# Copyright Steffen Ullrich 2023
+# License: public domain (no restrictions)
+
 use strict;
 use warnings;
 use IO::Socket::SSL;

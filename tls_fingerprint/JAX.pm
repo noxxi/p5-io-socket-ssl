@@ -1,3 +1,6 @@
+# Copyright Steffen Ullrich 2023
+# License: public domain (no restrictions)
+
 package JAX;
 use strict;
 use warnings;
