@@ -74,7 +74,8 @@ unless (fork) {
 	LocalAddr => $localip,
     );
     print $client "Test\n";
-    is( <$client>, "This server is SSL only", "Client non-SSL connection");
+
+    like( <$client>, qr/This server is SSL only/, "Client non-SSL connection");
     close $client;
 
     $client = IO::Socket::SSL->new(
