@@ -18,7 +18,7 @@ my $fingerprints= [
   },
   {
     _ => 'no OCSP stapling',
-    fingerprint => 'sha1$pub$7bb3ccee47202aaa3ff54385d1e16041607c2717',
+    fingerprint => 'sha1$pub$8facee0f1cd627f8f2eff3caae6ad5579ca1b01d',
     host => 'www.bild.de',
     ocsp => {
               staple => 0
@@ -36,37 +36,37 @@ my $fingerprints= [
     port => 443
   },
   {
-    fingerprint => 'sha1$pub$8420580d25d48cbe657b44d44ffb3208c809d853',
+    fingerprint => 'sha1$pub$5e17bd05648fa0391395aaa3cb7dfcf301cd1688',
     host => 'www.yahoo.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$ca8114a3303ff688f63c70ae2e605d39f6f654cb',
+    fingerprint => 'sha1$pub$823f1729628d4fd8b7fd3f37488e6f19c5b15178',
     host => 'www.comdirect.de',
     port => 443,
     subject_hash_ca => '062cdee6'
   },
   {
-    fingerprint => 'sha1$pub$26907a3f3088cf57264f7a0f083767e400ea871e',
+    fingerprint => 'sha1$pub$89e72d6477cf17c09d5b6e1bc1640938f5037580',
     host => 'meine.deutsche-bank.de',
     port => 443,
     subject_hash_ca => '607986c7'
   },
   {
-    fingerprint => 'sha1$pub$916746dac08bb07342b3e5b76a80d108b6c3205b',
+    fingerprint => 'sha1$pub$59b067366473a080210fcab6e17a5d4486d1948e',
     host => 'www.twitter.com',
     port => 443,
-    subject_hash_ca => '3513523f'
+    subject_hash_ca => '607986c7'
   },
   {
-    fingerprint => 'sha1$pub$dd05d516982dc8d869fcb3269f323232eeaf2204',
+    fingerprint => 'sha1$pub$a633f0cfcfc39a74ecc4cc780c7673906c531f9b',
     host => 'www.facebook.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$6ad05c9dd77463152389f755cb6a81c41c33c987',
+    fingerprint => 'sha1$pub$e1fb56045719de063473031c3b4795ee243b794f',
     host => 'www.live.com',
     port => 443,
     subject_hash_ca => '3513523f'
