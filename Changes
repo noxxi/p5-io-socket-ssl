@@ -1,3 +1,7 @@
+2.085 2024/01/22
+- #147 fix test which failed due to behavior changes in OpenSSL 3.2
+- update PublicSuffix
+- add examples for TLS JA3/JA4 fingerprinting to tls_fingerprint/
 2.084 2023/11/06
 - various fixes for edge cases and build: #136, #141, #142, #143, #145
 - update documentation to reflect default SSL_version
