@@ -1594,7 +1594,7 @@ most a single SSL frame. This means, that no more than 16.384 bytes, which is
 the maximum size of an SSL frame, will be written at once.
 
 For non-blocking sockets SSL specific behavior applies.
-Pease read the specific section in this documentation.
+Please read the specific section in this documentation.
 
 =item B<peek( BUF, LEN, [ OFFSET ])>
 
