@@ -15,7 +15,6 @@ lib/IO/Socket/SSL/Utils.pm
 Makefile.PL
 MANIFEST			This list of files
 README
-README.Win32
 t/01loadmodule.t
 t/acceptSSL-timeout.t
 t/alpn.t
