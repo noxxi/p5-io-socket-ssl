@@ -1,3 +1,4 @@
+- internal: implement _touch_entry in session cache instead of using del+add.
 2.085 2024/01/22
 - #147 fix test which failed due to behavior changes in OpenSSL 3.2
 - update PublicSuffix

@@ -3086,22 +3086,30 @@ sub DESTROY {
 
 package IO::Socket::SSL::Session_Cache;
 *DEBUG = *IO::Socket::SSL::DEBUG;
+
+# The cache is consisting of one list which contains all sessions and then
+# for each session key another list containing all sessions for same key.
+# The order of the list is by use, i.e. last used are put on top.
+# self.ghead points to the top of the global list while
+# self.shead{key} to the top of the session key specific list
+# All lists are cyclic
+# Each element in the list consists of an array with slots for ...
 use constant {
-    SESSION => 0,
-    KEY     => 1,
-    GNEXT   => 2,
-    GPREV   => 3,
-    SNEXT   => 4,
-    SPREV   => 5,
+    SESSION => 0,  # session object
+    KEY     => 1,  # key for object
+    GNEXT   => 2,  # next element in global list
+    GPREV   => 3,  # previous element in global list
+    SNEXT   => 4,  # next element for same session key
+    SPREV   => 5,  # previous element for same session key
 };
 
 sub new {
     my ($class, $size) = @_;
     $size>0 or return;
     return bless {
-	room  => $size,
-	ghead => undef,
-	shead => {},
+	room  => $size,  # free space regarding to max size
+	ghead => undef,  # top of global list
+	shead => {},     # top of key specific list
     }, $class;
 }
 
@@ -3124,6 +3132,9 @@ sub replace_session {
 
 sub del_session {
     my ($self, $key, $session) = @_;
+
+    # find all sessions which match given key and session and add to @del
+    # if key is given scan only sessions for the key, else all sessions
     my ($head,$inext) = $key
 	? ($self->{shead}{$key},SNEXT) : ($self->{ghead},GNEXT);
     my $v = $head;
@@ -3152,6 +3163,9 @@ sub del_session {
 
 sub get_session {
     my ($self, $key, $session) = @_;
+
+    # find first session for key
+    # if $session is given further look for this specific one
     my $v = $self->{shead}{$key};
     if ($session) {
 	my $shead = $v;
@@ -3162,10 +3176,10 @@ sub get_session {
 	    $v = undef if $v == $shead; # session not found
 	}
     }
-    if ($v) {
-	_del_entry($self, $v); # remove
-	_add_entry($self, $v); # and add back on top
-    }
+
+    # mark as recent by moving to top so that it gets expired last
+    _touch_entry($self,$v) if $v;
+
     $DEBUG>=3 && DEBUG("get_session($key"
 	. ( $session ? ",$session) -> " : ") -> ")
 	. ($v? $v->[SESSION]:"none"));
@@ -3174,20 +3188,25 @@ sub get_session {
 
 sub _add_entry {
     my ($self,$v) = @_;
+
+    # If there are already sessions for same key add to this list else create
+    # a new sublist for this key. Similar for global list.
     for(
 	[ SNEXT, SPREV, \$self->{shead}{$v->[KEY]} ],
 	[ GNEXT, GPREV, \$self->{ghead} ],
     ) {
 	my ($inext,$iprev,$rhead) = @$_;
 	if ($$rhead) {
+	    # add on top of list
 	    $v->[$inext] = $$rhead;
 	    $v->[$iprev] = ${$rhead}->[$iprev];
 	    ${$rhead}->[$iprev][$inext] = $v;
 	    ${$rhead}->[$iprev] = $v;
+	    $$rhead = $v;
 	} else {
-	    $v->[$inext] = $v->[$iprev] = $v;
+	    # create a new list
+	    $$rhead = $v->[$inext] = $v->[$iprev] = $v;
 	}
-	$$rhead = $v;
     }
 
     $self->{room}--;
@@ -3203,6 +3222,8 @@ sub _add_entry {
 
 sub _del_entry {
     my ($self,$v) = @_;
+    # Remove element from both key specific list and global list
+    # If key specific list is then empty drop it from self.shead
     for(
 	[ SNEXT, SPREV, \$self->{shead}{$v->[KEY]} ],
 	[ GNEXT, GPREV, \$self->{ghead} ],
@@ -3226,6 +3247,37 @@ sub _del_entry {
 	}
     }
     $self->{room}++;
+}
+
+sub _touch_entry {
+    my ($self,$v) = @_;
+    if (0) {
+	_del_entry($self,$v);
+	_add_entry($self,$v);
+	return;
+    }
+
+    # Put element on top of both global list and key specific list
+    # so that it gets expired last when making space in the cache
+    for(
+	[ SNEXT, SPREV, \$self->{shead}{$v->[KEY]} ],
+	[ GNEXT, GPREV, \$self->{ghead} ],
+    ) {
+	my ($inext,$iprev,$rhead) = @$_;
+	$$rhead or die "entry not in list ($inext)"; # should not happen
+	next if $$rhead == $v; # already at top
+
+	# remove from current position - like _del_entry
+	$v->[$inext][$iprev] = $v->[$iprev];
+	$v->[$iprev][$inext] = $v->[$inext];
+
+	# add on top - like _add_entry
+	$v->[$inext] = $$rhead;
+	$v->[$iprev] = ${$rhead}->[$iprev];
+	${$rhead}->[$iprev][$inext] = $v;
+	${$rhead}->[$iprev] = $v;
+	$$rhead = $v;
+    }
 }
 
 sub _dump {
