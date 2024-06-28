@@ -3251,11 +3251,6 @@ sub _del_entry {
 
 sub _touch_entry {
     my ($self,$v) = @_;
-    if (0) {
-	_del_entry($self,$v);
-	_add_entry($self,$v);
-	return;
-    }
 
     # Put element on top of both global list and key specific list
     # so that it gets expired last when making space in the cache
