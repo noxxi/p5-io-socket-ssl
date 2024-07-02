@@ -114,6 +114,9 @@ my %usable_ca;
 {
     my $openssldir = eval { 
 	require Net::SSLeay;
+	Net::SSLeay::SSLeay_version(Net::SSLeay::SSLEAY_DIR()) =~m{^OPENSSLDIR: "(.+)"$} && $1 || '';
+    } || eval {
+	require Net::SSLeay;
 	Net::SSLeay::SSLeay_version(5) =~m{^OPENSSLDIR: "(.+)"$} && $1 || '';
     };
     my $dir = $ENV{SSL_CERT_DIR} 
