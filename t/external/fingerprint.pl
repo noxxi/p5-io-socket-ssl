@@ -36,7 +36,7 @@ my $fingerprints= [
     port => 443
   },
   {
-    fingerprint => 'sha1$pub$5e17bd05648fa0391395aaa3cb7dfcf301cd1688',
+    fingerprint => 'sha1$pub$5173382a0feb29f20b0433099e5f6cd4d9c99ae4',
     host => 'www.yahoo.com',
     port => 443,
     subject_hash_ca => '244b5494'
@@ -60,13 +60,13 @@ my $fingerprints= [
     subject_hash_ca => '607986c7'
   },
   {
-    fingerprint => 'sha1$pub$a633f0cfcfc39a74ecc4cc780c7673906c531f9b',
+    fingerprint => 'sha1$pub$ecd4ac9c7857d3a4fa4c9d5fa371552ed5668c72',
     host => 'www.facebook.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$e1fb56045719de063473031c3b4795ee243b794f',
+    fingerprint => 'sha1$pub$8fa5e67c40659e2afa5ed08c7a29f6e62d58d01c',
     host => 'www.live.com',
     port => 443,
     subject_hash_ca => '3513523f'
