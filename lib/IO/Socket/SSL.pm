@@ -2594,7 +2594,7 @@ sub new {
 		Net::SSLeay::CTX_set_psk_server_callback($ctx, sub {
 		    my ($ssl,$identity,$psklen) = @_;
 		    if (ref($psk) eq 'HASH') {
-			return $psk->{$identity} || $psk->{''} or return
+			return $psk->{$identity} || $psk->{''} ||
 			    IO::Socket::SSL->_internal_error(
 			    "no PSK for given identity '$identity' and no default");
 		    } else {

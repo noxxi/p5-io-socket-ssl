@@ -1357,7 +1357,7 @@ the configuration in the peer can be useless ("handshake failure") or misleading
 ("bad mac").
 
 PSK support needs respective API functionality in Net::SSLeay, which was
-only fully included in 1.94. C<<IO::Socket::SSL->can_psk()>> returns undef if
+only fully included in 1.94. C<< IO::Socket::SSL->can_psk() >> returns undef if
 functionality is not available and a hash-ref with details otherwise: key
 C<client> in the hash signals support for using PSK in a SSL client (available
 since Net::SSLeay 1.82) while key server for support of PSK in SSL server (since
