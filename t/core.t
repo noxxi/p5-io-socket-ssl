@@ -18,7 +18,7 @@ Test::More->builder->no_ending(1);
 my $CAN_NONBLOCK = eval "use 5.006; use IO::Select; 1";
 my $CAN_PEEK = &Net::SSLeay::OPENSSL_VERSION_NUMBER >= 0x0090601f;
 
-my $numtests = 40;
+my $numtests = 41;
 $numtests+=5 if $CAN_NONBLOCK;
 $numtests+=3 if $CAN_PEEK;
 
@@ -151,6 +151,15 @@ unless (fork) {
     @array = $client->getlines;
     is( scalar @array, 6, "Client Getlines Check 1");
 
+    {
+        local $@;
+        eval { my $scalar = $client->getlines; };
+        like(
+            $@,
+            qr/\QUse of getlines() not allowed in scalar context\E/,
+            "Got exception: no getlines() in scalar context",
+        );
+    }
     is( $array[0], "1.04\n", "Client Getlines Check 2");
 
     is( $array[1], "4\n", "Client Getlines Check 3");
