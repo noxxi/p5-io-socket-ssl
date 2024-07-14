@@ -2608,7 +2608,7 @@ sub new {
 		    my $hint = shift;
 		    my ($i,$p);
 		    if (ref($psk) eq 'HASH') {
-			$hint //= '';
+			$hint = '' if ! defined $hint;
 			$p = $psk->{$hint} or return IO::Socket::SSL->_internal_error(
 			    "no PSK for given hint '$hint'");
 			$i = $hint;
