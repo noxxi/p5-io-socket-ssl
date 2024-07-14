@@ -2253,8 +2253,9 @@ sub want_write { shift->errstr == SSL_WANT_WRITE }
 #Redundant IO::Handle functionality
 sub getline { return(scalar shift->readline()) }
 sub getlines {
-    return(shift->readline()) if wantarray();
-    croak("Use of getlines() not allowed in scalar context");
+    wantarray()
+        ? return(shift->readline())
+        : croak("Use of getlines() not allowed in scalar context");
 }
 
 #Useless IO::Handle functionality
