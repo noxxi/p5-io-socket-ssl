@@ -1,3 +1,6 @@
+2.088 2024/07/14
+- minor fixes for use on ancient versions of perl and for building with
+  newer versions of openssl
 2.087 2024/07/08
 - support for PSK, see SSL_psk in documentation
 2.086 2024/07/03
