@@ -1,0 +1,146 @@
+name: Test IO::Socket::SSL
+
+on:
+  push:
+    branches-ignore:
+      - '*travis*'
+      - '*appveyor*'
+      - '*doozer*'
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test on ${{ matrix.config_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - config_name: ubuntu-20.04
+            os: ubuntu-20.04
+          - config_name: ubuntu-22.04
+            os: ubuntu-22.04
+          - config_name: macos-12
+            os: macos-12
+          - config_name: macos-13
+            os: macos-13
+          - config_name: macos-14
+            os: macos-14
+          - config_name: windows-latest
+            os: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        clean: false
+        show-progress: false
+    - name: System packages on Ubuntu
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y --no-install-recommends cpanminus libssl-dev zlib1g-dev
+      if: "startsWith(matrix.os, 'ubuntu-')"
+    - name: System packages on Windows
+      run: |
+        choco install openssl.light
+      if: "startsWith(matrix.os, 'windows-')"
+
+    - name: Install cpanminus on Mac
+      run: |
+        brew install cpanminus
+        cpanm --sudo --quiet --notest --installdeps .
+      if: "startsWith(matrix.os, 'macos-')"
+
+    - name: Install perl dependencies on Unix-like systems
+      run: |
+        cpanm --sudo --quiet --installdeps --notest . || ( cat /root/.cpanm/work/*/build.log; false )
+      if: "!startsWith(matrix.os, 'windows-')"
+    - name: Install perl dependencies on Windows
+      run: |
+        cpanm --quiet --installdeps --notest .
+      if: "startsWith(matrix.os, 'windows-')"
+
+    - name: Build
+      run: |
+        perl Makefile.PL
+        make -j4
+
+    - name: Build on Unix-like systems
+      run: |
+        make test
+      if: "!startsWith(matrix.os, 'windows-')"
+    - name: Build on Windows
+      run: |
+        make test HARNESS_VERBOSE=1
+      timeout-minutes: 3
+      if: "startsWith(matrix.os, 'windows-')"
+
+  test_in_container:
+    name: Test with ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: perl:5.8.9-threaded-stretch
+          - image: perl:5.10.1-buster
+          - image: perl:5.12.5-stretch
+          - image: perl:5.14.4-stretch
+          - image: perl:5.16.3-buster
+          - image: perl:5.18.4-buster
+          - image: perl:5.22.4-stretch
+          - image: perl:5.36.0-slim-bullseye
+          - image: perl:5.38.0-slim-bookworm
+          - image: perl:5.40.0-slim-bookworm
+          ## use debian:* images only if there's no suitable perl:* image
+          #- image: debian:bookworm
+          - image: ubuntu:noble
+          - image: rockylinux:9
+          - image: fedora:40
+
+    steps:
+    # Note: checkout@v4 does not work with older debians (e.g.stretch), so do this step *outside* the container
+    - uses: actions/checkout@v4
+    - name: Preinstall, Configure, Build and Test
+      run: |
+        docker run --quiet -v $(pwd):$(pwd) ${{ matrix.image }} sh -c "cd $(pwd); "'
+          set -ex
+          export HARNESS_TIMER=1
+          export HARNESS_OPTIONS=j8
+          which cpanm 2>/dev/null || if which apt-get 2>/dev/null >/dev/null
+            then
+              apt-get update -qq && apt-get install -qy --no-install-recommends cpanminus libssl-dev openssl zlib1g-dev make gcc
+            else
+              yum -y install perl-App-cpanminus "perl(Test::More)" openssl-devel openssl zlib-devel
+            fi
+          cpanm --quiet --installdeps --notest . || ( cat /root/.cpanm/work/*/build.log; false )
+          perl Makefile.PL
+          make -j4
+          make test
+        '
+
+  test_freebsd:
+    name: Test on FreeBSD ${{ matrix.osvers }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - osvers: '13.3'
+          - osvers: '14.1'
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        clean: false
+        show-progress: false
+    - uses: cross-platform-actions/action@v0.25.0
+      with:
+        operating_system: freebsd
+        version: '${{ matrix.osvers }}'
+        run: |
+          sudo pkg update
+          sudo pkg install -y perl5 p5-App-cpanminus
+          cpanm --sudo --quiet --notest --installdeps .
+          perl Makefile.PL
+          make -j4
+          make test
