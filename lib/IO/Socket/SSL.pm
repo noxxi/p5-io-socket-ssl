@@ -2318,6 +2318,10 @@ my $DEFAULT_SSL_OP = &Net::SSLeay::OP_ALL
     | &Net::SSLeay::OP_SINGLE_DH_USE
     | ($can_ecdh ? &Net::SSLeay::OP_SINGLE_ECDH_USE : 0);
 
+
+# _get_ctx_object is for internal use ONLY!
+sub _get_ctx_object { shift->{context} }
+
 # Note that the final object will actually be a reference to the scalar
 # (C-style pointer) returned by Net::SSLeay::CTX_*_new() so that
 # it can be blessed.
