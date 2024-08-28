@@ -2881,6 +2881,7 @@ sub new {
     }
     my $verify_fingerprint = @accept_fp && do {
 	my $fail;
+	my $force = $arg_hash->{SSL_force_fingerprint};
 	sub {
 	    my ($ok,$cert,$depth) = @_;
 	    $fail = 1 if ! $ok;
@@ -2894,7 +2895,7 @@ sub new {
 		next if $fp ne $_->[2];
 		return 1;
 	    }
-	    return ! $fail;
+	    return $force ? 0 : ! $fail;
 	}
     };
     my $verify_callback = ( $verify_cb || @accept_fp ) && sub {

@@ -947,10 +947,27 @@ It is also possible to skip C<algo$>, i.e. only specify the fingerprint. In
 this case the likely algorithms will be automatically detected based on the
 length of the digest string.
 
+Examples:
+
+    sha1$pub$f0f0c49b8a04a2dd2110e10f7806c97d87d0b26f  # pubkey SHA-1
+    sha1$f0f0c49b8a04a2dd2110e10f7806c97d87d0b26f      # certificate SHA-1
+    f0f0c49b8a04a2dd2110e10f7806c97d87d0b26f           # certificate SHA-1
+
 You can specify a list of fingerprints in case you have several acceptable
 certificates.
 If a fingerprint matches the topmost (i.e. leaf) certificate no additional
 validations can make the verification fail.
+
+Note that the default behavior of SSL_fingerprint is to be an alternative to the
+normal validation. A mismatching fingerprint does not override a successful
+validation of the certificate, but a matching fingerprint can override an
+otherwise failed validation. To enforce a fingerprint see
+C<SSL_force_fingerprint>.
+
+=item SSL_force_fingerprint
+
+This option should be set to true if a failed fingerprint validation should
+override an otherwise successful certificate validation.
 
 =item SSL_cert_file | SSL_cert | SSL_key_file | SSL_key
 
