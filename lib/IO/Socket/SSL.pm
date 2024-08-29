@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.088';
+our $VERSION = '2.089';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -1570,14 +1570,14 @@ sub fileno {
 
 
 ####### IO::Socket::SSL specific functions #######
-# _get_ssl_object is for internal use ONLY!
+# get access to SSL handle for use with Net::SSLeay. Use with caution!
 sub _get_ssl_object {
     my $self = shift;
     return ${*$self}{'_SSL_object'} ||
 	IO::Socket::SSL->_internal_error("Undefined SSL object",9);
 }
 
-# _get_ctx_object is for internal use ONLY!
+# get access to SSL handle for use with Net::SSLeay. Use with caution!
 sub _get_ctx_object {
     my $self = shift;
     my $ctx_object = ${*$self}{_SSL_ctx};
@@ -2319,7 +2319,7 @@ my $DEFAULT_SSL_OP = &Net::SSLeay::OP_ALL
     | ($can_ecdh ? &Net::SSLeay::OP_SINGLE_ECDH_USE : 0);
 
 
-# _get_ctx_object is for internal use ONLY!
+# get access to SSL handle for use with Net::SSLeay. Use with caution!
 sub _get_ctx_object { shift->{context} }
 
 # Note that the final object will actually be a reference to the scalar

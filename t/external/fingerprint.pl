@@ -28,7 +28,7 @@ my $fingerprints= [
   },
   {
     _ => 'this is revoked',
-    fingerprint => 'sha1$pub$f0f0c49b8a04a2dd2110e10f7806c97d87d0b26f',
+    fingerprint => 'sha1$pub$31b4b89651e35cb09606f445172d3e7c5642ed74',
     host => 'revoked.grc.com',
     ocsp => {
               revoked => 1
@@ -36,7 +36,7 @@ my $fingerprints= [
     port => 443
   },
   {
-    fingerprint => 'sha1$pub$5173382a0feb29f20b0433099e5f6cd4d9c99ae4',
+    fingerprint => 'sha1$pub$1ada705dc522af9da86c6e0788c1a2525c07c7d3',
     host => 'www.yahoo.com',
     port => 443,
     subject_hash_ca => '244b5494'
@@ -48,7 +48,7 @@ my $fingerprints= [
     subject_hash_ca => '062cdee6'
   },
   {
-    fingerprint => 'sha1$pub$89e72d6477cf17c09d5b6e1bc1640938f5037580',
+    fingerprint => 'sha1$pub$19d4c556a1cccbe84270c474346e9ad737d1b1b2',
     host => 'meine.deutsche-bank.de',
     port => 443,
     subject_hash_ca => '607986c7'
@@ -60,7 +60,7 @@ my $fingerprints= [
     subject_hash_ca => '607986c7'
   },
   {
-    fingerprint => 'sha1$pub$ecd4ac9c7857d3a4fa4c9d5fa371552ed5668c72',
+    fingerprint => 'sha1$pub$73a457e8b59c271cee98a79a3a9e1dc4d1b6126a',
     host => 'www.facebook.com',
     port => 443,
     subject_hash_ca => '244b5494'

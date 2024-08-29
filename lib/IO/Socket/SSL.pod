@@ -2190,6 +2190,20 @@ the print/printf/syswrite and read/sysread families instead.
 
 =back
 
+=head1 ACCESS TO INTERNALS
+
+C<IO::Socket::SSL> uses internally C<Net::SSLeay> which provides a lower level
+API to OpenSSL and provides functions which work directly with OpenSSL SSL and
+CTX handles. Sometimes it might be necessary to get direct access to these
+handles from C<IO::Socket::SSL> in order to apply functionality available only
+with C<Net::SSLeay>.
+
+For this C<_get_ssl_object> can be used on the C<IO::Socket::SSL> object to get
+access to the OpenSSL SSL handle and C<_get_ctx_object> can be used on
+C<IO::Socket::SSL> and C<IO::Socket::SSL_Context> objects to access the OpenSSL
+CTX handle. Use very carefully since OpenSSL memory/reference management must be
+done manually with C<Net::SSLeay>.
+
 =head1 DEPRECATIONS
 
 The following functions are deprecated and are only retained for compatibility:

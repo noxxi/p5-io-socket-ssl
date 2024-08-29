@@ -1,3 +1,8 @@
+2.089 2024/08/29
+- new option SSL_force_fingerprint to enforce fingerprint matching even if
+  certificate validation would be successful without
+- document _get_ssl_object and _get_ctx_object for cases, where direct use of
+  Net::SSLeay functions is needed
 2.088 2024/07/14
 - minor fixes for use on ancient versions of perl and for building with
   newer versions of openssl
