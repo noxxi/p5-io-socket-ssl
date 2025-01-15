@@ -324,7 +324,7 @@ my $DEFAULT_X509_STORE_flags = 0;
 }
 
 our $DEBUG;
-use vars qw(@ISA $SSL_ERROR @EXPORT);
+our $SSL_ERROR;
 
 {
     # These constants will be used in $! at return from SSL_connect,
@@ -337,7 +337,7 @@ use vars qw(@ISA $SSL_ERROR @EXPORT);
     my $y = $Net_SSLeay_ERROR_WANT_WRITE;
     use constant SSL_WANT_WRITE => dualvar( \$y, 'SSL wants a write first' );
 
-    @EXPORT = qw(
+    our @EXPORT = qw(
 	SSL_WANT_READ SSL_WANT_WRITE SSL_VERIFY_NONE SSL_VERIFY_PEER
 	SSL_VERIFY_FAIL_IF_NO_PEER_CERT SSL_VERIFY_CLIENT_ONCE
 	SSL_OCSP_NO_STAPLE SSL_OCSP_TRY_STAPLE SSL_OCSP_MUST_STAPLE
@@ -350,6 +350,7 @@ my @caller_force_inet4; # in case inet4 gets forced we store here who forced it
 
 my $IOCLASS;
 my $family_key; # 'Domain'||'Family'
+our @ISA;
 BEGIN {
     # declare @ISA depending of the installed socket class
 
