@@ -1593,8 +1593,11 @@ by both peers.
 A naive implementation would thus wait until it receives the
 close notify message from the peer - which conflicts with the commonly expected
 semantic that a close will not block. The default behavior is thus to only send
-a close notify but not  wait for the close notify of the peer. If this is
-required C<SSL_fast_shutdown> need to be explicitly set to false.
+a close notify but not  wait for the close notify of the peer.
+If it should instead wait for a close notify from the peer than
+C<SSL_fast_shutdown> must be explicitly set to false:
+
+     $self->close(SSL_fast_shutdown => 0);
 
 There are also cases where a SSL shutdown should not be done at all. This is
 true for example when forking to let a child deal with the socket and closing
@@ -1602,7 +1605,9 @@ the socket in the parent process. A naive explicit C<close> or an implicit close
 when destroying the socket in the parent would send a close notify to the peer
 which would make the SSL socket in the client process unusable. In this case an
 explicit C<close> with C<SSL_no_shutdown> set to true should be done in the
-parent process.
+parent process:
+
+     $self->close(SSL_no_shutdown => 1);
 
 For more details and other arguments see C<stop_SSL> which gets called from
 C<close> to shutdown the SSL state of the socket.
