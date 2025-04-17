@@ -1170,6 +1170,8 @@ This option sets the verification mode for the peer certificate.
 You may combine SSL_VERIFY_PEER (verify_peer), SSL_VERIFY_FAIL_IF_NO_PEER_CERT
 (fail verification if no peer certificate exists; ignored for clients),
 SSL_VERIFY_CLIENT_ONCE (verify client once; ignored for clients).
+Note that SSL_VERIFY_FAIL_IF_NO_PEER_CERT and SSL_VERIFY_CLIENT_ONCE must be
+used together with SSL_VERIFY_PEER.
 See OpenSSL man page for SSL_CTX_set_verify for more information.
 
 The default is SSL_VERIFY_NONE for server  (e.g. no check for client
