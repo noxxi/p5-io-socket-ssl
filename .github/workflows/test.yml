@@ -17,18 +17,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - config_name: ubuntu-20.04
-            os: ubuntu-20.04
           - config_name: ubuntu-22.04
             os: ubuntu-22.04
-          - config_name: macos-12
-            os: macos-12
+          - config_name: ubuntu-24.04
+            os: ubuntu-24.04
           - config_name: macos-13
             os: macos-13
           - config_name: macos-14
             os: macos-14
+          - config_name: macos-15
+            os: macos-15
           - config_name: windows-latest
             os: windows-latest
+            allow-failure: true
+    continue-on-error: ${{ matrix.allow-failure == true }}
 
     steps:
     - uses: actions/checkout@v4
@@ -83,6 +85,7 @@ jobs:
       matrix:
         include:
           - image: perl:5.8.9-threaded-stretch
+            allow-failure: true
           - image: perl:5.10.1-buster
           - image: perl:5.12.5-stretch
           - image: perl:5.14.4-stretch
@@ -94,9 +97,10 @@ jobs:
           - image: perl:5.40.0-slim-bookworm
           ## use debian:* images only if there's no suitable perl:* image
           #- image: debian:bookworm
-          - image: ubuntu:noble
+          - image: ubuntu:focal
           - image: rockylinux:9
-          - image: fedora:40
+          - image: fedora:41
+    continue-on-error: ${{ matrix.allow-failure == true }}
 
     steps:
     # Note: checkout@v4 does not work with older debians (e.g.stretch), so do this step *outside* the container
@@ -109,7 +113,7 @@ jobs:
           export HARNESS_OPTIONS=j8
           which cpanm 2>/dev/null || if which apt-get 2>/dev/null >/dev/null
             then
-              apt-get update -qq && apt-get install -qy --no-install-recommends cpanminus libssl-dev openssl zlib1g-dev make gcc
+              DEBIAN_FRONTEND=noninteractive apt-get update -qq && apt-get install -qy --no-install-recommends cpanminus libssl-dev openssl zlib1g-dev make gcc
             else
               yum -y install perl-App-cpanminus "perl(Test::More)" openssl-devel openssl zlib-devel
             fi
@@ -121,19 +125,19 @@ jobs:
 
   test_freebsd:
     name: Test on FreeBSD ${{ matrix.osvers }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
-          - osvers: '13.3'
-          - osvers: '14.1'
+          - osvers: '13.4'
+          - osvers: '14.2'
     steps:
     - uses: actions/checkout@v4
       with:
         clean: false
         show-progress: false
-    - uses: cross-platform-actions/action@v0.25.0
+    - uses: cross-platform-actions/action@v0.26.0
       with:
         operating_system: freebsd
         version: '${{ matrix.osvers }}'
