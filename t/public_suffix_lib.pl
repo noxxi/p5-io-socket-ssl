@@ -30,7 +30,7 @@ sub run_with_lib {
 
     require IO::Socket::SSL::PublicSuffix;
 
-    plan tests => 79;
+    plan tests => 83;
 
 
     # all one-level, but co.uk two-level
@@ -188,6 +188,12 @@ sub run_with_lib {
 	    skip "no IDN support with @idnlib",2
 	}
     }
+
+    # preserve trailing dot
+    is public_suffix('www.example.com'), 'com';
+    is public_suffix('www.example.com.'), 'com.';
+    minimal_private_suffix('www.bar.co.uk','www','bar.co.uk');
+    minimal_private_suffix('www.bar.co.uk.','www','bar.co.uk.');
 }
 
 

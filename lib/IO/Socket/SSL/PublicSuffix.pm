@@ -203,6 +203,7 @@ sub from_file {
 sub public_suffix {
     my ($self,$name,$add) = @_;
     my $want; # [a]rray, [s]tring, [u]nicode-string
+    my $add_dot;
     if ( ref($name)) {
 	$want = 'a';
 	$name = [ @$name ]; # don't change input
@@ -215,7 +216,7 @@ sub public_suffix {
 	    $want = 's';
 	}
 	$name = lc($name);
-	$name =~s{\.$}{};
+	$add_dot = 1 if $name =~s{\.$}{};
 	$name = [ $name =~m{([^.]+)}g ];
     }
     @$name or return;
@@ -284,6 +285,7 @@ sub public_suffix {
 	}
     }
 
+    $suffix .= "." if $add_dot && !ref $suffix;
     return wantarray ? ($name,$suffix):$suffix;
 }
 
