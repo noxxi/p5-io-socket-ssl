@@ -8,17 +8,17 @@ use IO::Socket::SSL;
 # --- BEGIN-FINGERPRINTS ----
 my $fingerprints= [
   {
-    _ => 'this should give us OCSP stapling',
+    _ => 'this should give us OCSP stapling - before LetsEncrypt had disabled OCSP support',
     fingerprint => 'sha1$pub$39d64bbaea90c6035e25ff990ba4ce565350bac5',
     host => 'www.chksum.de',
-    ocsp => {
+    _disabled_ocsp => {
               staple => 1
             },
     port => 443
   },
   {
     _ => 'no OCSP stapling',
-    fingerprint => 'sha1$pub$8facee0f1cd627f8f2eff3caae6ad5579ca1b01d',
+    fingerprint => 'sha1$pub$136e4c79586c88759201e705696e72bdaa12c9e2',
     host => 'www.bild.de',
     ocsp => {
               staple => 0
@@ -36,13 +36,13 @@ my $fingerprints= [
     port => 443
   },
   {
-    fingerprint => 'sha1$pub$1ada705dc522af9da86c6e0788c1a2525c07c7d3',
+    fingerprint => 'sha1$pub$1ecb28613975b1477ca49eafdbbcda5472c53f23',
     host => 'www.yahoo.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$823f1729628d4fd8b7fd3f37488e6f19c5b15178',
+    fingerprint => 'sha1$pub$88f7d4848c4217aa2805436b7145b8fe305fb240',
     host => 'www.comdirect.de',
     port => 443,
     subject_hash_ca => '062cdee6'
@@ -54,19 +54,19 @@ my $fingerprints= [
     subject_hash_ca => '607986c7'
   },
   {
-    fingerprint => 'sha1$pub$59b067366473a080210fcab6e17a5d4486d1948e',
+    fingerprint => 'sha1$pub$1c1d85a6a26f103c66a088dfd48e7ee9d19b4c49',
     host => 'www.twitter.com',
     port => 443,
-    subject_hash_ca => '607986c7'
+    subject_hash_ca => '4042bcee'
   },
   {
-    fingerprint => 'sha1$pub$73a457e8b59c271cee98a79a3a9e1dc4d1b6126a',
+    fingerprint => 'sha1$pub$c06ebc6e8c75fcd8388c9db8ff49907677471bcb',
     host => 'www.facebook.com',
     port => 443,
     subject_hash_ca => '244b5494'
   },
   {
-    fingerprint => 'sha1$pub$8fa5e67c40659e2afa5ed08c7a29f6e62d58d01c',
+    fingerprint => 'sha1$pub$62b73053f65d85a6d1fe281da47fb91bae972bd2',
     host => 'www.live.com',
     port => 443,
     subject_hash_ca => '3513523f'
