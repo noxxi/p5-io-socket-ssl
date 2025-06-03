@@ -1,3 +1,6 @@
+2.090 2025/06/03
+- fix OCSP live test after Let's Encrypt has disabled OCSP support #169
+- public_suffix now preserves trailing dot #167
 2.089 2024/08/29
 - new option SSL_force_fingerprint to enforce fingerprint matching even if
   certificate validation would be successful without
