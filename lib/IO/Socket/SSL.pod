@@ -1943,8 +1943,22 @@ with the same arguments once the socket is ready.
 For calling from C<stop_SSL> C<SSL_fast_shutdown> default to false, e.g. it
 waits for the close_notify of the peer. This is necessary in case you want to
 downgrade the socket and continue to use it as a plain socket.
+If C<SSL_fast_shutdown> is set to true only the write direction will be
+shutdown for SSL and there can still be SSL data read. Read direction will
+then be closed either automatically when receiving a shutdown from the peer
+during read or by explicitly calling C<stop_SSL> with C<SSL_fast_shutdown> false.
 
-After stop_SSL the socket can again be used to exchange plain data.
+After a complete stop_SSL the socket can again be used to exchange plain data.
+Even if the SSL shutdown is only done for writing (C<SSL_fast_shutdown>) plain
+data can be immediately written.
+
+If the SSL shutdown was initiated by the peer it will lead to an implicit SSL
+shutdown for reading and sysread will return 0 (eof) once in this case. After this
+the socket is ready to receive plain data from the peer. But to keep the program
+in control when encrypted and when plain data are received the plain read will
+only be done if either a full SSL shutdown was explicitly issued by calling
+C<stop_SSL> or if the one sided SSL shutdown from the peer is explicitly
+acknowledged by calling C<stop_SSL> with C<SSL_ack_read_closed> set to true.
 
 =item B<connect_SSL>, B<accept_SSL>
 

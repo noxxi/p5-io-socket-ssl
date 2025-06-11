@@ -606,6 +606,9 @@ my @all_my_keys = qw(
     _SSL_ocsp_verify
     _SSL_opened
     _SSL_opening
+    _SSL_read_closed
+    _SSL_write_closed
+    _SSL_rawfd
     _SSL_servername
     _SSL_msg_callback
 );
@@ -1174,9 +1177,8 @@ if ($auto_retry) {
 }
 
 sub _generic_read {
-    my ($self, $read_func, undef, $length, $offset) = @_;
-    my $ssl =  ${*$self}{_SSL_object} || return;
-    my $buffer=\$_[2];
+    my ($self, $ssl, $justpeek, $read_func, undef, $length, $offset) = @_;
+    my $buffer = \$_[4];
 
     $SSL_ERROR = $! = undef;
     my ($data,$rwerr) = $read_func->($ssl, $length);
@@ -1197,6 +1199,20 @@ sub _generic_read {
     }
 
     $length = length($data);
+    if (!$length && !$justpeek) {
+	my $status = Net::SSLeay::get_shutdown($ssl);
+	if ($status & SSL_RECEIVED_SHUTDOWN) {
+	    if ($status & SSL_SENT_SHUTDOWN) {
+		# fully done, close SSL object - no need to call shutdown again
+		$self->stop_SSL(SSL_no_shutdown => 1);
+	    } else {
+		# mark read side as automatically closed
+		${*$self}{_SSL_read_closed} = -1;
+	    }
+	}
+	return 0;
+    }
+
     $$buffer = '' if !defined $$buffer;
     $offset ||= 0;
     if ($offset>length($$buffer)) {
@@ -1207,35 +1223,65 @@ sub _generic_read {
     return $length;
 }
 
+# This is only needed in case of a one sided SSL shutdown, i.e. if the fd is
+# still tied and has SSL_object, but needs to read or write in plain in one
+# direction. Here it will fdopen the SSL fd, thus loosing the class and tie.
+sub _rawfd {
+    my $self = shift;
+    return ${*$self}{_SSL_rawfd} ||= do { open(my $fh,'+<&=',$self); $fh };
+}
+
 sub read {
     my $self = shift;
-    ${*$self}{_SSL_object} && return _generic_read($self,
-	$self->blocking ? \&Net::SSLeay::ssl_read_all : \&Net::SSLeay::read,
-	@_
-    );
+    my $rc = ${*$self}{_SSL_read_closed};
+    if (my $ssl = !$rc && ${*$self}{_SSL_object}) {
+	return _generic_read($self, $ssl, 0,
+	    $self->blocking ? \&Net::SSLeay::ssl_read_all : \&Net::SSLeay::read,
+	    @_);
+    }
+
+    if ($rc && $rc<0) {
+	warn "got SSL shutdown by peer, call stop_SSL(SSL_ack_read_closed => 1) before reading plain data";
+	return;
+    }
+
+
 
     # fall back to plain read if we are not required to use SSL yet
-    return $self->SUPER::read(@_);
+    return ($rc ? _rawfd($self) : $self)->SUPER::read(@_);
 }
 
 # contrary to the behavior of read sysread can read partial data
 sub sysread {
     my $self = shift;
-    ${*$self}{_SSL_object} && return _generic_read( $self,
-	\&Net::SSLeay::read, @_ );
+    my $rc = ${*$self}{_SSL_read_closed};
+    if (my $ssl = !$rc && ${*$self}{_SSL_object}) {
+	return _generic_read( $self, $ssl, 0, \&Net::SSLeay::read, @_ );
+    }
+
+    if ($rc && $rc<0) {
+	warn "got SSL shutdown by peer, call stop_SSL(SSL_ack_read_closed => 1) before reading plain data";
+	return;
+    }
 
     # fall back to plain sysread if we are not required to use SSL yet
-    my $rv = $self->SUPER::sysread(@_);
-    return $rv;
+    return ($rc ? _rawfd($self) : $self)->SUPER::sysread(@_);
 }
 
 sub peek {
     my $self = shift;
-    ${*$self}{_SSL_object} && return _generic_read( $self,
-	\&Net::SSLeay::peek, @_ );
+    my $rc = ${*$self}{_SSL_read_closed};
+    if (my $ssl = !$rc && ${*$self}{_SSL_object}) {
+	return _generic_read( $self, $ssl, 1, \&Net::SSLeay::peek, @_ );
+    }
+
+    if ($rc && $rc<0) {
+	warn "got SSL shutdown by peer, call stop_SSL(SSL_ack_read_closed => 1) before reading plain data";
+	return;
+    }
 
     # fall back to plain peek if we are not required to use SSL yet
-    # emulate peek with recv(...,MS_PEEK) - peek(buf,len,offset)
+    # emulate peek with recv(...,MSG_PEEK) - peek(buf,len,offset)
     return if ! defined recv($self,my $buf,$_[1],MSG_PEEK);
     $_[0] = $_[2] ? substr($_[0],0,$_[2]).$buf : $buf;
     return length($buf);
@@ -1243,10 +1289,8 @@ sub peek {
 
 
 sub _generic_write {
-    my ($self, $write_all, undef, $length, $offset) = @_;
-
-    my $ssl =  ${*$self}{_SSL_object} || return;
-    my $buffer = \$_[2];
+    my ($self, $ssl, $write_all, undef, $length, $offset) = @_;
+    my $buffer = \$_[3];
 
     my $buf_len = length($$buffer);
     $length ||= $buf_len;
@@ -1283,21 +1327,26 @@ sub _generic_write {
 # if all data are written
 sub write {
     my $self = shift;
-    ${*$self}{_SSL_object} && return _generic_write( $self,
-	scalar($self->blocking),@_ );
+    my $wc = ${*$self}{_SSL_write_closed};
+    if (my $ssl = !$wc && ${*$self}{_SSL_object}) {
+	return _generic_write( $self, $ssl, scalar($self->blocking),@_ );
+    }
 
     # fall back to plain write if we are not required to use SSL yet
-    return $self->SUPER::write(@_);
+    return ($wc ? _rawfd($self) : $self)->SUPER::write(@_);
 }
 
 # contrary to write syswrite() returns already if only
 # a part of the data is written
 sub syswrite {
     my $self = shift;
-    ${*$self}{_SSL_object} && return _generic_write($self,0,@_);
+    my $wc = ${*$self}{_SSL_write_closed};
+    if (my $ssl = !$wc && ${*$self}{_SSL_object}) {
+	return _generic_write($self,$ssl,0,@_);
+    }
 
     # fall back to plain syswrite if we are not required to use SSL yet
-    return $self->SUPER::syswrite(@_);
+    return ($wc ? _rawfd($self) : $self)->SUPER::syswrite(@_);
 }
 
 sub print {
@@ -1458,6 +1507,10 @@ sub stop_SSL {
     if (my $ssl = ${*$self}{'_SSL_object'}) {
 	if (delete ${*$self}{'_SSL_opening'}) {
 	    # just destroy the object further below
+	} elsif ($stop_args->{SSL_ack_read_closed} ) {
+	    return 0 if !${*$self}{_SSL_read_closed}; # not (automatically) closed
+	    ${*$self}{_SSL_read_closed} = 1; # accept as closed
+	    return 1;
 	} elsif ( ! $stop_args->{SSL_no_shutdown} ) {
 	    my $status = Net::SSLeay::get_shutdown($ssl);
 
@@ -1524,6 +1577,11 @@ sub stop_SSL {
 		$status |= SSL_RECEIVED_SHUTDOWN if $rv>0;
 	    }
 	    $self->blocking(1) if $timeout;
+	    if (not($status & SSL_RECEIVED_SHUTDOWN)) {
+		# not yet fully closed, mark only write as closed
+		${*$self}{_SSL_write_closed} = 1;
+		return 1;
+	    }
 	}
 
 	# destroy allocated objects for SSL and untie
@@ -1533,6 +1591,7 @@ sub stop_SSL {
 	    Net::SSLeay::X509_free($cert);
 	}
 	delete ${*$self}{_SSL_object};
+	delete ${*$self}{_SSL_rawfd};
 	${*$self}{'_SSL_opened'} = 0;
 	delete $SSL_OBJECT{$ssl};
 	delete $CREATED_IN_THIS_THREAD{$ssl};
