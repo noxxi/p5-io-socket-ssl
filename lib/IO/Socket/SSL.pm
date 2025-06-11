@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.090';
+our $VERSION = '2.091';
 
 use IO::Socket;
 use Net::SSLeay 1.46;

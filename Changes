@@ -1,3 +1,9 @@
+2.091 2025/06/11
+- fix behavior on one-sided SSL shutdown. If the application continued
+  to read after half-closing the SSL connection this could result in reading
+  encrypted data (i.e. close notify, SSL session tickets ...).
+  See documentation of stop_SSL for detailed description of handling
+  half-closed SSL connections.
 2.090 2025/06/03
 - fix OCSP live test after Let's Encrypt has disabled OCSP support #169
 - public_suffix now preserves trailing dot #167
