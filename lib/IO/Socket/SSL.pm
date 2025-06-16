@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.091';
+our $VERSION = '2.092';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -592,26 +592,30 @@ my %SSL_OBJECT;
 my %CREATED_IN_THIS_THREAD;
 sub CLONE { %CREATED_IN_THIS_THREAD = (); }
 
-# all keys used internally, these should be cleaned up at end
-my @all_my_keys = qw(
-    _SSL_arguments
-    _SSL_certificate
-    _SSL_ctx
+# all keys specific for the current state of the socket
+# these should be removed on close
+my @all_my_conn_keys = qw(
     _SSL_fileno
-    _SSL_in_DESTROY
-    _SSL_ioclass_downgrade
-    _SSL_ioclass_upgraded
-    _SSL_last_err
     _SSL_object
-    _SSL_ocsp_verify
     _SSL_opened
     _SSL_opening
     _SSL_read_closed
     _SSL_write_closed
     _SSL_rawfd
+);
+
+# all keys used internally, these should be cleaned up at end
+# but not already on close
+my @all_my_keys = (@all_my_conn_keys, qw(
+    _SSL_arguments
+    _SSL_certificate
+    _SSL_ctx
+    _SSL_ioclass_upgraded
+    _SSL_last_err
+    _SSL_ocsp_verify
     _SSL_servername
     _SSL_msg_callback
-);
+));
 
 
 # we have callbacks associated with contexts, but have no way to access the
@@ -1207,10 +1211,14 @@ sub _generic_read {
 		$self->stop_SSL(SSL_no_shutdown => 1);
 	    } else {
 		# mark read side as automatically closed
+		# _SSL_read_closed is
+		# -1: SSL shutdown done, but not acknowledged by user
+		#  1: SSL shutdown acknowledged by the user
 		${*$self}{_SSL_read_closed} = -1;
 	    }
 	}
-	return 0;
+	$! = EAGAIN;
+	return;
     }
 
     $$buffer = '' if !defined $$buffer;
@@ -1231,21 +1239,26 @@ sub _rawfd {
     return ${*$self}{_SSL_rawfd} ||= do { open(my $fh,'+<&=',$self); $fh };
 }
 
+sub _handle_read_closed_unack {
+    my ($self,$rc) = @_;
+    # reading eof is fine, reading plain data is not
+    return if ! defined recv($self,my $buf,1,MSG_PEEK);
+    return 0 if $buf eq '';
+    carp "got SSL shutdown by peer, call stop_SSL(SSL_ack_read_closed => 1) before reading plain data";
+    $! = EAGAIN;
+    return;
+}
+
 sub read {
     my $self = shift;
-    my $rc = ${*$self}{_SSL_read_closed};
+    my $rc = ${*$self}{_SSL_read_closed} || 0;
     if (my $ssl = !$rc && ${*$self}{_SSL_object}) {
 	return _generic_read($self, $ssl, 0,
 	    $self->blocking ? \&Net::SSLeay::ssl_read_all : \&Net::SSLeay::read,
 	    @_);
     }
 
-    if ($rc && $rc<0) {
-	warn "got SSL shutdown by peer, call stop_SSL(SSL_ack_read_closed => 1) before reading plain data";
-	return;
-    }
-
-
+    return _handle_read_closed_unack($self) if $rc<0;
 
     # fall back to plain read if we are not required to use SSL yet
     return ($rc ? _rawfd($self) : $self)->SUPER::read(@_);
@@ -1254,15 +1267,12 @@ sub read {
 # contrary to the behavior of read sysread can read partial data
 sub sysread {
     my $self = shift;
-    my $rc = ${*$self}{_SSL_read_closed};
+    my $rc = ${*$self}{_SSL_read_closed} || 0;
     if (my $ssl = !$rc && ${*$self}{_SSL_object}) {
 	return _generic_read( $self, $ssl, 0, \&Net::SSLeay::read, @_ );
     }
 
-    if ($rc && $rc<0) {
-	warn "got SSL shutdown by peer, call stop_SSL(SSL_ack_read_closed => 1) before reading plain data";
-	return;
-    }
+    return _handle_read_closed_unack($self) if $rc<0;
 
     # fall back to plain sysread if we are not required to use SSL yet
     return ($rc ? _rawfd($self) : $self)->SUPER::sysread(@_);
@@ -1270,13 +1280,13 @@ sub sysread {
 
 sub peek {
     my $self = shift;
-    my $rc = ${*$self}{_SSL_read_closed};
+    my $rc = ${*$self}{_SSL_read_closed} || 0;
     if (my $ssl = !$rc && ${*$self}{_SSL_object}) {
 	return _generic_read( $self, $ssl, 1, \&Net::SSLeay::peek, @_ );
     }
 
-    if ($rc && $rc<0) {
-	warn "got SSL shutdown by peer, call stop_SSL(SSL_ack_read_closed => 1) before reading plain data";
+    if ($rc<0) {
+	carp "got SSL shutdown by peer, call stop_SSL(SSL_ack_read_closed => 1) before reading plain data";
 	return;
     }
 
@@ -1488,7 +1498,7 @@ sub close {
 
     if ( ! $close_args->{_SSL_in_DESTROY} ) {
 	untie( *$self );
-	undef ${*$self}{_SSL_fileno};
+	delete @{*$self}{@all_my_conn_keys};
 	return $self->SUPER::close;
     }
     return 1;
@@ -1496,7 +1506,9 @@ sub close {
 
 sub is_SSL {
     my $self = pop;
-    return ${*$self}{_SSL_object} && 1
+    return if !${*$self}{_SSL_object};
+    return (${*$self}{_SSL_read_closed} ? '':'r') .
+	(${*$self}{_SSL_write_closed} ? '':'w');
 }
 
 sub stop_SSL {

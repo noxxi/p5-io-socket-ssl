@@ -117,10 +117,10 @@ sub server {
 	    syswrite($client,"OK\n");
 
 	} elsif ( $line eq 'stop:write' ) {
-	    # expect "eof" on ssl shutdown from peer
+	    # expect EAGAIN on ssl shutdown from peer
 	    my $n = sysread($client, $line, 1);
-	    print "not " if !defined $n or $n !=0;
-	    print "ok # server read ssl eof\n";
+	    print "not " if defined $n or not $!{EAGAIN};
+	    print "ok # server read ssl EAGAIN\n";
 
 	    ref($client) eq "IO::Socket::SSL" or print "not ";
 	    print "ok # server class=".ref($client)."\n";

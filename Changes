@@ -1,3 +1,6 @@
+2.092 2025/06/16
+- rework implementation and behavior for one-sided SSL shutdown. Implementation
+  in 2.091 lead to some problems with Net::FTP and others.
 2.091 2025/06/11
 - fix behavior on one-sided SSL shutdown. If the application continued
   to read after half-closing the SSL connection this could result in reading

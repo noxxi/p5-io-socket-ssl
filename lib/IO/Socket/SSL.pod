@@ -1953,12 +1953,15 @@ Even if the SSL shutdown is only done for writing (C<SSL_fast_shutdown>) plain
 data can be immediately written.
 
 If the SSL shutdown was initiated by the peer it will lead to an implicit SSL
-shutdown for reading and sysread will return 0 (eof) once in this case. After this
-the socket is ready to receive plain data from the peer. But to keep the program
-in control when encrypted and when plain data are received the plain read will
-only be done if either a full SSL shutdown was explicitly issued by calling
-C<stop_SSL> or if the one sided SSL shutdown from the peer is explicitly
-acknowledged by calling C<stop_SSL> with C<SSL_ack_read_closed> set to true.
+shutdown for reading and sysread will return undef with errno EAGAIN once in
+this case. After this the socket is ready to receive plain data from the peer.
+But to keep the program in control when encrypted and when plain data are
+received the plain read will only be done if either a full SSL shutdown was
+explicitly issued by calling C<stop_SSL> or if the one sided SSL shutdown from
+the peer is explicitly acknowledged by calling C<stop_SSL> with
+C<SSL_ack_read_closed> set to true. Without this reading will just check
+if the socket is closed and without this issue a warning and return undef with
+EAGAIN.
 
 =item B<connect_SSL>, B<accept_SSL>
 
