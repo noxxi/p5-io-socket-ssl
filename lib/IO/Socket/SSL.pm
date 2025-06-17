@@ -13,13 +13,13 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.092';
+our $VERSION = '2.093';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
 use IO::Socket::SSL::PublicSuffix;
 use Exporter ();
-use Errno qw( EWOULDBLOCK EAGAIN ETIMEDOUT EINTR EPIPE );
+use Errno qw( EWOULDBLOCK EAGAIN ETIMEDOUT EINTR EPIPE EPERM );
 use Carp;
 use strict;
 
@@ -1209,16 +1209,23 @@ sub _generic_read {
 	    if ($status & SSL_SENT_SHUTDOWN) {
 		# fully done, close SSL object - no need to call shutdown again
 		$self->stop_SSL(SSL_no_shutdown => 1);
+	    } elsif (my $cb = ${*$self}{_SSL_arguments}{SSL_on_peer_shutdown}) {
+		# Mark as half done but leave further handling to callback
+		${*$self}{_SSL_read_closed} = 1;
+		return $cb->($self);
 	    } else {
-		# mark read side as automatically closed
-		# _SSL_read_closed is
-		# -1: SSL shutdown done, but not acknowledged by user
-		#  1: SSL shutdown acknowledged by the user
-		${*$self}{_SSL_read_closed} = -1;
+		# Half done, send also close notify
+		# Don't destruct _SSL_object since code might still rely on
+		# having access to it. Leave this to explicit stop_SSL or close.
+		local $SIG{PIPE} = 'IGNORE';
+		$SSL_ERROR = $! = undef;
+		Net::SSLeay::shutdown($ssl);
+		# Use "-1" to mark as automatic closed and thus require action
+		# before reading/sending plain data
+		${*$self}{_SSL_read_closed} = ${*$self}{_SSL_write_closed} = -1;
 	    }
 	}
-	$! = EAGAIN;
-	return;
+	return 0;
     }
 
     $$buffer = '' if !defined $$buffer;
@@ -1244,8 +1251,7 @@ sub _handle_read_closed_unack {
     # reading eof is fine, reading plain data is not
     return if ! defined recv($self,my $buf,1,MSG_PEEK);
     return 0 if $buf eq '';
-    carp "got SSL shutdown by peer, call stop_SSL(SSL_ack_read_closed => 1) before reading plain data";
-    $! = EAGAIN;
+    $! = EPERM;
     return;
 }
 
@@ -1285,10 +1291,7 @@ sub peek {
 	return _generic_read( $self, $ssl, 1, \&Net::SSLeay::peek, @_ );
     }
 
-    if ($rc<0) {
-	carp "got SSL shutdown by peer, call stop_SSL(SSL_ack_read_closed => 1) before reading plain data";
-	return;
-    }
+    return _handle_read_closed_unack($self) if $rc<0;
 
     # fall back to plain peek if we are not required to use SSL yet
     # emulate peek with recv(...,MSG_PEEK) - peek(buf,len,offset)
@@ -1337,9 +1340,15 @@ sub _generic_write {
 # if all data are written
 sub write {
     my $self = shift;
-    my $wc = ${*$self}{_SSL_write_closed};
+    my $wc = ${*$self}{_SSL_write_closed} || 0;
     if (my $ssl = !$wc && ${*$self}{_SSL_object}) {
 	return _generic_write( $self, $ssl, scalar($self->blocking),@_ );
+    }
+
+    # don't write plain after automtic SSL shutdown
+    if ($wc<0) {
+	$! = EPERM;
+	return;
     }
 
     # fall back to plain write if we are not required to use SSL yet
@@ -1350,9 +1359,15 @@ sub write {
 # a part of the data is written
 sub syswrite {
     my $self = shift;
-    my $wc = ${*$self}{_SSL_write_closed};
+    my $wc = ${*$self}{_SSL_write_closed} || 0;
     if (my $ssl = !$wc && ${*$self}{_SSL_object}) {
 	return _generic_write($self,$ssl,0,@_);
+    }
+
+    # don't write plain after automtic SSL shutdown
+    if ($wc<0) {
+	$! = EPERM;
+	return;
     }
 
     # fall back to plain syswrite if we are not required to use SSL yet
@@ -1519,10 +1534,6 @@ sub stop_SSL {
     if (my $ssl = ${*$self}{'_SSL_object'}) {
 	if (delete ${*$self}{'_SSL_opening'}) {
 	    # just destroy the object further below
-	} elsif ($stop_args->{SSL_ack_read_closed} ) {
-	    return 0 if !${*$self}{_SSL_read_closed}; # not (automatically) closed
-	    ${*$self}{_SSL_read_closed} = 1; # accept as closed
-	    return 1;
 	} elsif ( ! $stop_args->{SSL_no_shutdown} ) {
 	    my $status = Net::SSLeay::get_shutdown($ssl);
 
@@ -1602,8 +1613,8 @@ sub stop_SSL {
 	if (my $cert = delete ${*$self}{'_SSL_certificate'}) {
 	    Net::SSLeay::X509_free($cert);
 	}
-	delete ${*$self}{_SSL_object};
-	delete ${*$self}{_SSL_rawfd};
+	delete @{*$self}{
+	    qw(_SSL_object _SSL_write_closed _SSL_read_closed _SSL_rawfd)};
 	${*$self}{'_SSL_opened'} = 0;
 	delete $SSL_OBJECT{$ssl};
 	delete $CREATED_IN_THIS_THREAD{$ssl};

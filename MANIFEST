@@ -75,6 +75,7 @@ t/sni_verify.t
 t/startssl-failed.t
 t/startssl.t
 t/start-stopssl.t
+t/start-stopssl-with-cb.t
 t/sysread_write.t
 t/testlib.pl
 t/verify_fingerprint.t

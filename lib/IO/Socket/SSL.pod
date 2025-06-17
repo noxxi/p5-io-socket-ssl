@@ -1,4 +1,4 @@
-
+CK
 =head1 NAME
 
 IO::Socket::SSL - SSL sockets with IO::Socket interface
@@ -1559,6 +1559,12 @@ Example:
 
     my $srv = IO::Socket::SSL->new(..., SSL_ticket_keycb => $keycb);
 
+=item SSL_on_peer_shutdown CODE
+
+This defines a callback which gets called on receiving SSL shutdown (close
+notify) from the peer. This can be used to override the default behavior, see
+C<stop_SSL> for more.
+
 =item SSL_mode_release_buffers 1|0
 
 This enables or disables the SSL_MODE_RELEASE_BUFFERS option on the SSL object.
@@ -1905,6 +1911,14 @@ This returns false if the socket could not be opened, 1 if the socket could be
 opened and the SSL handshake was successful done and -1 if the underlying
 IO::Handle is open, but the SSL handshake failed.
 
+=item B<is_SSL()>
+
+This returns undefined if there is no SSL object associated with the socket.
+It will return C<rw> if the state of the SSL object has SSL active for both
+directions, C<r> if there was a locally initiated SSL shutdown (close notify),
+C<w> if a remote SSL shutdown was received and C<> (empty string but defined) if
+a bidirectional SSL shutdown was done.
+
 =item B<< IO::Socket::SSL->start_SSL($socket, ... ) >>
 
 This will convert a glob reference or a socket that you provide to an
@@ -1953,15 +1967,20 @@ Even if the SSL shutdown is only done for writing (C<SSL_fast_shutdown>) plain
 data can be immediately written.
 
 If the SSL shutdown was initiated by the peer it will lead to an implicit SSL
-shutdown for reading and sysread will return undef with errno EAGAIN once in
-this case. After this the socket is ready to receive plain data from the peer.
-But to keep the program in control when encrypted and when plain data are
-received the plain read will only be done if either a full SSL shutdown was
-explicitly issued by calling C<stop_SSL> or if the one sided SSL shutdown from
-the peer is explicitly acknowledged by calling C<stop_SSL> with
-C<SSL_ack_read_closed> set to true. Without this reading will just check
-if the socket is closed and without this issue a warning and return undef with
-EAGAIN.
+shutdown for reading and sysread will return with 0 in this case. It will also
+SSL shutdown the local side. After this the socket is ready to receive plain
+data from the peer and locally send data will also be transmitted in plain. To
+prevent accidental sending/receiving plain data after such implicit SSL
+shutdown, the read and write functions will return undef with $ERRNO set to
+EPERM until an explicit stop_SSL was done. If the peer directly closes the TCP
+connection ater the SSL shutdown without sending plain data this will still be
+detected though.
+
+If this default behavior is not wanted a callback can be setup using
+C<SSL_on_peer_shutdown> which gets C<$self> as first argument. The result from
+the callback will then be returned instead of 0 and no local SSL shutdown will
+be automatically initiated. Similar no explicit stop_SSL is needed before
+receiving plain data since the callback is considered explicit action enough.
 
 =item B<connect_SSL>, B<accept_SSL>
 

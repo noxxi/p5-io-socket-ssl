@@ -1,3 +1,7 @@
+2.093 2025/06/17
+- Another rework for one-sided SSL shutdown, to a) implement a useful and secure
+  behavior and b) without affecting existing applications. 2.092 had still
+  unwanted side effects
 2.092 2025/06/16
 - rework implementation and behavior for one-sided SSL shutdown. Implementation
   in 2.091 lead to some problems with Net::FTP and others.
