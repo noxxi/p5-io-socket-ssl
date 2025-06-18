@@ -596,7 +596,6 @@ sub CLONE { %CREATED_IN_THIS_THREAD = (); }
 # these should be removed on close
 my @all_my_conn_keys = qw(
     _SSL_fileno
-    _SSL_object
     _SSL_opened
     _SSL_opening
     _SSL_read_closed
@@ -607,6 +606,7 @@ my @all_my_conn_keys = qw(
 # all keys used internally, these should be cleaned up at end
 # but not already on close
 my @all_my_keys = (@all_my_conn_keys, qw(
+    _SSL_object
     _SSL_arguments
     _SSL_certificate
     _SSL_ctx

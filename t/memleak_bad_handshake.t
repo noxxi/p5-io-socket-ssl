@@ -82,8 +82,8 @@ for(200..300) {
     IO::Socket::INET->new( $saddr ) or next;
 }
 my $size300 = $getsize->($pid);
-if ($size100>$size200 or $size200<$size300) {;
-    print "1..0 # skipped  - do we measure the right thing?\n";
+if ($size100>$size200 or $size200>$size300) {;
+    print "1..0 # skipped  - do we measure the right thing? ($size100>$size200 or $size200<$size300)\n";
     goto done;
 }
 
