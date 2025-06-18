@@ -594,8 +594,9 @@ sub CLONE { %CREATED_IN_THIS_THREAD = (); }
 
 # all keys specific for the current state of the socket
 # these should be removed on close
-my @all_my_conn_keys = qw(
+my %all_my_conn_keys = map { $_ => 1 } qw(
     _SSL_fileno
+    _SSL_object
     _SSL_opened
     _SSL_opening
     _SSL_read_closed
@@ -603,19 +604,25 @@ my @all_my_conn_keys = qw(
     _SSL_rawfd
 );
 
+my %all_my_conn_and_cert_keys = (
+    %all_my_conn_keys,
+    _SSL_certificate => 1,
+);
+
 # all keys used internally, these should be cleaned up at end
 # but not already on close
-my @all_my_keys = (@all_my_conn_keys, qw(
-    _SSL_object
-    _SSL_arguments
-    _SSL_certificate
-    _SSL_ctx
-    _SSL_ioclass_upgraded
-    _SSL_last_err
-    _SSL_ocsp_verify
-    _SSL_servername
-    _SSL_msg_callback
-));
+my %all_my_keys = (
+    %all_my_conn_and_cert_keys,
+    map { $_ => 1 } qw(
+	_SSL_arguments
+	_SSL_ctx
+	_SSL_ioclass_upgraded
+	_SSL_last_err
+	_SSL_ocsp_verify
+	_SSL_servername
+	_SSL_msg_callback
+    )
+);
 
 
 # we have callbacks associated with contexts, but have no way to access the
@@ -675,7 +682,7 @@ sub configure_SSL {
     # add user defined defaults, maybe after filtering
     $FILTER_SSL_ARGS->($is_server,$arg_hash) if $FILTER_SSL_ARGS;
 
-    delete @{*$self}{@all_my_keys};
+    _cleanup_ssl($self); # in case there was something left
     ${*$self}{_SSL_opened} = $is_server;
     ${*$self}{_SSL_arguments} = $arg_hash;
 
@@ -1512,8 +1519,7 @@ sub close {
     );
 
     if ( ! $close_args->{_SSL_in_DESTROY} ) {
-	untie( *$self );
-	delete @{*$self}{@all_my_conn_keys};
+	_cleanup_ssl($self,\%all_my_conn_keys);
 	return $self->SUPER::close;
     }
     return 1;
@@ -1606,29 +1612,16 @@ sub stop_SSL {
 		return 1;
 	    }
 	}
-
-	# destroy allocated objects for SSL and untie
-	# do not destroy CTX unless explicitly specified
-	Net::SSLeay::free($ssl);
-	if (my $cert = delete ${*$self}{'_SSL_certificate'}) {
-	    Net::SSLeay::X509_free($cert);
-	}
-	delete @{*$self}{
-	    qw(_SSL_object _SSL_write_closed _SSL_read_closed _SSL_rawfd)};
-	${*$self}{'_SSL_opened'} = 0;
-	delete $SSL_OBJECT{$ssl};
-	delete $CREATED_IN_THIS_THREAD{$ssl};
-	untie(*$self);
     }
 
-    if ($stop_args->{'SSL_ctx_free'}) {
-	my $ctx = delete ${*$self}{'_SSL_ctx'};
-	$ctx && $ctx->DESTROY();
+    _cleanup_ssl($self, \%all_my_conn_and_cert_keys);
+    if ($stop_args->{'SSL_ctx_free'} and
+	my $ctx = delete ${*$self}{_SSL_ctx}) {
+	$ctx->DESTROY();
     }
 
 
     if ( ! $stop_args->{_SSL_in_DESTROY} ) {
-
 	my $downgrade = $stop_args->{_SSL_ioclass_downgrade};
 	if ( $downgrade || ! defined $downgrade ) {
 	    # rebless to original class from start_SSL
@@ -1637,12 +1630,36 @@ sub stop_SSL {
 		# FIXME: if original class was tied too we need to restore the tie
 		# remove all _SSL related from *$self
 		my @sslkeys = grep { m{^_?SSL_} } keys %{*$self};
-		delete @{*$self}{@sslkeys} if @sslkeys;
+		_cleanup_ssl($self,{map { $_ => 1 } @sslkeys}) if @sslkeys;
 	    }
 	}
     }
     return 1;
 }
+
+sub _cleanup_ssl {
+    my ($self,$keys) = @_;
+    $keys ||= \%all_my_keys;
+
+    if ($keys->{_SSL_object} and my $ssl = ${*$self}{_SSL_object}) {
+	Net::SSLeay::free($ssl);
+	delete $SSL_OBJECT{$ssl};
+	delete $CREATED_IN_THIS_THREAD{$ssl};
+	untie(*$self);
+    }
+
+    if ($keys->{_SSL_certificate} and
+	my $cert = delete ${*$self}{_SSL_certificate}) {
+	Net::SSLeay::X509_free($cert);
+    }
+
+    # don't cleanup _SSL_ctx here, will only be explicitly done when stop_SSL is
+    # used with SSL_ctx_free
+
+    delete @{*$self}{keys %$keys};
+    ${*$self}{_SSL_opened} = 0 if exists ${*$self}{_SSL_opened};
+}
+
 
 
 sub fileno {
@@ -2225,7 +2242,7 @@ sub DESTROY {
 	    $self->close(_SSL_in_DESTROY => 1, SSL_no_shutdown => 1);
 	}
     }
-    delete @{*$self}{@all_my_keys};
+    delete @{*$self}{keys %all_my_keys};
 }
 
 
@@ -2425,13 +2442,13 @@ sub new {
     %$arg_hash = ( %defaults, %$arg_hash ) if %defaults;
 
     if (my $ctx = $arg_hash->{'SSL_reuse_ctx'}) {
-	if ($ctx->isa('IO::Socket::SSL::SSL_Context') and
-	    $ctx->{context}) {
-	    # valid context
-	} elsif ( $ctx = ${*$ctx}{_SSL_ctx} ) {
+	if ($ctx->isa('IO::Socket::SSL::SSL_Context')) {
+	    return $ctx if $ctx->{context};
+	} elsif (eval { $ctx = ${*$ctx}{_SSL_ctx} }) {
 	    # reuse context from existing SSL object
+	    return $ctx;
 	}
-	return $ctx
+	die "invalid context to reuse: $ctx";
     }
 
     # common problem forgetting to set SSL_use_cert
