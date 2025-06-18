@@ -1,3 +1,5 @@
+2.094 2025/06/18
+- fixed memory leak introduced in 2.092
 2.093 2025/06/17
 - Another rework for one-sided SSL shutdown, to a) implement a useful and secure
   behavior and b) without affecting existing applications. 2.092 had still
