@@ -39,7 +39,7 @@ sub client {
 	    sleep(1); # avoid race condition, if client calls start but server is not yet available
 
 	    #print STDERR ">>$$(client) start\n";
-	    IO::Socket::SSL->start_SSL($client, SSL_verify_mode => 0 )
+	    $client = IO::Socket::SSL->start_SSL($client, SSL_verify_mode => 0, SSL_usebio => 1)
 		|| die "not ok # client::start_SSL: $SSL_ERROR\n";
 	    #print STDERR "<<$$(client) start\n";
 	    print "ok # client::start_SSL\n";
@@ -49,7 +49,7 @@ sub client {
 
 	} elsif ( $test eq 'stop' ) {
 	    syswrite($client,"stop\n");
-	    $client->stop_SSL || die "not ok # client::stop_SSL\n";
+	    $client = $client->stop_SSL || die "not ok # client::stop_SSL\n";
 	    print "ok # client::stop_SSL\n";
 
 	    ref($client) eq "IO::Socket::INET" or print "not ";
@@ -57,7 +57,7 @@ sub client {
 
 	} elsif ( $test eq 'stop:write' ) {
 	    syswrite($client,"stop:write\n");
-	    $client->stop_SSL(SSL_fast_shutdown => 1)
+	    $client = $client->stop_SSL(SSL_fast_shutdown => 1)
 		|| die "not ok # client::stop_SSL\n";
 	    print "ok # client::stop_SSL(SSL_fast_shutdown => 1)\n";
 
@@ -73,7 +73,7 @@ sub client {
 	} elsif ( $test eq 'close' ) {
 	    syswrite($client,"close\n");
 	    my $class = ref($client);
-	    $client->close || die "not ok # client::close\n";
+	    $client->close || die "not ok # client::close: $!\n";
 	    print "ok # client::close\n";
 
 	    ref($client) eq $class or print "not ";
@@ -99,10 +99,11 @@ sub server {
 	chomp($line);
 	if ( $line eq 'start' ) {
 	    #print STDERR ">>$$ start\n";
-	    IO::Socket::SSL->start_SSL( $client,
+	    $client = IO::Socket::SSL->start_SSL( $client,
 		SSL_server => 1,
 		SSL_cert_file => "t/certs/client-cert.pem",
 		SSL_key_file => "t/certs/client-key.pem",
+		SSL_usebio => 1,
 	    ) || die "not ok # server::start_SSL: $SSL_ERROR\n";
 	    #print STDERR "<<$$ start\n";
 
@@ -111,7 +112,7 @@ sub server {
 	    syswrite($client,"OK\n");
 
 	} elsif ( $line eq 'stop' ) {
-	    $client->stop_SSL || die "not ok # server::stop_SSL\n";
+	    $client = $client->stop_SSL || die "not ok # server::stop_SSL\n";
 	    print "ok # server::stop_SSL\n";
 
 	    ref($client) eq "IO::Socket::INET" or print "not ";
@@ -153,7 +154,7 @@ sub server {
 	    print "ok # server read results in undef/EPERM\n";
 
 	    # will both work after explicit stop_SSL
-	    $client->stop_SSL();
+	    $client = $client->stop_SSL();
 
 	    # downgraded
 	    ref($client) eq "IO::Socket::INET" or print "not ";

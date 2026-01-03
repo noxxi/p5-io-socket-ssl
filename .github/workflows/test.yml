@@ -93,8 +93,9 @@ jobs:
           - image: perl:5.18.4-buster
           - image: perl:5.22.4-stretch
           - image: perl:5.36.0-slim-bullseye
-          - image: perl:5.38.0-slim-bookworm
-          - image: perl:5.40.0-slim-bookworm
+          - image: perl:5.38.5-slim-bookworm
+          - image: perl:5.40.3-slim-bookworm
+          - image: perl:5.42.0-slim-bookworm
           ## use debian:* images only if there's no suitable perl:* image
           #- image: debian:bookworm
           - image: ubuntu:focal
@@ -130,8 +131,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - osvers: '13.4'
-          - osvers: '14.2'
+          - osvers: '13.5'
+          - osvers: '14.3'
+          - osvers: '15.0'
     steps:
     - uses: actions/checkout@v4
       with:

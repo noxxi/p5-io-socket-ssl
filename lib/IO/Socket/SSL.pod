@@ -1049,7 +1049,6 @@ SSL_use_cert will implicitly be set if SSL_server is set.
 For convenience it is also set if it was not given but a cert was given for use
 (SSL_cert_file or similar).
 
-
 =item SSL_version
 
 Sets the version of the SSL protocol used to transmit data.
@@ -1268,8 +1267,6 @@ If you want to verify that the peer certificate has not been revoked
 by the signing authority, set this value to true. OpenSSL will search
 for the CRL in your SSL_ca_path, or use the file specified by
 SSL_crl_file.  See the Net::SSLeay documentation for more details.
-Note that this functionality appears to be broken with OpenSSL <
-v0.9.7b, so its use with lower versions will result in an error.
 
 =item SSL_crl_file
 
@@ -1573,6 +1570,35 @@ need to be reallocated for each new SSL_read. If memory usage is a concern this
 might save lots of memory in the mean time though, about 34k per idle SSL
 connection according to the documentation in SSL_CTX_set_mode(3ssl).
 
+=item SSL_usebio 1|0
+
+If this option is used with C<start_SSL> (not supported somewhere else) it will
+not upgrade the given IO handle but instead wrap it inside a new IO object and
+use openssl memory BIO's to manage exchange between TLS layer and socket layer.
+While this will add some overhead it makes it possible to stack TLS layers, i.e.
+first create an outer TLS connection (without or with SSL_usebio) and then
+create the inner TLS layer with SSL_usebio, using the outer TLS connection as
+the IO handle in C<start_SSL>.
+
+Example:
+
+   # create TLS connection to TLS enabled http proxy
+   my $outer = IO::Socket::SSL->new('proxy.test:3128');
+
+   # send proxy request
+   print $outer "CONNECT real-target.test:443 HTTP/1.0\r\n\r\n";
+   ... # read and check response from proxy on $outer
+
+   # create an inner TLS connection to the server inside $outer
+   my $inner = IO::Socket::SSL->start_SSL($outer,
+      SSL_usebio => 1,
+      SSL_hostname => 'real-target.test', # SNI
+   );
+
+   # send request to server through proxy using $inner
+   print $inner "GET / HTTP/1.0\r\nHost: real-target.test\r\n\r\n";
+   ... # read response from server on $inner
+
 =back
 
 =item B<accept>
@@ -1660,8 +1686,7 @@ Please read the specific section in this documentation.
 
 This function has exactly the same syntax as B<sysread>, and performs nearly the
 same task but will not advance the read position so that successive calls to
-peek() with the same arguments will return the same results.  This function
-requires OpenSSL 0.9.6a or later to work.
+peek() with the same arguments will return the same results.
 
 =item B<pending()>
 

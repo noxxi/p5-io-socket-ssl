@@ -1,3 +1,7 @@
+2.096 2026/01/04
+- Allow stacking TLS layers with SSL_usebio
+  This also allows LWP (after patches) to access https site through TLS
+  enabled proxy
 2.095 2025/07/10
 - regression: make sysread set buffer to empty string again when returning
   EOf. Fixes #171
