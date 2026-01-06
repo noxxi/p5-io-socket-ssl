@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.097';
+our $VERSION = '2.098';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -1921,15 +1921,10 @@ sub pending {
 
 sub start_SSL {
     my ($class,$socket) = (shift,shift);
-    return $class->_internal_error("Not a socket",9) if ! ref($socket);
+    return $class->_internal_error("Not a socket",9) if ! ref($socket); # glob or object
     my $arg_hash = @_ == 1 ? $_[0] : {@_};
     my %to = exists $arg_hash->{Timeout} ? ( Timeout => delete $arg_hash->{Timeout} ) :();
     my $original_class = blessed($socket);
-    if ( ! $original_class ) {
-	$socket = ($original_class = $ISA[0])->new_from_fd($socket,'+<')
-	    or return $class->_internal_error(
-	    "creating $original_class from file handle failed",9);
-    }
 
     my $usebio = $arg_hash->{SSL_usebio};
     my $original_fileno = (UNIVERSAL::can($socket, "fileno"))

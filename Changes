@@ -1,3 +1,8 @@
+2.098 2026/01/06
+- Another fix to issue #175 to make sure that an unblessed sockets gets
+  blessed in place instead of using new_from_fd. Document that it will
+  not retain original class with unblessed sockets on error, since this
+  never worked anyway (there is no native unbless)
 2.097 2026/01/06
 - fix issue #175 with upgrading from plain socket (no object) by using
   correct fdopen mode +< instead of <+

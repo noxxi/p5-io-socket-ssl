@@ -1955,12 +1955,16 @@ inherits from IO::Socket::SSL and you want the $socket to be blessed into your
 own class instead, use MyClass->start_SSL($socket) to achieve the desired
 effect.
 
-Note that if start_SSL() fails in SSL negotiation, $socket will remain blessed
-in its original class.	 For non-blocking sockets you better just upgrade the
-socket to IO::Socket::SSL and call accept_SSL or connect_SSL and the upgraded
-object. To just upgrade the socket set B<SSL_startHandshake> explicitly to 0. If
-you call start_SSL w/o this parameter it will revert to blocking behavior for
-accept_SSL and connect_SSL.
+Note that if start_SSL() fails (wrong arguments, error in SSL negotiation ...),
+it will try to bless the socket back to its original class. This will fail
+if the given socket was not blessed, since there is no builtin "unbless".
+Therefore better use IO::Socket (or other IO::Handle) objects as C<$socket>
+instead of creating unblessed sockets with C<socket> or similar.
+
+For non-blocking sockets you better just upgrade the socket to IO::Socket::SSL
+and call accept_SSL or connect_SSL and the upgraded object. To just upgrade the
+socket set B<SSL_startHandshake> explicitly to 0. If you call start_SSL w/o this
+parameter it will revert to blocking behavior for accept_SSL and connect_SSL.
 
 If given the parameter "Timeout" it will stop if after the timeout no SSL
 connection was established. This parameter is only used for blocking sockets, if
