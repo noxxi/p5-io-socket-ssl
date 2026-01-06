@@ -13,7 +13,7 @@
 
 package IO::Socket::SSL;
 
-our $VERSION = '2.096';
+our $VERSION = '2.097';
 
 use IO::Socket;
 use Net::SSLeay 1.46;
@@ -1926,7 +1926,7 @@ sub start_SSL {
     my %to = exists $arg_hash->{Timeout} ? ( Timeout => delete $arg_hash->{Timeout} ) :();
     my $original_class = blessed($socket);
     if ( ! $original_class ) {
-	$socket = ($original_class = $ISA[0])->new_from_fd($socket,'<+')
+	$socket = ($original_class = $ISA[0])->new_from_fd($socket,'+<')
 	    or return $class->_internal_error(
 	    "creating $original_class from file handle failed",9);
     }
