@@ -45,6 +45,7 @@ t/compatibility.t
 t/connectSSL-timeout.t
 t/core.t
 t/dhe.t
+t/double-tls-layer.t
 t/ecdhe.t
 t/external/fingerprint.pl
 t/external/ocsp.t
