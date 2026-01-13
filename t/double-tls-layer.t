@@ -7,7 +7,7 @@ use IO::Socket::SSL;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 $|=1;
-print "1..15\n";
+print "1..14\n";
 
 my $server = IO::Socket::INET->new(
     LocalAddr => '127.0.0.1',
@@ -84,9 +84,7 @@ sub client {
     die "'$buf'" if $buf ne "WORLD\n";
     print "ok # client data exchange through double TLS\n";
 
-    # Close connection
-    $inner->close || die "not ok # client::close\n";
-    print "ok # client::close\n";
+    <$inner>; # wait for EOF from server
 }
 
 sub server {
