@@ -7,7 +7,7 @@ use IO::Socket::SSL;
 do './testlib.pl' || do './t/testlib.pl' || die "no testlib";
 
 $|=1;
-print "1..14\n";
+print "1..16\n";
 
 my $server = IO::Socket::INET->new(
     LocalAddr => '127.0.0.1',
