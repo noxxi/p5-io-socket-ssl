@@ -939,6 +939,9 @@ sub connect_SSL {
 
     $ctx ||= ${*$self}{'_SSL_ctx'};
 
+    # _SSL_ocsp_verify is set only when a staple was received and fully
+    # verified. A missing staple and a broken/unverifiable staple both leave it
+    # undef, so MUST_STAPLE treats both identically as "no usable staple".
     if ( my $ocsp_result = ${*$self}{_SSL_ocsp_verify} ) {
 	# got result from OCSP stapling
 	if ( $ocsp_result->[0] > 0 ) {
@@ -3285,7 +3288,13 @@ sub new {
 		return 1;
 	    }
 
-	    # default callback does verification
+	    # Default callback does verification.
+	    # _SSL_ocsp_verify is only written when a staple is received AND fully
+	    # verified (good status, valid signature, cert status retrieved).
+	    # Returning 1 here without writing _SSL_ocsp_verify means the staple
+	    # is treated the same as if no staple was provided: with
+	    # SSL_OCSP_TRY_STAPLE the connection continues; with
+	    # SSL_OCSP_MUST_STAPLE the post-handshake check will reject it.
 	    if ( ! $resp ) {
 		$DEBUG>=3 && DEBUG("did not get stapled OCSP response");
 		return 1;
@@ -3293,11 +3302,13 @@ sub new {
 	    $DEBUG>=3 && DEBUG("got stapled OCSP response");
 	    my $status = Net::SSLeay::OCSP_response_status($resp);
 	    if ($status != Net::SSLeay::OCSP_RESPONSE_STATUS_SUCCESSFUL()) {
+		# Treat a broken staple the same as no staple (see comment above).
 		$DEBUG>=3 && DEBUG("bad status of stapled OCSP response: ".
 		    Net::SSLeay::OCSP_response_status_str($status));
 		return 1;
 	    }
 	    if (!eval { Net::SSLeay::OCSP_response_verify($ssl,$resp) }) {
+		# Treat an unverifiable staple the same as no staple (see comment above).
 		$DEBUG>=3 && DEBUG("verify of stapled OCSP response failed");
 		return 1;
 	    }

@@ -966,8 +966,16 @@ C<SSL_force_fingerprint>.
 
 =item SSL_force_fingerprint
 
-This option should be set to true if a failed fingerprint validation should
-override an otherwise successful certificate validation.
+Set this to true to enforce strict certificate pinning: the connection will be
+rejected unless the peer certificate matches one of the fingerprints given in
+C<SSL_fingerprint>, even if the certificate chain would otherwise be trusted.
+
+Without this option, C<SSL_fingerprint> acts as an alternative trust anchor —
+a matching fingerprint can unlock an otherwise-rejected certificate (e.g.
+self-signed or from an unknown CA), but a non-matching fingerprint does not
+block a certificate that passes normal chain validation. With this option, the
+fingerprint check is the sole trust decision: any certificate not in the
+fingerprint list is rejected regardless of CA trust.
 
 =item SSL_cert_file | SSL_cert | SSL_key_file | SSL_key
 
@@ -1293,13 +1301,17 @@ This is the default if SSL_verify_mode is VERIFY_NONE.
 
 =item SSL_OCSP_TRY_STAPLE
 
-Try OCSP stapling, but don't complain if it gets no stapled response back.
+Try OCSP stapling, but don't fail if no usable stapled response is received.
+Both a missing staple and a broken or unverifiable staple are treated the same:
+the connection continues without OCSP revocation information from the staple.
 This is the default if SSL_verify_mode is VERIFY_PEER (the default).
 
 =item SSL_OCSP_MUST_STAPLE
 
-Consider it a hard error, if the server does not send a stapled OCSP response
-back. Most servers currently send no stapled OCSP response back.
+Require a valid stapled OCSP response; fail the connection if none is received.
+A broken or unverifiable staple is treated the same as a missing one — both
+cause the connection to fail with "did not receive the required stapled OCSP
+response". Most servers currently send no stapled OCSP response back.
 
 =item SSL_OCSP_FAIL_HARD
 
