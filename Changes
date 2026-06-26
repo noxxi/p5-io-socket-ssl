@@ -1,3 +1,7 @@
+2.099 2026/06/26
+- Close socket by default on failed SSL handshake when created with new, but
+  keep open when upgrading from existing socket with start_SSL. This restores
+  old behavior which was accidentally broken.
 2.098 2026/01/06
 - Another fix to issue #175 to make sure that an unblessed sockets gets
   blessed in place instead of using new_from_fd. Document that it will
