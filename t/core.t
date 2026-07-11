@@ -151,7 +151,8 @@ unless (fork) {
     @array = $client->getlines;
     is( scalar @array, 6, "Client Getlines Check 1");
 
-    is( $array[0], "1.04\n", "Client Getlines Check 2");
+    # workaround for https://github.com/noxxi/p5-io-socket-ssl/issues/179
+    like( $array[0], qr/\A1[.,]04\n\z/, "Client Getlines Check 2");
 
     is( $array[1], "4\n", "Client Getlines Check 3");
 
