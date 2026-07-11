@@ -10,18 +10,11 @@ my $can_psk = IO::Socket::SSL->can_psk;
 plan skip_all => 'insufficient support for PSK in Net::SSLeay'
     if !$can_psk || !$can_psk->{server} || !$can_psk->{client};
 
-my $server = IO::Socket::SSL->new(
+my $server = IO::Socket::INET->new(
     LocalAddr => '127.0.0.1',
     Listen => 2,
     ReuseAddr => 1,
-    SSL_server => 1,
-    SSL_cipher_list => 'PSK',
-    SSL_psk => {
-	'foo' => 'foobar',
-	'io_socket_ssl' => 'barfoot',
-	'' => pack("H*",'deadbeef'),
-    }
-) or die "\$!=$!, \$\@=$@, S\$SSL_ERROR=$SSL_ERROR";
+) or die "\$!=$!, \$\@=$@";
 my $saddr = $server->sockhost.':'.$server->sockport;
 
 defined(my $server_pid = fork()) || die $!;
@@ -31,6 +24,22 @@ if ($server_pid == 0) {
 	    diag("accept failed: $!, $SSL_ERROR");
 	    next;
 	};
+	diag("tcp accept ok");
+
+	IO::Socket::SSL->start_SSL($cl,
+	    SSL_server => 1,
+	    SSL_cipher_list => 'PSK',
+	    SSL_psk => {
+		'foo' => 'foobar',
+		'io_socket_ssl' => 'barfoot',
+		'' => pack("H*",'deadbeef'),
+	    }
+	) or do {
+	    diag("start_SSL failed: \$\@=$@, S\$SSL_ERROR=$SSL_ERROR");
+	    next;
+	};
+	diag("ssl accept ok");
+
 	diag("client accepted: ver=".$cl->get_sslversion." cipher=".$cl->get_cipher);
 	my $l = <$cl>;
 	$l eq "ping\n" or die "wrong message from client: '$l'";
@@ -56,13 +65,15 @@ for my $v ('TLSv1_3','TLSv1_2') {
 	[ 0, [ foo => pack("H*",'deadbeef') ] ],
     ) {
 	my ($expect_ok,$psk) = @$t;
-	my $cl = IO::Socket::SSL->new(
-	    PeerAddr => $saddr,
+	my $tid = ref($psk) ? "$v/['$psk->[0]','$psk->[1]']":"$v/'$psk'";
+	my $cl = IO::Socket::INET->new(
+	    PeerAddr => $saddr
+	) or die "tcp connect failed";
+	$cl = IO::Socket::SSL->start_SSL($cl,
 	    SSL_version => $v,
 	    SSL_cipher_list => 'PSK',
 	    SSL_psk => $psk
 	);
-	my $tid = ref($psk) ? "$v/['$psk->[0]','$psk->[1]']":"$v/'$psk'";
 	ok($expect_ok ? $cl : !$cl, "$tid - connect");
 	next if !$cl or !$expect_ok;
 	print $cl "ping\n";
