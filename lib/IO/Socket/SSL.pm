@@ -1948,13 +1948,13 @@ sub start_SSL {
     }
 
     if (!$socket->configure_SSL($arg_hash)) {
-	bless($socket, $original_class) if $original_class;
+	bless($socket, $original_class) if defined $original_class;
 	return;
     }
 
     ${*$socket}{'_SSL_fileno'} = $original_fileno;
     ${*$socket}{'_SSL_ioclass_upgraded'} = $original_class
-	if $class ne $original_class;
+	if defined $original_class and $class ne $original_class;
 
     my $start_handshake = $arg_hash->{SSL_startHandshake};
     if ( ! defined($start_handshake) || $start_handshake ) {
@@ -1969,7 +1969,7 @@ sub start_SSL {
 	    return $socket;
 	} else {
 	    # upgrade to SSL failed, downgrade socket to original class
-	    bless($socket,$original_class) if $original_class;
+	    bless($socket,$original_class) if defined $original_class;
 	    return;
 	}
     } else {
