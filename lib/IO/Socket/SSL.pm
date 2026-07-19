@@ -1954,7 +1954,7 @@ sub start_SSL {
 
     ${*$socket}{'_SSL_fileno'} = $original_fileno;
     ${*$socket}{'_SSL_ioclass_upgraded'} = $original_class
-	if $class ne $original_class;
+	if $original_class && $class ne $original_class;
 
     my $start_handshake = $arg_hash->{SSL_startHandshake};
     if ( ! defined($start_handshake) || $start_handshake ) {
