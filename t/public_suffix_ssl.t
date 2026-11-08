@@ -72,6 +72,7 @@ if ( ! $pid ) {
 	    SSL_cert   => $cert,
 	    SSL_key    => $key,
 	);
+	CERT_free($cert);
     }
     exit(0);
 }
