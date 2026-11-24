@@ -1730,7 +1730,7 @@ sub is_SSL {
 sub stop_SSL {
     my $self = shift || return _invalid_object();
     my $stop_args = (ref($_[0]) eq 'HASH') ? $_[0] : {@_};
-    $stop_args->{SSL_no_shutdown} = 1 if ! ${*$self}{_SSL_opened};
+    $stop_args->{SSL_no_shutdown} = 1 if (${*$self}{_SSL_opened} || 0) <= 0;
     my $dobio = ${*$self}{_SSL_bio_sub};
 
     if (my $ssl = ${*$self}{'_SSL_object'}) {
