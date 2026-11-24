@@ -268,6 +268,7 @@ higher and L<Net::SSLeay> 1.59 or higher):
     my $client = IO::Socket::SSL->new($dst);
 
     # better yet: require checking of full chain
+    # (needs Net::SSLeay::get_verified_chain, see can_ocsp_full_chain)
     my $client = IO::Socket::SSL->new(
 	PeerAddr => $dst,
 	SSL_ocsp_mode => SSL_OCSP_FULL_CHAIN,
@@ -1327,9 +1328,18 @@ OCSP responder.
 
 =item SSL_OCSP_FULL_CHAIN
 
-This will set up the C<ocsp_resolver> so that all certificates from the peer
-chain will be checked, otherwise only the leaf certificate will be checked
-against revocation.
+This will set up the C<ocsp_resolver> so that all certificates from the
+verified trust chain will be checked, otherwise only the leaf certificate will
+be checked against revocation. The trust anchor itself (i.e. the last
+certificate of the verified chain) is not checked since it is trusted by
+configuration. Note that the verified chain is used and not the certificates
+as sent by the peer, since the latter might contain additional certificates
+which are not part of the trust chain.
+
+This option requires the C<get_verified_chain> function in L<Net::SSLeay>.
+If this is not available, the creation of the SSL context will fail when
+this flag is given. To check support you might call
+C<< IO::Socket::SSL->can_ocsp_full_chain() >>.
 
 =back
 
@@ -1806,6 +1816,24 @@ internally and will only be valid as long as the SSL connection exists.
 
 This function depends on a version of Net::SSLeay >= 1.58 .
 
+=item B<chain_certificates>
+
+This returns the verified trust chain of the peer as X509 handles, i.e. first
+the peers own certificate, then the intermediate certificates and finally the
+trust anchor. Contrary to B<peer_certificates> this contains only the
+certificates actually used to verify the peer, i.e. it does not contain
+additional unrelated certificates sent by the peer but it might contain
+certificates from the local trust store which were not sent by the peer.
+If verification of the peer failed or verification was disabled (e.g. with
+SSL_verify_mode of VERIFY_NONE) the result might be empty or incomplete and
+should not be relied upon.
+
+Like with B<peer_certificates> the handles are owned internally and will only
+be valid as long as the SSL connection exists.
+
+This function depends on C<get_verified_chain> in L<Net::SSLeay> and will die
+if this is not available.
+
 =item B<get_servername>
 
 This gives the name requested by the client if Server Name Indication
@@ -2072,8 +2100,9 @@ Example:
 This will create an OCSP resolver object, which can be used to create OCSP
 requests for the certificates of the SSL connection. Which certificates are
 verified depends on the setting of C<SSL_ocsp_mode>: by default only the leaf
-certificate will be checked, but with SSL_OCSP_FULL_CHAIN all chain
-certificates will be checked.
+certificate will be checked, but with SSL_OCSP_FULL_CHAIN all certificates
+of the verified trust chain except the trust anchor will be checked.
+See C<SSL_OCSP_FULL_CHAIN> for details.
 
 Because to create an OCSP request the certificate and its issuer certificate
 need to be known it is not possible to check certificates when the trust chain
@@ -2133,6 +2162,8 @@ necessary requests in a blocking way. C<%args> will be given to L<HTTP::Tiny>
 so that you can put proxy settings etc here. L<HTTP::Tiny> will be called with
 C<verify_SSL> of false, because the OCSP responses have their own signatures so
 no extra SSL verification is needed.
+The size of the response is limited to 1 MiB by default, which can be changed
+with the C<max_size> argument.
 
 If you don't want to use blocking requests you need to roll your own user agent
 with C<requests> and C<add_response>.

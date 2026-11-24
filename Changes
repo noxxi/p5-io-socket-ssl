@@ -1,3 +1,14 @@
+- new function chain_certificates to get the verified trust chain of the peer
+  Only available if Net::SSLeay provides get_verified_chain
+- SECURITY: with SSL_OCSP_FULL_CHAIN ocsp_resolver used all certificates sent
+  by the peer, including certificates not part of the verified chain. This
+  way a server could make the client send OCSP requests to arbitrary URLs.
+  Now the verified chain from Net::SSLeay::get_verified_chain is used
+  instead. If this function is not available SSL_OCSP_FULL_CHAIN is no
+  longer supported. Fixes #186.
+- new function can_ocsp_full_chain
+- limit the size of OCSP responses in resolve_blocking to 1 MiB by default.
+  Can be changed with max_size argument. See #186.
 2.099 2026/06/26
 - Close socket by default on failed SSL handshake when created with new, but
   keep open when upgrading from existing socket with start_SSL. This restores

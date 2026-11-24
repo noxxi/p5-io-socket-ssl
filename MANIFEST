@@ -57,6 +57,7 @@ t/mitm.t
 t/multiple-cert-rsa-ecc.t
 t/nonblock.t
 t/npn.t
+t/ocsp_full_chain.t
 t/plain_upgrade_downgrade.t
 t/protocol_version.t
 t/psk.t

@@ -148,6 +148,7 @@ for my $test (@tests) {
 	diag("validation with default CA with OCSP defaults ok");
 
 	# now check with full chain
+	goto done if ! IO::Socket::SSL->can_ocsp_full_chain;
 	$cl = eval { &$tcp_connect } or skip "TCP connect#4 failed: $@",1;
 	my $cache = IO::Socket::SSL::OCSP_Cache->new;
 	if (! IO::Socket::SSL->start_SSL($cl,
@@ -157,7 +158,9 @@ for my $test (@tests) {
 	)) {
 	    skip "unexpected fail of SSL connect: $SSL_ERROR",1
 	}
-	my $chain_size = $cl->peer_certificates;
+	# verified chain without trust anchor
+	my $chain_size = () = $cl->chain_certificates;
+	$chain_size--;
 	if ( my $ocsp_resolver = $have_httptiny && $cl->ocsp_resolver ) {
 	    # there should be no hard error after resolving - unless an
 	    # intermediate certificate got revoked which I don't hope

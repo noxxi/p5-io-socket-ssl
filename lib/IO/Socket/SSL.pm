@@ -66,6 +66,7 @@ my $can_ecdh;        # do we support ECDH key exchange
 my $set_groups_list; # SSL_CTX_set1_groups_list || SSL_CTX_set1_curves_list || undef
 my $can_ocsp;        # do we support OCSP
 my $can_ocsp_staple; # do we support OCSP stapling
+my $can_ocsp_full_chain; # do we support OCSP checks of the full verified chain
 my $can_tckt_keycb;  # TLS ticket key callback
 my $can_pha;         # do we support PHA
 my $session_upref;   # SSL_SESSION_up_ref is implemented
@@ -110,6 +111,8 @@ BEGIN {
 	&& ($netssleay_version < 1.75 || $netssleay_version > 1.77);
     $can_ocsp_staple = $can_ocsp
 	&& defined &Net::SSLeay::set_tlsext_status_type;
+    $can_ocsp_full_chain = $can_ocsp
+	&& defined &Net::SSLeay::get_verified_chain;
     $can_tckt_keycb  = defined &Net::SSLeay::CTX_set_tlsext_ticket_getkey_cb
 	&& $netssleay_version >= 1.80;
     $can_pha = defined &Net::SSLeay::CTX_set_post_handshake_auth;
@@ -2025,6 +2028,18 @@ if ( defined &Net::SSLeay::get_peer_cert_chain
     }
 }
 
+if ( defined &Net::SSLeay::get_verified_chain ) {
+    *chain_certificates = sub {
+	my $self = shift;
+	my $ssl = $self->_get_ssl_object || return;
+	return Net::SSLeay::get_verified_chain($ssl);
+    }
+} else {
+    *chain_certificates = sub {
+	die "chain_certificates needs Net::SSLeay::get_verified_chain";
+    }
+}
+
 {
     my %dispatcher = (
 	issuer =>  sub { Net::SSLeay::X509_NAME_oneline( Net::SSLeay::X509_get_issuer_name( shift )) },
@@ -2356,7 +2371,12 @@ if ($can_ocsp) {
 	    $ctx->{ocsp_cache} ||= IO::Socket::SSL::OCSP_Cache->new,
 	    $ctx->{ocsp_mode} & SSL_OCSP_FAIL_HARD,
 	    @_ ? \@_ :
-		$ctx->{ocsp_mode} & SSL_OCSP_FULL_CHAIN ? [ $self->peer_certificates ]:
+		# Use verified chain, not certificates sent by the peer
+		$ctx->{ocsp_mode} & SSL_OCSP_FULL_CHAIN ? [ do {
+		    my @chain = $self->chain_certificates;
+		    pop @chain;
+		    @chain;
+		} ]:
 		[ $self->peer_certificate ]
 	);
     };
@@ -2456,6 +2476,7 @@ sub can_alpn       { return $can_alpn }
 sub can_ecdh       { return $can_ecdh }
 sub can_ipv6       { return CAN_IPV6 }
 sub can_ocsp       { return $can_ocsp }
+sub can_ocsp_full_chain { return $can_ocsp_full_chain }
 sub can_ticket_keycb { return $can_tckt_keycb }
 sub can_pha        { return $can_pha }
 sub can_partial_chain { return $check_partial_chain && 1 }
@@ -2711,6 +2732,13 @@ sub new {
 
     # Avoid passing undef arguments to Net::SSLeay
     defined($arg_hash->{$_}) or delete($arg_hash->{$_}) for(keys %$arg_hash);
+
+    # checking the full chain with OCSP needs the verified chain
+    return IO::Socket::SSL->_internal_error(
+	"SSL_OCSP_FULL_CHAIN not supported in Net::SSLeay",9)
+	if $arg_hash->{SSL_ocsp_mode}
+	&& $arg_hash->{SSL_ocsp_mode} & IO::Socket::SSL::SSL_OCSP_FULL_CHAIN()
+	&& ! $can_ocsp_full_chain;
 
     # check SSL CA, cert etc arguments
     # some apps set keys '' to signal that it is not set, replace with undef
@@ -3956,7 +3984,8 @@ sub resolve_blocking {
     while ( my %todo = $self->requests ) {
 	eval { require HTTP::Tiny } or die "need HTTP::Tiny installed";
 	# OCSP responses have their own signature, so we don't need SSL verification
-	my $ua = HTTP::Tiny->new(verify_SSL => 0,%args);
+	# OCSP responses are small, so limit the size of the response by default
+	my $ua = HTTP::Tiny->new(verify_SSL => 0, max_size => 1 << 20, %args);
 	while (my ($uri,$reqdata) = each %todo) {
 	    $DEBUG && DEBUG("sending OCSP request to $uri");
 	    my $resp = $ua->request('POST',$uri, {
