@@ -42,6 +42,7 @@ for (keys %{ $certs{SSL_cert_file} }) {
     my $fp = 'sha256$'.unpack('H*',Net::SSLeay::X509_digest($cert, $sha256));
     $k2fp{$_} = $fp;
     $fp2k{$fp} = $_;
+    CERT_free($cert);
 }
 
 my $server = IO::Socket::SSL->new(

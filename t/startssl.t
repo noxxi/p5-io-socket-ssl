@@ -20,7 +20,9 @@ my $getfp = do {
 	my $file = shift;
 	return $file2fp{$file} ||= do {
 	    my $cert = PEM_file2cert($file);
-	    'sha256$'.unpack('H*',Net::SSLeay::X509_digest($cert, $sha256));
+	    my $fp = 'sha256$'.unpack('H*',Net::SSLeay::X509_digest($cert, $sha256));
+	    CERT_free($cert);
+	    return $fp;
 	};
     }
 };
